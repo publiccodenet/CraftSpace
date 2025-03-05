@@ -1,0 +1,82 @@
+name: Build and Deploy CraftSpace
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Unity WebGL and SvelteKit App
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+      
+      - name: Cache Library
+        uses: actions/cache@v3
+        with:
+          path: Unity/CraftSpace/Library
+          key: Library-${{ hashFiles('Unity/CraftSpace/Assets/**', 'Unity/CraftSpace/Packages/**', 'Unity/CraftSpace/ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './SvelteKit/BackSpace/package-lock.json'
+      
+      - name: Install SvelteKit Dependencies
+        working-directory: ./SvelteKit/BackSpace
+        run: npm ci
+      
+      - name: Unity - Build WebGL
+        uses: game-ci/unity-builder@v2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: Unity/CraftSpace
+          targetPlatform: WebGL
+          buildName: CraftSpace
+          buildPath: Build/WebGL
+      
+      - name: Copy Unity Build to SvelteKit Static
+        run: |
+          mkdir -p ./SvelteKit/BackSpace/static/unity
+          cp -r ./Unity/CraftSpace/Build/WebGL/* ./SvelteKit/BackSpace/static/unity/
+      
+      - name: Build SvelteKit App
+        working-directory: ./SvelteKit/BackSpace
+        run: npm run build
+      
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sveltekit-build
+          path: ./SvelteKit/BackSpace/build
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Production
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sveltekit-build
+          path: ./build
+      
+      # Add your deployment step here
+      # This could be deploying to Vercel, Netlify, a custom server, etc.
+      - name: Deploy to Your Platform
+        run: echo "Replace this with your actual deployment command" 

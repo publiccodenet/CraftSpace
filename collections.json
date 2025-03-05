@@ -1,0 +1,52 @@
+{
+  "collections": [
+    {
+      "prefix": "sf",
+      "query": "subject:\"Science fiction\" AND mediatype:texts",
+      "name": "Science Fiction",
+      "description": "Classic science fiction literature",
+      "includeInUnity": true,
+      "maxItems": 100,
+      "sortBy": "downloads",
+      "sortDirection": "desc",
+      "resolutions": {
+        "1x1": { "generate": true, "cacheInUnity": true },
+        "2x3": { "generate": true, "cacheInUnity": true },
+        "16x24": { "generate": true, "cacheInUnity": true },
+        "64x96": { "generate": true, "cacheInUnity": false },
+        "full": { "generate": true, "cacheInUnity": false }
+      }
+    },
+    {
+      "prefix": "poetry",
+      "query": "subject:Poetry AND mediatype:texts",
+      "name": "Poetry Collection",
+      "description": "Famous poetry works",
+      "includeInUnity": false,
+      "maxItems": 50,
+      "resolutions": {
+        "1x1": { "generate": true, "cacheInUnity": true },
+        "2x3": { "generate": true, "cacheInUnity": true },
+        "16x24": { "generate": true, "cacheInUnity": false },
+        "64x96": { "generate": true, "cacheInUnity": false },
+        "full": { "generate": false, "cacheInUnity": false }
+      }
+    },
+    {
+      "prefix": "dyn_a7f3b2",
+      "query": "creator:\"Asimov, Isaac\" AND mediatype:texts",
+      "name": "Dynamic Query - Asimov",
+      "description": "Dynamically generated collection for Isaac Asimov",
+      "includeInUnity": false,
+      "maxItems": 30,
+      "dynamic": true,
+      "resolutions": {
+        "1x1": { "generate": true, "cacheInUnity": true },
+        "2x3": { "generate": true, "cacheInUnity": true },
+        "16x24": { "generate": true, "cacheInUnity": false },
+        "64x96": { "generate": false, "cacheInUnity": false },
+        "full": { "generate": false, "cacheInUnity": false }
+      }
+    }
+  ]
+} 
