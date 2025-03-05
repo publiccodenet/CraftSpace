@@ -32,6 +32,167 @@ The project consists of:
 │   └── Notes/                        # Documentation and notes
 ```
 
+## Rapid Development & Pipeline Architecture
+
+### Development Philosophy
+
+The CraftSpace project is built on a philosophy of rapid iteration through specialized pipelines. Rather than treating the entire application as a monolith that must be rebuilt for every change, we've decomposed the system into independently deployable components that can be developed and iterated at different speeds.
+
+### Pipeline Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      DEVELOPMENT PIPELINES                          │
+├─────────────┬─────────────┬─────────────┬─────────────┬─────────────┤
+│ SvelteKit   │ Unity       │ Collection  │ Unity JS    │ Full        │
+│ Changes     │ WebGL       │ Content     │ Scripts     │ Release     │
+│             │ Application │ Updates     │ Hot-Patch   │ Build       │
+├─────────────┼─────────────┼─────────────┼─────────────┼─────────────┤
+│ Minutes     │ Hours       │ Minutes     │ Seconds     │ Hours       │
+│ to deploy   │ to deploy   │ to deploy   │ to deploy   │ to deploy   │
+└─────────────┴─────────────┴─────────────┴─────────────┴─────────────┘
+```
+
+### Development Goals
+
+1. **Minimize Wait Times**: Developers should never wait more than a few seconds to see changes during active development
+2. **Component Independence**: Changes to one component shouldn't require rebuilding others
+3. **Flexible Deployment**: Support partial updates for quick iteration and full builds for releases
+4. **Environment Consistency**: Development, staging, and production should use identical processes
+5. **Build Acceleration**: Use specialized hardware where needed (e.g., self-hosted runners for Unity)
+6. **Hot-Patching**: Update running applications without redeployment whenever possible
+
+### Component Iteration Strategies
+
+#### 1. SvelteKit Application (Minutes)
+
+**Workflow File**: `.github/workflows/build-deploy-sveltekit.yml.disabled`
+
+For changes to the web application interface, API endpoints, or server logic:
+
+- **Development**: Use `npm run dev` for instant hot-reloading during development
+- **Staging/Production**: Push changes and deploy SvelteKit without rebuilding Unity
+- **Integration Points**: 
+  - Serves Unity WebGL files
+  - Provides API endpoints for Unity
+  - Manages dynamic content loading
+
+#### 2. Unity WebGL Application (Hours)
+
+**Workflow File**: `.github/workflows/build-unity-webgl.yml.disabled`
+
+For changes to C# code, Unity assets, prefabs, scenes, or shaders:
+
+- **Development**: Work in Unity Editor for rapid visualization and testing
+- **Build Acceleration**: Self-hosted runners with pre-configured Unity installations
+  - MacBook Pro (M1/M2) or high-performance Windows laptops
+  - Pre-cached Unity Editor with all dependencies
+  - Optimized build settings for development iterations
+- **Release Builds**: Use full WebGL compression and optimization for production
+- **CI/CD Integration**: Automated builds triggered by changes to Unity code paths
+
+#### 3. Collection Content (Minutes)
+
+**Workflow File**: `.github/workflows/update-content.yml.disabled`
+
+For changes to collection data, metadata, or texture atlases:
+
+- **Development**: Update collection data with local processing
+- **Hot Deployment**: Push updated content to all environments without app rebuilds
+- **Multi-Target**: Update content in:
+  - SvelteKit static directory
+  - Unity Resources folder
+  - CDN edge locations
+- **Cache Management**: Purge CDN caches and update version markers for client refreshes
+
+#### 4. Unity JavaScript Extensions (Seconds)
+
+**Workflow File**: `.github/workflows/build-unity-scripts.yml.disabled`
+
+For changes to Unity behavior without modifying C# code:
+
+- **Development**: Edit JavaScript and JSON files that control Unity at runtime
+- **Instant Refresh**: Changes take effect on browser refresh without rebuilding
+- **Deployment Types**:
+  - Local development (file system)
+  - Staging server (test environment)
+  - Production CDN (optimized, minified)
+- **Dynamic Loading**: Unity loads these scripts at runtime through JavaScript interop
+
+#### 5. Full Release Build (Hours)
+
+**Workflow File**: `.github/workflows/build-deploy.yml.disabled`
+
+For comprehensive releases with changes across all components:
+
+- **Complete Process**: Rebuilds everything from scratch in the correct order
+- **Asset Optimization**: Full compression and optimization for production
+- **Consistency Checks**: Ensures all components are compatible and synchronized
+- **Version Tagging**: Creates release tags and versioning across all assets
+- **Documentation**: Generates release notes and deployment records
+
+### Unity Build Acceleration Strategy
+
+```
+┌──────────────────────┐       ┌────────────────────────┐
+│ GitHub Actions       │       │ Self-Hosted Runner     │
+│ Workflow Dispatcher  ├──────►│ (MacBook Pro/Windows)  │
+└──────────────────────┘       └───────────┬────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Pre-Configured Environment                                       │
+│                                                                  │
+│ ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐   │
+│ │ Unity Editor    │  │ Cache Library   │  │ Build Pipeline  │   │
+│ │ Pre-Installed   │  │ Pre-Warmed      │  │ Optimized       │   │
+│ └─────────────────┘  └─────────────────┘  └─────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+                                           │
+                                           ▼
+                              ┌──────────────────────────┐
+                              │ Optimized WebGL Build    │
+                              └──────────────────────────┘
+```
+
+- **Self-Hosted Runners**: MacBook Pro or Windows laptops dedicated to Unity builds
+- **Pre-Installation**: Unity Editor, packages, and dependencies pre-installed
+- **Library Caching**: Pre-warmed Unity Library folder to skip import phase
+- **Parallel Processing**: Multiple runners can handle different build tasks
+- **Hardware Acceleration**: Dedicated GPUs improve shader compilation speed
+- **Build Variants**: Development builds (faster, less compressed) vs Production builds
+
+### Deployment Matrix
+
+| Component | Change Type | Workflow | Typical Deployment Time | Hot-Patchable |
+|-----------|-------------|----------|-------------------------|---------------|
+| SvelteKit | Web UI/API | build-deploy-sveltekit | 3-5 minutes | Yes (dev mode) |
+| Unity WebGL | C#/Assets | build-unity-webgl | 30-60 minutes | No |
+| Collections | Content | update-content | 2-10 minutes | Yes |
+| Unity JS | Runtime Behavior | build-unity-scripts | 30-60 seconds | Yes |
+| Full Release | Everything | build-deploy | 60-90 minutes | No |
+
+### Practical Development Workflow
+
+1. **Initial Setup**: Full build of all components to establish baseline
+   - `gh workflow run build-deploy.yml`
+
+2. **Daily Development**: Focused iteration on specific components
+   - Working on SvelteKit: Use local dev server with hot reloading
+   - Working on Unity: Use Unity Editor, push only when ready for build
+   - Working on content: Use content pipeline for rapid updates
+   - Working on behavior: Use JavaScript hot-patching
+
+3. **Integration Testing**: Periodic integration of all components
+   - Deploy to staging environment
+   - Verify cross-component interactions
+   - Test on multiple browsers and devices
+
+4. **Production Release**: Complete rebuild with full optimization
+   - Trigger full build and deploy workflow
+   - Run comprehensive test suite
+   - Deploy to production with staged rollout
+
 ## Automated Workflows
 
 This project uses GitHub Actions to automate building and deployment:
@@ -395,14 +556,6 @@ The workflows are designed to work together in a complementary way:
     └────────────┬─────────────┘   └─────────────┬────────────┘
                  │                               │
 ┌────────────────┼───────────────────────────────┼────────────────┐
-│                │                               │                │
-│ ┌──────────────▼───────────────┐ ┌─────────────▼──────────────┐ │
-│ │ SvelteKit App               │ │ Unity WebGL                │ │
-│ └──────────────┬───────────────┘ └─────────────┬──────────────┘ │
-│                │                               │                │
-│ ┌──────────────▼───────────────┐ ┌─────────────▼──────────────┐ │
-│ │ Docker Build                │ │ Collection Processing      │ │
-│ └──────────────────────────────┘ └────────────────────────────┘ │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -414,14 +567,79 @@ This multi-tiered approach allows for:
 3. **Scheduled updates** of collection data
 4. **Flexible deployment options** (container, direct, CDN)
 
-## Incremental Updates
+## Content Development Workflow
 
-The workflows support different levels of incremental updates to optimize CI/CD time:
+**File**: `.github/workflows/update-content.yml.disabled`
 
-1. **Full Build**: Builds everything from scratch (slowest but most comprehensive)
-2. **Unity-Only**: Updates just the Unity WebGL build
-3. **SvelteKit-Only**: Updates just the web application
-4. **Collections-Only**: Updates just the collection data
-5. **Docker-Only**: Rebuilds just the container image
+This specialized workflow is designed for rapid content iteration without rebuilding application code. It enables developers to update collection data, metadata, and even client-side functionality with minimal deployment overhead.
 
-This allows for efficient development cycles based on what component has changed. 
+### Purpose
+
+The content development pipeline allows:
+
+1. Hot-patching content into production environments
+2. Updating collection data without rebuilding SvelteKit or Unity
+3. Modifying client-side behavior through JavaScript injection
+4. Minimizing developer wait times during content iteration
+
+### Process Overview
+
+```
+┌─────────────────┐        ┌─────────────────┐        ┌─────────────────┐
+│                 │        │                 │        │  Multi-Target   │
+│  Content        │───────►│  Processing     │───────►│  Deployment     │
+│  Development    │        │  Pipeline       │        │  Injection      │
+│                 │        │                 │        │                 │
+└─────────────────┘        └─────────────────┘        └─────────────────┘
+                                                              │
+                                                              │
+                                                              ▼
+                           ┌─────────────────────────────────────────────────────┐
+                           │                                                     │
+                           ▼                                                     ▼
+              ┌─────────────────────────┐                        ┌─────────────────────────┐
+              │                         │                        │                         │
+              │  Static Content Cache   │                        │  Dynamic Code Cache     │
+              │  (Collections Data)     │                        │  (JavaScript/JSON)      │
+              │                         │                        │                         │
+              └─────────────────┬───────┘                        └───────────┬─────────────┘
+                                │                                            │
+                                ▼                                            ▼
+           ┌────────────────────────────────────┐          ┌────────────────────────────────────┐
+           │                                    │          │                                    │
+           ▼                      ▼             ▼          ▼                      ▼             ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────┐  ┌──────────────────┐  ┌──────────────────┐  ┌──────┐
+│                  │  │                  │  │      │  │                  │  │                  │  │      │
+│ SvelteKit        │  │ Unity Client     │  │ CDN  │  │ SvelteKit        │  │ Unity Client     │  │ CDN  │
+│ Static Directory │  │ Resources Dir    │  │      │  │ Public JS        │  │ Dynamic Scripts  │  │      │
+│                  │  │                  │  │      │  │                  │  │                  │  │      │
+└──────────────────┘  └──────────────────┘  └──────┘  └──────────────────┘  └──────────────────┘  └──────┘
+```
+
+### JavaScript Hot-Patching Details
+
+The Unity WebGL build is configured to load external JavaScript modules that implement functionality outside the Unity C# codebase:
+
+1. **Core Communication Layer**: Establishes messaging between Unity and JavaScript
+2. **Extension Modules**: Implement specific features that can be hot-patched
+3. **Configuration Data**: JSON files defining behavior that can be updated
+
+This approach allows significant portions of application logic to be modified without Unity rebuilds.
+
+Example directory structure:
+```
+SvelteKit/BackSpace/static/js/unity-extensions/
+├── core/
+│   ├── bridge.js          # Core Unity-JS communication
+│   ├── loader.js          # Dynamically loads extension modules
+│   └── messaging.js       # Message formatting and routing
+├── features/
+│   ├── collections.js     # Collection management (hot-patchable)
+│   ├── search.js          # Search functionality (hot-patchable)
+│   ├── visualization.js   # Visualization options (hot-patchable)
+│   └── ui.js              # UI customizations (hot-patchable)
+└── config/
+    ├── display.json       # Visual configuration (hot-patchable)
+    ├── collections.json   # Collection settings (hot-patchable)
+    └── features.json      # Feature flags (hot-patchable)
+``` 
