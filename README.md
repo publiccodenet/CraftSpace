@@ -390,26 +390,3 @@ https://github.com/mxwllstn/internetarchive-sdk-js
   - **Cons**: Basic functionality, requires separate WebSocket server implementation
 
 **Recommendation**: Start with Socket.IO for development due to its flexibility and ease of implementation. 
-
-## Features
-
-### Intelligent Low-Resolution Book Cover Visualization
-
-CraftSpace uses an innovative approach to display large collections of books at various distances:
-
-- **Adaptive Resolution Thumbnails**: Books appear with appropriate detail based on viewing distance
-- **Error Diffusion Color Representation**: Even at just 2x3 pixels (6 total), book covers remain recognizable
-- **Spatial Color Distribution**: The system extracts the 6 most distinct colors from each cover and places them to minimize color error:
-  ```
-  +-------+-------+
-  |   1   |   2   |  Colors are placed to maintain
-  +-------+-------+  spatial relationship with the
-  |   3   |   4   |  original cover's color layout
-  +-------+-------+
-  |   5   |   6   |
-  +-------+-------+
-  ```
-- **Maximum Visual Distinction**: This approach preserves gross color patterns and overall visual impression even at extreme distances
-- **Seamless Detail Transitions**: As you approach books, they gradually reveal more detail through multiple LOD levels
-
-The visualization pipeline processes book covers to extract distinct representative colors, optimize their placement using error diffusion principles, and create multiresolution texture atlases for efficient rendering of thousands of books simultaneously. 

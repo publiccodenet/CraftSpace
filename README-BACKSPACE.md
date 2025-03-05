@@ -93,6 +93,25 @@ For the 2x3 representation (just 6 pixels total), the algorithm:
 
 This approach creates a "color fingerprint" that remains surprisingly recognizable even at this extremely low resolution.
 
+**Error Diffusion Color Representation**:
+Even at just 2x3 pixels (6 total), the system ensures book covers remain recognizable through:
+- Spatial color distribution that preserves the original cover's layout
+- Optimized color selection that maximizes visual distinction
+- Error diffusion principles to maintain overall visual impression
+
+The color placement follows this pattern to maintain spatial relationships:
+```
++-------+-------+
+|   1   |   2   |  Colors are placed to maintain
++-------+-------+  spatial relationship with the
+|   3   |   4   |  original cover's color layout
++-------+-------+
+|   5   |   6   |
++-------+-------+
+```
+
+This technique delivers maximum visual distinction even at extreme distances, allowing users to recognize covers from afar before getting close enough to see details. As users approach books, the system seamlessly transitions through multiple LOD levels, gradually revealing more detail.
+
 #### Metadata-Embedded Icon Representations
 
 Low-resolution icons are embedded directly in metadata using compact encodings:
