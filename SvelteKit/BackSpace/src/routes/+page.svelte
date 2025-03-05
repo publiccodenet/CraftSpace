@@ -1,4 +1,5 @@
 <script>
+  import CraftSpace from '$lib/components/CraftSpace.svelte';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
@@ -7,11 +8,13 @@
   let loadingProgress = 0;
   let loadingStatus = 'Initializing...';
   let isLoaded = false;
+  let initialized = false;
 
   onMount(() => {
     if (browser) {
       loadUnityGame();
     }
+    initialized = true;
   });
 
   async function loadUnityGame() {
@@ -53,9 +56,14 @@
 </script>
 
 <svelte:head>
-  <title>CraftSpace Viewer</title>
+  <title>CraftSpace - Internet Archive 3D Explorer</title>
+  <meta name="description" content="3D virtual browsing of Internet Archive collections">
   <script src="/unity/CraftSpace.loader.js"></script>
 </svelte:head>
+
+<div class="craftspace-container">
+  <CraftSpace />
+</div>
 
 <main>
   {#if !isLoaded}
@@ -73,6 +81,13 @@
 </main>
 
 <style>
+  .craftspace-container {
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+  
   :global(body) {
     margin: 0;
     padding: 0;
