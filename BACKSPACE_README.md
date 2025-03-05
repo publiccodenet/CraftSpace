@@ -1,76 +1,35 @@
-# BackSpace - SvelteKit Application for CraftSpace
+# BackSpace SvelteKit Application
 
-This directory contains the SvelteKit web application component of the CraftSpace project.
+The BackSpace application is the web platform component of CraftSpace, built with SvelteKit. It serves as both the host for the Unity WebGL client and the data processing pipeline for Internet Archive collections.
 
 ## Overview
 
-BackSpace serves as:
+BackSpace handles several key responsibilities:
 
-1. The web host for the Unity WebGL client
-2. The data processing pipeline for Internet Archive collections
-3. The API server for dynamic queries and collection access
-
-## Quick Start
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-```
-
-## Documentation
-
-For complete documentation, see [BACKSPACE_README.md](../../BACKSPACE_README.md) in the repository root.
+1. **Content Pipeline**: Processes Internet Archive collections, generates metadata, and creates texture atlases
+2. **Web Interface**: Hosts the Unity WebGL build and provides UI elements
+3. **API Server**: Provides endpoints for dynamic queries and data retrieval
+4. **Deployment**: Manages static and dynamic content delivery
 
 ## Project Structure
 
-- `scripts/`: Collection processing scripts and data pipeline
-- `src/`: SvelteKit application source code
-- `static/`: Static assets including collection data and Unity build
-
-# sv
-
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
-
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
 ```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+SvelteKit/BackSpace/
+├── scripts/                 # Collection processing scripts
+│   ├── download-items.js    # Fetch items from Internet Archive 
+│   ├── generate-atlases.js  # Create texture atlases
+│   ├── pipeline-*.js        # Data pipeline workflows
+│   └── ...
+├── src/                     # SvelteKit application source
+│   ├── routes/              # Application routes
+│   ├── lib/                 # Shared components and utilities
+│   └── ...
+├── static/                  # Static assets
+│   ├── data/                # Collection data
+│   ├── unity/               # Unity WebGL build
+│   └── ...
+└── build/                   # Production build output
 ```
-
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
 
 ## Data Pipeline and Deployment Strategy
 
@@ -207,92 +166,6 @@ The static data can be deployed in multiple ways:
  └─────────────────┘      └─────────────────┘
 ```
 
-### Implementation Steps
-
-1. **Initial Setup** (Complete):
-   - Download script places data in both Unity and SvelteKit directories
-   - Basic caching strategy implemented in CollectionLoader.cs
-
-2. **Enhanced Downloading** (Next):
-   - Add flags to control Unity bundling: `--include-in-unity=true/false`
-   - Implement color processing algorithms for 1x1 and 2x3 icons
-
-3. **Local Testing**:
-   - Test Unity WebGL build with embedded collections
-   - Test progressive loading from SvelteKit static directory
-
-4. **Production Deployment**:
-   - Configure CDN/storage bucket for static data
-   - Set up routing rules on load balancer
-   - Deploy Unity build and SvelteKit application
-
-5. **Performance Optimization**:
-   - Add HTTP caching headers for static data
-   - Implement compression for metadata files
-   - Monitor and optimize data transfer between client and server
-
-### Usage
-
-To download a collection with the current implementation:
-
-```bash
-# Build the scripts first
-npm run build:scripts
-
-# Run the download process using the collections.json configuration
-npm run download-collections
-```
-
-## Collection Management System
-
-BackSpace uses a configuration-driven approach to manage Internet Archive collections.
-
-### Master Collection Configuration
-
-Collections are defined in `collections.json` in the project root:
-
-```json
-{
-  "collections": [
-    {
-      "prefix": "sf",
-      "query": "subject:\"Science fiction\" AND mediatype:texts",
-      "name": "Science Fiction",
-      "description": "Classic science fiction literature",
-      "includeInUnity": true,
-      "maxItems": 100,
-      "sortBy": "downloads",
-      "sortDirection": "desc",
-      "resolutions": {
-        "1x1": { "generate": true, "cacheLevel": "metadata" },
-        "2x3": { "generate": true, "cacheLevel": "metadata" },
-        "16x24": { "generate": true, "cacheLevel": "server" },
-        "64x96": { "generate": true, "cacheLevel": "server" },
-        "tile": { "generate": true, "cacheLevel": "server" },
-        "full": { "generate": false, "cacheLevel": "server" }
-      }
-    },
-    {
-      "prefix": "poetry",
-      "query": "subject:Poetry AND mediatype:texts",
-      "name": "Poetry Collection",
-      "description": "Famous poetry works",
-      "includeInUnity": false,
-      "maxItems": 50
-    },
-    {
-      "prefix": "dyn_a7f3b2",
-      "query": "creator:\"Asimov, Isaac\" AND mediatype:texts",
-      "name": "Dynamic Query - Asimov",
-      "description": "Dynamically generated collection for Isaac Asimov",
-      "includeInUnity": false,
-      "maxItems": 30,
-      "dynamic": true
-    }
-  ]
-}
-```
-
 ### Resolution Levels and Caching Strategy
 
 Each collection can specify which resolution levels to generate and cache:
@@ -355,42 +228,6 @@ The system handles resolutions as follows:
    - As the user approaches books, higher resolution assets are loaded
    - Requests are made to the SvelteKit server or CDN for non-cached resolutions
 
-5. **Fallback Mechanism**:
-   - If a higher resolution asset fails to load, the system falls back to the next lower resolution
-   - This ensures books are always visualized, even with connectivity issues
-
-### Deployment Process
-
-During the build process:
-
-1. The `npm run build` command:
-   - Builds the SvelteKit application
-   - Processes all collections to ensure they're up to date
-   - Prepares the static data directory for deployment
-
-2. The `npm run build:unity` command:
-   - Copies only the collections marked with `includeInUnity: true` to Unity
-   - Updates Unity's `index.json` to include only these collections
-   - Performs the Unity WebGL build
-
-### Cache Control
-
-The system supports cache invalidation through query parameters:
-
-- `?clearcache=true` - Instructs Unity to clear its persistent browser storage
-- `?reload=collections` - Forces a refresh of the collection index from the server
-- `?version={hash}` - Used for cache-busting when new collections are deployed
-
-These parameters are recognized by the SvelteKit app and passed to Unity.
-
-1. **Initial View**: Uses embedded 1x1 and 2x3 data from metadata
-2. **Approaching**: Loads 16x24 atlas for the visible section as user gets closer
-3. **Examination**: Loads 64x96 atlas when user is examining books closely
-4. **Interaction**: Loads full cover when user selects or interacts with a book
-5. **Extended Interaction**: For dynamic or special collections, may load additional metadata
-
-This ensures books are always visualized, even with connectivity issues
-
 ### Dynamic Content Workflow
 
 When a user creates a dynamic query through search or filters:
@@ -416,16 +253,62 @@ When a user creates a dynamic query through search or filters:
    - Scheduled cleanup jobs remove unused dynamic content
    - Administrators can manually promote/demote collections
 
-### Deployment Process
+## Development Setup
 
-During the build process:
+1. **Install Dependencies**:
+   ```bash
+   cd SvelteKit/BackSpace
+   npm install
+   ```
 
-1. The `npm run build` command:
-   - Builds the SvelteKit application
-   - Processes all collections to ensure they're up to date
-   - Prepares the static data directory for deployment
+2. **Configure Collections**:
+   Edit the `collections.json` file at the project root
 
-2. The `npm run build:unity` command:
-   - Copies only the collections marked with `includeInUnity: true` to Unity
-   - Updates Unity's `index.json` to include only these collections
-   - Performs the Unity WebGL build
+3. **Run Development Server**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Process Collections**:
+   ```bash
+   # Build TypeScript scripts
+   npm run build:scripts
+   
+   # Run full pipeline
+   npm run pipeline-full
+   
+   # Or run incremental updates
+   npm run pipeline-incremental
+   ```
+
+## Building for Production
+
+```bash
+# Build scripts
+npm run build:scripts
+
+# Process collections
+npm run pipeline-full
+
+# Build SvelteKit app
+npm run build
+```
+
+The build output will be in `SvelteKit/BackSpace/build/`.
+
+## Adding New Collections
+
+To add a new collection:
+
+1. Edit the `collections.json` file
+2. Add a new entry with query parameters
+3. Run the pipeline to process the collection
+4. Update the Unity project if including in client
+
+## API Reference
+
+The BackSpace application provides several API endpoints:
+
+- `/api/collections` - List all available collections
+- `/api/collections/:prefix` - Get details for a specific collection
+- `/api/search` - Perform dynamic queries against Internet Archive 

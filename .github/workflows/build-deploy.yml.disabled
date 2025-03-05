@@ -37,17 +37,16 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: './SvelteKit/BackSpace/package-lock.json'
+          cache-dependency-path: 'SvelteKit/BackSpace/package-lock.json'
       
       - name: Install SvelteKit Dependencies
-        working-directory: ./SvelteKit/BackSpace
+        working-directory: SvelteKit/BackSpace
         run: npm ci
       
       - name: Process Collections
-        working-directory: ./SvelteKit/BackSpace
         run: |
-          npm run build:scripts
-          npm run pipeline-full
+          chmod +x .github/scripts/process-collections.sh
+          .github/scripts/process-collections.sh full
       
       - name: Unity - Build WebGL
         uses: game-ci/unity-builder@v2
@@ -61,18 +60,18 @@ jobs:
       
       - name: Copy Unity Build to SvelteKit Static
         run: |
-          mkdir -p ./SvelteKit/BackSpace/static/unity
-          cp -r ./build/WebGL/CraftSpace/* ./SvelteKit/BackSpace/static/unity/
+          mkdir -p SvelteKit/BackSpace/static/unity
+          cp -r build/WebGL/CraftSpace/* SvelteKit/BackSpace/static/unity/
       
       - name: Build SvelteKit App
-        working-directory: ./SvelteKit/BackSpace
+        working-directory: SvelteKit/BackSpace
         run: npm run build
       
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
         with:
           name: sveltekit-build
-          path: ./SvelteKit/BackSpace/build
+          path: SvelteKit/BackSpace/build
           retention-days: 7
 
   deploy:

@@ -1,0 +1,50 @@
+name: Update Collections
+
+on:
+  schedule:
+    # Run weekly on Monday at 1 AM
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+    inputs:
+      enable:
+        description: 'Set to true to run this workflow'
+        required: true
+        default: 'false'
+
+jobs:
+  update:
+    name: Update Collection Data
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.enable == 'true' }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'SvelteKit/BackSpace/package-lock.json'
+      
+      - name: Install SvelteKit Dependencies
+        working-directory: SvelteKit/BackSpace
+        run: npm ci
+      
+      - name: Process Collections Incrementally
+        run: |
+          chmod +x .github/scripts/process-collections.sh
+          .github/scripts/process-collections.sh incremental
+      
+      - name: Deploy Collections to CDN
+        env:
+          DO_SPACES_KEY: ${{ secrets.DO_SPACES_KEY }}
+          DO_SPACES_SECRET: ${{ secrets.DO_SPACES_SECRET }}
+          DO_SPACES_ENDPOINT: ${{ secrets.DO_SPACES_ENDPOINT }}
+          DO_SPACES_BUCKET: ${{ secrets.DO_SPACES_BUCKET }}
+        run: |
+          chmod +x .github/scripts/deploy-collections.sh
+          .github/scripts/deploy-collections.sh 

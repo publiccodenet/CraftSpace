@@ -250,4 +250,89 @@ npm run download-items output_directory
 
 ## Contributors
 
-[List contributors here] 
+[List contributors here]
+
+# GitHub Actions Configuration for CraftSpace
+
+This document explains the GitHub Actions workflows set up for the CraftSpace monorepo.
+
+## Monorepo Structure
+
+The CraftSpace repository is organized as a monorepo containing:
+
+- **Unity/CraftSpace**: Unity WebGL application
+- **SvelteKit/BackSpace**: SvelteKit web application
+- **Collections**: Internet Archive collection data
+
+## Workflow Overview
+
+### 1. Main Build and Deploy Workflow
+
+**File**: `.github/workflows/build-deploy.yml`
+
+This workflow handles the complete build and deployment process:
+
+1. Builds the Unity WebGL application
+2. Processes collections data
+3. Builds the SvelteKit application
+4. Deploys everything to Digital Ocean
+
+**Trigger**: Manual workflow dispatch (with enable parameter)
+
+### 2. Collection Update Workflow
+
+**File**: `.github/workflows/update-collections.yml`
+
+This workflow updates the collection data without rebuilding the entire application:
+
+1. Incrementally processes collection data
+2. Deploys updated collections to CDN
+
+**Trigger**: 
+- Weekly schedule (Monday at 1 AM)
+- Manual workflow dispatch
+
+## Shared Scripts
+
+Scripts in `.github/scripts/` are shared across workflows:
+
+- `process-collections.sh`: Handles collection processing (full or incremental)
+- `deploy-collections.sh`: Deploys collections to CDN
+
+## Required Secrets
+
+The following secrets need to be set in the GitHub repository:
+
+### Unity Build
+- `UNITY_LICENSE`: Unity license for building WebGL
+
+### Digital Ocean Deployment
+- `DIGITALOCEAN_ACCESS_TOKEN`: API token
+- `DIGITALOCEAN_APP_ID`: App Platform application ID
+- `DIGITALOCEAN_HOST`: Host for SSH connection
+- `SSH_PRIVATE_KEY`: SSH private key
+
+### CDN/Storage
+- `DO_SPACES_KEY`: Digital Ocean Spaces access key
+- `DO_SPACES_SECRET`: Digital Ocean Spaces secret
+- `DO_SPACES_ENDPOINT`: Digital Ocean Spaces endpoint
+- `DO_SPACES_BUCKET`: Digital Ocean Spaces bucket name
+
+## Running Workflows
+
+### Manual Trigger
+
+1. Go to "Actions" tab in the GitHub repository
+2. Select the workflow you want to run
+3. Click "Run workflow"
+4. Set "enable" to "true"
+5. Click "Run workflow" button
+
+### Adding New Components
+
+When adding new components to the monorepo:
+
+1. Create a new directory at the root level
+2. Add a specific workflow file in `.github/workflows/`
+3. Share scripts when possible using `.github/scripts/`
+4. Update this documentation 
