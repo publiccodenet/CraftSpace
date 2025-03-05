@@ -256,6 +256,9 @@ npm run download-items output_directory
 
 This document explains the GitHub Actions workflows set up for the CraftSpace monorepo.
 
+> **Note:** All workflow files currently have a `.disabled` suffix to prevent them from running automatically. 
+> This is a temporary measure during development. To activate a workflow, rename it to remove the `.disabled` suffix.
+
 ## Monorepo Structure
 
 The CraftSpace repository is organized as a monorepo containing:
@@ -268,9 +271,9 @@ The CraftSpace repository is organized as a monorepo containing:
 
 ### 1. Main Build and Deploy Workflow
 
-**File**: `.github/workflows/build-deploy.yml`
+**File**: `.github/workflows/build-deploy.yml.disabled`
 
-This workflow handles the complete build and deployment process:
+This comprehensive workflow handles the complete build and deployment process:
 
 1. Builds the Unity WebGL application
 2. Processes collections data
@@ -281,7 +284,7 @@ This workflow handles the complete build and deployment process:
 
 ### 2. Collection Update Workflow
 
-**File**: `.github/workflows/update-collections.yml`
+**File**: `.github/workflows/update-collections.yml.disabled`
 
 This workflow updates the collection data without rebuilding the entire application:
 
@@ -290,6 +293,46 @@ This workflow updates the collection data without rebuilding the entire applicat
 
 **Trigger**: 
 - Weekly schedule (Monday at 1 AM)
+- Manual workflow dispatch
+
+### 3. SvelteKit-Only Workflow
+
+**File**: `.github/workflows/build-deploy-sveltekit.yml.disabled`
+
+For faster iterations on the web application without rebuilding Unity:
+
+1. Builds only the SvelteKit application
+2. Deploys to Digital Ocean App Platform
+
+**Trigger**: 
+- Push to main branch affecting SvelteKit files
+- Manual workflow dispatch
+
+### 4. Unity-Only Workflow
+
+**File**: `.github/workflows/build-unity-webgl.yml.disabled`
+
+For Unity-focused development:
+
+1. Builds only the Unity WebGL application
+2. Updates the SvelteKit static directory with the new build
+3. Commits the changes back to the repository
+
+**Trigger**:
+- Push to main branch affecting Unity files
+- Manual workflow dispatch
+
+### 5. Docker Build and Push
+
+**File**: `.github/workflows/build-push-docker.yml.disabled`
+
+For containerized deployment:
+
+1. Builds a Docker image for the SvelteKit application
+2. Pushes to DockerHub registry
+
+**Trigger**:
+- Changes to Dockerfile or package.json
 - Manual workflow dispatch
 
 ## Shared Scripts
@@ -312,6 +355,10 @@ The following secrets need to be set in the GitHub repository:
 - `DIGITALOCEAN_HOST`: Host for SSH connection
 - `SSH_PRIVATE_KEY`: SSH private key
 
+### Docker Registry
+- `DOCKERHUB_USERNAME`: Docker Hub username
+- `DOCKERHUB_TOKEN`: Docker Hub access token
+
 ### CDN/Storage
 - `DO_SPACES_KEY`: Digital Ocean Spaces access key
 - `DO_SPACES_SECRET`: Digital Ocean Spaces secret
@@ -322,11 +369,12 @@ The following secrets need to be set in the GitHub repository:
 
 ### Manual Trigger
 
-1. Go to "Actions" tab in the GitHub repository
-2. Select the workflow you want to run
-3. Click "Run workflow"
-4. Set "enable" to "true"
-5. Click "Run workflow" button
+1. First, rename the workflow by removing the `.disabled` suffix
+2. Go to "Actions" tab in the GitHub repository
+3. Select the workflow you want to run
+4. Click "Run workflow"
+5. Set "enable" to "true"
+6. Click "Run workflow" button
 
 ### Adding New Components
 
@@ -335,4 +383,53 @@ When adding new components to the monorepo:
 1. Create a new directory at the root level
 2. Add a specific workflow file in `.github/workflows/`
 3. Share scripts when possible using `.github/scripts/`
-4. Update this documentation 
+4. Update this documentation
+
+## Workflow Integration
+
+The workflows are designed to work together in a complementary way:
+
+```
+                       ┌───────────────────┐
+                       │ Manual Workflow   │
+                       │    Dispatch       │
+                       └─────────┬─────────┘
+                                 │
+                 ┌───────────────┴───────────────┐
+                 │                               │
+    ┌────────────▼─────────────┐   ┌─────────────▼────────────┐
+    │ Component-Specific       │   │ Comprehensive            │
+    │ Workflows                │   │ Build and Deploy         │
+    └────────────┬─────────────┘   └─────────────┬────────────┘
+                 │                               │
+┌────────────────┼───────────────────────────────┼────────────────┐
+│                │                               │                │
+│ ┌──────────────▼───────────────┐ ┌─────────────▼──────────────┐ │
+│ │ SvelteKit App               │ │ Unity WebGL                │ │
+│ └──────────────┬───────────────┘ └─────────────┬──────────────┘ │
+│                │                               │                │
+│ ┌──────────────▼───────────────┐ ┌─────────────▼──────────────┐ │
+│ │ Docker Build                │ │ Collection Processing      │ │
+│ └──────────────────────────────┘ └────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+This multi-tiered approach allows for:
+
+1. **Fast iterative development** on specific components
+2. **Automated deployment** of the full application
+3. **Scheduled updates** of collection data
+4. **Flexible deployment options** (container, direct, CDN)
+
+## Incremental Updates
+
+The workflows support different levels of incremental updates to optimize CI/CD time:
+
+1. **Full Build**: Builds everything from scratch (slowest but most comprehensive)
+2. **Unity-Only**: Updates just the Unity WebGL build
+3. **SvelteKit-Only**: Updates just the web application
+4. **Collections-Only**: Updates just the collection data
+5. **Docker-Only**: Rebuilds just the container image
+
+This allows for efficient development cycles based on what component has changed. 

@@ -1,0 +1,74 @@
+name: Build Unity WebGL Only
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Unity/CraftSpace/**'
+      - '!Unity/CraftSpace/README.md'
+  workflow_dispatch:
+    inputs:
+      enable:
+        description: 'Set to true to run this workflow'
+        required: true
+        default: 'false'
+
+jobs:
+  build:
+    name: Build Unity WebGL
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.enable == 'true' }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+      
+      - name: Cache Library
+        uses: actions/cache@v3
+        with:
+          path: Unity/CraftSpace/Library
+          key: Library-${{ hashFiles('Unity/CraftSpace/Assets/**', 'Unity/CraftSpace/Packages/**', 'Unity/CraftSpace/ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+      
+      - name: Unity - Build WebGL
+        uses: game-ci/unity-builder@v2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: Unity/CraftSpace
+          targetPlatform: WebGL
+          buildName: CraftSpace
+          buildsPath: build
+      
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: unity-webgl-build
+          path: build/WebGL
+          retention-days: 7
+      
+      - name: Update Unity Build in SvelteKit Static
+        if: github.ref == 'refs/heads/main'
+        uses: actions/checkout@v3
+        with:
+          ref: main
+          path: repo-for-commit
+      
+      - name: Copy Unity Build to SvelteKit
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p repo-for-commit/SvelteKit/BackSpace/static/unity
+          cp -r build/WebGL/CraftSpace/* repo-for-commit/SvelteKit/BackSpace/static/unity/
+      
+      - name: Commit and Push Unity Build
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd repo-for-commit
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add SvelteKit/BackSpace/static/unity
+          git commit -m "Update Unity WebGL build [skip ci]"
+          git push 
