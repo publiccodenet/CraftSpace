@@ -10,11 +10,12 @@
       "sortBy": "downloads",
       "sortDirection": "desc",
       "resolutions": {
-        "1x1": { "generate": true, "cacheInUnity": true },
-        "2x3": { "generate": true, "cacheInUnity": true },
-        "16x24": { "generate": true, "cacheInUnity": true },
-        "64x96": { "generate": true, "cacheInUnity": false },
-        "full": { "generate": true, "cacheInUnity": false }
+        "1x1": { "generate": true, "cacheLevel": "metadata" },
+        "2x3": { "generate": true, "cacheLevel": "metadata" },
+        "16x24": { "generate": true, "cacheLevel": "server" },
+        "64x96": { "generate": true, "cacheLevel": "server" },
+        "tile": { "generate": true, "cacheLevel": "server" },
+        "full": { "generate": false, "cacheLevel": "server" }
       }
     },
     {
@@ -25,11 +26,12 @@
       "includeInUnity": false,
       "maxItems": 50,
       "resolutions": {
-        "1x1": { "generate": true, "cacheInUnity": true },
-        "2x3": { "generate": true, "cacheInUnity": true },
-        "16x24": { "generate": true, "cacheInUnity": false },
-        "64x96": { "generate": true, "cacheInUnity": false },
-        "full": { "generate": false, "cacheInUnity": false }
+        "1x1": { "generate": true, "cacheLevel": "metadata" },
+        "2x3": { "generate": true, "cacheLevel": "metadata" },
+        "16x24": { "generate": true, "cacheLevel": "server" },
+        "64x96": { "generate": true, "cacheLevel": "server" },
+        "tile": { "generate": true, "cacheLevel": "server" },
+        "full": { "generate": false, "cacheLevel": "server" }
       }
     },
     {
@@ -41,11 +43,12 @@
       "maxItems": 30,
       "dynamic": true,
       "resolutions": {
-        "1x1": { "generate": true, "cacheInUnity": true },
-        "2x3": { "generate": true, "cacheInUnity": true },
-        "16x24": { "generate": true, "cacheInUnity": false },
-        "64x96": { "generate": false, "cacheInUnity": false },
-        "full": { "generate": false, "cacheInUnity": false }
+        "1x1": { "generate": true, "cacheLevel": "metadata" },
+        "2x3": { "generate": true, "cacheLevel": "metadata" },
+        "16x24": { "generate": true, "cacheLevel": "server" },
+        "64x96": { "generate": false, "cacheLevel": "server" },
+        "tile": { "generate": false, "cacheLevel": "server" },
+        "full": { "generate": false, "cacheLevel": "server" }
       }
     }
   ]

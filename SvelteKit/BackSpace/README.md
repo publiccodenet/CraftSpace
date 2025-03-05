@@ -69,6 +69,24 @@ BackSpace uses a multi-tiered caching and deployment strategy for Internet Archi
 
 BackSpace implements a multi-level caching strategy:
 
+#### Static Collections vs Dynamic Queries
+
+The system handles two types of collections:
+
+1. **Static Collections**:
+   - Defined in the master configuration with specific queries
+   - Downloaded and processed during build time
+   - Permanently stored in the static data directory or CDN
+   - Example: `"prefix": "sf", "dynamic": false` (default)
+
+2. **Dynamic Queries**:
+   - Generated on-demand based on user searches or filters
+   - Processed at runtime and cached temporarily
+   - Stored in a separate directory structure from static collections
+   - Example: `"prefix": "dyn_a7f3b2", "dynamic": true`
+
+#### Storage Locations
+
 1. **Unity Client-Side Cache**:
    - Selected high-priority collections are bundled directly with the Unity WebGL build
    - Stored in `Unity/CraftSpace/Assets/Resources/Collections/{prefix}`
@@ -77,15 +95,45 @@ BackSpace implements a multi-level caching strategy:
    - Flag during download: `--include-in-unity=true`
 
 2. **SvelteKit Static Directory**:
-   - All downloaded collections are placed in `SvelteKit/BackSpace/static/data/{prefix}`
+   - Static collections are placed in `SvelteKit/BackSpace/static/data/collections/{prefix}`
    - Provides a server-side cache for collections not bundled with Unity
-   - The server's `index.json` includes all available collections
+   - Can be offloaded to a CDN for improved performance
 
-3. **Progressive Loading**:
+3. **Dynamic Content Directory**:
+   - Dynamic queries are stored in `SvelteKit/BackSpace/static/data/dynamic/{hash}`
+   - Managed by the SvelteKit app with automatic cleanup for old/unused queries
+   - Not typically deployed to CDN due to their temporary nature
+   - TTL (Time To Live) configuration controls how long dynamic content is kept
+
+4. **Progressive Loading**:
    - Collections bundled with Unity load instantly
    - Additional collections load from the server as needed
    - Low-resolution icons (1x1, 2x3) load first for immediate visualization
    - Higher resolution assets load progressively
+
+#### Cache Levels and Data Types
+
+For each collection item, the system provides multiple resolution levels with specific caching strategies:
+
+1. **Metadata Level**:
+   - `cacheLevel: "metadata"`
+   - Encoded directly in JSON as base64 strings
+   - Always available without additional requests
+   - Typically used for 1x1 and 2x3 pixel representations
+   - Example: `"1x1": "AAABBB=="` (base64 encoded pixel data)
+
+2. **Client Level**:
+   - `cacheLevel: "client"`
+   - Stored in Unity client as pre-bundled assets
+   - Also available on server/CDN as fallback
+   - Typically used for medium-resolution atlases (16x24)
+   - Prioritized for frequently accessed collections
+
+3. **Server Level**:
+   - `cacheLevel: "server"`
+   - Only available from server/CDN, not pre-bundled
+   - Used for higher-resolution assets (64x96, tile, full)
+   - Loaded on-demand when user approaches or selects items
 
 ### Deployment Options
 
@@ -97,23 +145,31 @@ The static data can be deployed in multiple ways:
 
 2. **Split Deployment** (recommended for production):
    - Static data files are deployed to a dedicated storage service (S3, GCS, etc.)
-   - Load balancer routes `/data/*` requests directly to the storage service
+   - Load balancer routes `/data/collections/*` requests directly to the storage service
+   - Dynamic queries in `/data/dynamic/*` are handled by the SvelteKit server
    - SvelteKit server only handles dynamic API requests and application routes
    - Benefits: Reduced server load, better scalability, cheaper hosting
 
+#### Hybrid Deployment Architecture
+
 ```
-          ┌───────────────┐
+           ┌───────────────┐
  User ───►│ Load Balancer │
-          └───────┬───────┘
-                  │
-          ┌───────┴───────┐
-          │               │
-          ▼               ▼
- ┌─────────────────┐    ┌─────────────────┐
- │  SvelteKit      │    │  Static Storage │
- │  Node.js Server │    │  Bucket/CDN     │
- └─────────────────┘    └─────────────────┘
-   (API/Dynamic)          (Collection Data)
+           └───────┬───────┘
+                   │
+          ┌────────┴────────┐
+          │                 │
+          ▼                 ▼
+ ┌─────────────────┐      ┌─────────────────┐
+ │  SvelteKit      │      │  CDN/Storage    │
+ │  Node.js Server │      │  Service        │
+ └────────┬────────┘      └────────┬────────┘
+          │                        │
+          ▼                        ▼
+ ┌─────────────────┐      ┌─────────────────┐
+ │ Dynamic Queries │      │ Static          │
+ │ /data/dynamic/* │      │ Collections     │
+ └─────────────────┘      └─────────────────┘
 ```
 
 ### Implementation Steps
@@ -173,11 +229,12 @@ Collections are defined in `collections.json` in the project root:
       "sortBy": "downloads",
       "sortDirection": "desc",
       "resolutions": {
-        "1x1": { "generate": true, "cacheInUnity": true },
-        "2x3": { "generate": true, "cacheInUnity": true },
-        "16x24": { "generate": true, "cacheInUnity": false },
-        "64x96": { "generate": true, "cacheInUnity": false },
-        "full": { "generate": true, "cacheInUnity": false }
+        "1x1": { "generate": true, "cacheLevel": "metadata" },
+        "2x3": { "generate": true, "cacheLevel": "metadata" },
+        "16x24": { "generate": true, "cacheLevel": "server" },
+        "64x96": { "generate": true, "cacheLevel": "server" },
+        "tile": { "generate": true, "cacheLevel": "server" },
+        "full": { "generate": false, "cacheLevel": "server" }
       }
     },
     {
@@ -214,6 +271,7 @@ Each collection can specify which resolution levels to generate and cache:
 │  2x3    - Ultra-low resolution (embedded directly in metadata) │
 │  16x24  - Low resolution atlas (server/CDN hosted)             │
 │  64x96  - Medium resolution atlas (server/CDN hosted)          │
+│  tile   - Individual book cover tiles (server/CDN hosted)      │
 │  full   - Original cover image (server/CDN hosted)             │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
@@ -221,20 +279,24 @@ Each collection can specify which resolution levels to generate and cache:
 
 The system handles resolutions as follows:
 
-1. **Embedded in Metadata**:
-   - 1x1 and 2x3 resolutions are stored as hex color strings directly in metadata
+1. **Cache Levels**:
+   - **metadata**: Encoded directly in JSON as base64 strings
+   - **server**: Stored as image files on the server/CDN only
+   - **client**: Cached in the Unity client for offline use (also implies server caching)
+
+2. **Embedded in Metadata**:
+   - Resolutions with `cacheLevel: "metadata"` are stored as base64 encoded pixel data
    - These are always available to the Unity client without additional requests
-   - Example: `"1x1": "4080FF"` or `"2x3": "FF2010,80A0C0,20FF40,D0D0D0,302080,FFC040"`
+   - Example: `"1x1": "AAABBB=="` (base64 encoded pixel data)
+   - Example: `"2x3": "AAABBBCCCDDDEEEFFF=="` (base64 encoded pixel data)
 
-2. **Atlas Generation**:
-   - For each enabled resolution level, the system generates texture atlases
-   - Atlases pack multiple book covers into a single texture for efficient loading
-   - Each resolution level has its own atlas files and metadata
-
-3. **Selective Caching**:
+3. **Caching Strategy**:
    - Collections marked with `includeInUnity: true` have their metadata included in the Unity build
-   - Within each collection, only resolution levels marked with `cacheInUnity: true` are embedded
-   - Higher resolution assets are loaded on-demand from the SvelteKit server or CDN
+   - Within each collection, resolution levels are cached according to their `cacheLevel`:
+     - `metadata`: Always included in collection metadata as base64 encoded strings
+     - `client`: Included in Unity build as atlas files (and also on server)
+     - `server`: Only available from the SvelteKit server/CDN
+   - Higher resolution assets are loaded on-demand as needed
 
 ### Collection Processing Workflow
 
@@ -285,3 +347,50 @@ The system supports cache invalidation through query parameters:
 - `?version={hash}` - Used for cache-busting when new collections are deployed
 
 These parameters are recognized by the SvelteKit app and passed to Unity.
+
+1. **Initial View**: Uses embedded 1x1 and 2x3 data from metadata
+2. **Approaching**: Loads 16x24 atlas for the visible section as user gets closer
+3. **Examination**: Loads 64x96 atlas when user is examining books closely
+4. **Interaction**: Loads full cover when user selects or interacts with a book
+5. **Extended Interaction**: For dynamic or special collections, may load additional metadata
+
+This ensures books are always visualized, even with connectivity issues
+
+### Dynamic Content Workflow
+
+When a user creates a dynamic query through search or filters:
+
+1. **Request Processing**:
+   - Client sends search parameters to SvelteKit server
+   - Server generates a unique hash for the query (e.g., `dyn_a7f3b2`)
+   - System checks if this query has been processed before
+
+2. **Content Generation**:
+   - If new, server executes query against Internet Archive API
+   - Processes results into the same format as static collections
+   - Stores in `static/data/dynamic/{hash}/` with appropriate TTL
+
+3. **Client Caching**:
+   - Dynamic content is never pre-bundled with Unity
+   - Browser may cache results for subsequent visits
+   - Unity client can store in browser's IndexedDB
+   - Automatic cleanup based on access frequency and age
+
+4. **Lifecycle Management**:
+   - Popular dynamic queries may be promoted to static collections
+   - Scheduled cleanup jobs remove unused dynamic content
+   - Administrators can manually promote/demote collections
+
+### Deployment Process
+
+During the build process:
+
+1. The `npm run build` command:
+   - Builds the SvelteKit application
+   - Processes all collections to ensure they're up to date
+   - Prepares the static data directory for deployment
+
+2. The `npm run build:unity` command:
+   - Copies only the collections marked with `includeInUnity: true` to Unity
+   - Updates Unity's `index.json` to include only these collections
+   - Performs the Unity WebGL build

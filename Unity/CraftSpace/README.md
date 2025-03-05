@@ -32,17 +32,18 @@ The system handles book covers at multiple resolution levels:
 
 | Resolution | Size   | Description                  | Cache Strategy         |
 |------------|--------|------------------------------|------------------------|
-| 1x1        | 1 px   | Single color representation  | Always in metadata     |
-| 2x3        | 6 px   | Ultra-low resolution colors  | Always in metadata     |
-| 16x24      | 384 px | Low resolution atlas         | Configurable caching   |
-| 64x96      | 6144 px| Medium resolution atlas      | Typically server-only  |
-| full       | Varies | Original cover image         | Server-only            |
+| 1x1        | 1 px   | Single color representation  | metadata               |
+| 2x3        | 6 px   | Ultra-low resolution colors  | metadata               |
+| 16x24      | 384 px | Low resolution atlas         | client or server       |
+| 64x96      | 6144 px| Medium resolution atlas      | client or server       |
+| tile       | Varies | Individual cover tiles       | server                 |
+| full       | Varies | Original cover image         | server                 |
 
 Each resolution level serves a specific purpose in the visualization pipeline:
 
-- **1x1 & 2x3**: Used for distant view of books, embedded directly in collection metadata
-- **16x24**: Used for medium-distance viewing, may be cached in Unity or loaded on demand
-- **64x96 & full**: Used for close inspection, loaded from server as needed
+- **metadata level (1x1 & 2x3)**: Used for distant view of books, embedded directly in collection metadata
+- **client level (usually 16x24)**: Used for medium-distance viewing, cached in Unity for offline use
+- **server level (64x96, tile, full)**: Used for close inspection, loaded from server as needed
 
 ### 1. Resource-Based Collections
 
@@ -52,7 +53,7 @@ Collections marked as `includeInUnity: true` in the master configuration are bun
 - Loaded instantly on application start
 - No network requests required for initial use
 - Limited to high-priority collections to manage build size
-- Only includes resolution levels marked with `cacheInUnity: true`
+- Only includes resolution levels marked with `cacheLevel: "client"` or `"metadata"`
 
 ### 2. Browser Persistent Storage
 
@@ -73,6 +74,16 @@ All other collections are loaded from the SvelteKit server:
 - Higher resolution assets loaded progressively as needed
 - Cache headers optimize repeated requests
 
+### 4. Dynamic Query Collections
+
+Collections generated from dynamic user searches have special handling:
+
+- Identified by prefix pattern (e.g., `dyn_` followed by hash)
+- Cached in browser storage but with shorter TTL than static collections
+- Not included in Unity's pre-bundled resources
+- Visualization uses same resolution pipeline as static collections
+- Periodic cleanup to prevent excessive browser storage usage
+
 ### Progressive Loading Strategy
 
 CraftSpace uses a distance-based progressive loading approach:
@@ -91,6 +102,7 @@ CraftSpace uses a distance-based progressive loading approach:
 2. **Approaching**: Loads 16x24 atlas for the visible section as user gets closer
 3. **Examination**: Loads 64x96 atlas when user is examining books closely
 4. **Interaction**: Loads full cover when user selects or interacts with a book
+5. **Extended Interaction**: For dynamic or special collections, may load additional metadata
 
 This strategy ensures efficient memory usage while maintaining responsive performance.
 
