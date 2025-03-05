@@ -1,4 +1,4 @@
-# SpaceShip Project
+# SpaceShip Project GitHub README
 
 A modern Unity-based 3D environment for exploring digital archives, integrated with a SvelteKit web application.
 
