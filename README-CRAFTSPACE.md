@@ -210,11 +210,3 @@ Manual build process:
 4. **Deploy**:
    - Deploy `SvelteKit/BackSpace/build` to web server
    - Deploy collection data to CDN (optional)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
-
-## License
-
-See [LICENSE](LICENSE) for details. 

@@ -244,14 +244,6 @@ npm run download-items output_directory
 - Ensure all dependencies are installed: `npm ci`
 - Clear the SvelteKit build cache: `rm -rf .svelte-kit`
 
-## License
-
-[Insert your license information here]
-
-## Contributors
-
-[List contributors here]
-
 # GitHub Actions Configuration for CraftSpace
 
 This document explains the GitHub Actions workflows set up for the CraftSpace monorepo.
