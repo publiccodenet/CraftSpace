@@ -62,7 +62,7 @@ For full details, see:
    npm run start
    ```
 
-5. Visit http://localhost:3000 to access the application
+5. Visit http://localhost:5173 to access the application
 
 ## Architecture Overview
 
