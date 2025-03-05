@@ -277,6 +277,7 @@ These parameters are recognized by the SvelteKit app and passed to Unity.
 
 3. **Run Development Server**:
    ```bash
+   # Starts server on http://localhost:5173
    npm run dev
    ```
 

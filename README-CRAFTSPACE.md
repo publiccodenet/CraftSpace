@@ -172,6 +172,7 @@ This approach allows for efficient rendering of book collections while maintaini
    ```bash
    cd SvelteKit/BackSpace
    npm install
+   # Starts development server on http://localhost:5173
    npm run dev
    ```
 

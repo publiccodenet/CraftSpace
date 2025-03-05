@@ -16,8 +16,11 @@ BackSpace serves as:
 # Install dependencies
 npm install
 
-# Start development server
+# Start development server (runs on http://localhost:5173)
 npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
 
 # Build for production
 npm run build
