@@ -1,0 +1,95 @@
+{
+  "$ref": "#/definitions/CollectionSchema",
+  "definitions": {
+    "CollectionSchema": {
+      "type": "object",
+      "properties": {
+        "collection_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier for the collection"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name for the collection"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Internet Archive query string that defines the collection"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO date of last update"
+        },
+        "totalItems": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of items in the collection"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the collection"
+        },
+        "sort": {
+          "type": "string",
+          "default": "downloads desc",
+          "description": "Sort order for items"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Maximum items (0 = unlimited)"
+        },
+        "exportProfiles": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": true
+              }
+            ]
+          },
+          "default": [],
+          "description": "Export profile configurations to use"
+        },
+        "cache_dir": {
+          "type": "string",
+          "description": "Relative path to cache directory"
+        },
+        "index_cached": {
+          "type": "string",
+          "description": "Path to cached index file"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "collection_id",
+        "name",
+        "query",
+        "lastUpdated",
+        "totalItems"
+      ],
+      "additionalProperties": true
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "test-collection",
+  "name": "Test Collection",
+  "query": "collection:prelinger AND subject:science",
+  "created": "2025-03-15T13:25:27.781Z",
+  "lastUpdated": "2025-03-15T13:25:27.781Z",
+  "totalItems": 0
+}

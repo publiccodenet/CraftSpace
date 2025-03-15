@@ -186,20 +186,21 @@ Desktop.ini
 *.swp
 *.swo
 
-# Node modules
+# Node.js
 node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+package-lock.json
+yarn.lock
 
-# Build directories
-**/build/
-**/dist/
-**/.svelte-kit/
-**/output/
-**/dist-scripts/
-
-# Environment files
-.env
-.env.*
-!.env.example
+# Build artifacts
+/build/
+/dist/
+/out/
+.svelte-kit/
+*.js.map
+*.css.map
 
 # Unity specific
 [Ll]ibrary/
@@ -239,6 +240,12 @@ node_modules/
 
 # Test coverage
 coverage/
-*.blend1
-*.blend2
-*.blend3
+
+# Environment variables
+.env
++.env*
++!.env-template
+
+# Log files
+*.log
+logs/

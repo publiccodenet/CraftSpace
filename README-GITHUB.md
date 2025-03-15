@@ -1,35 +1,29 @@
-# SpaceShip Project GitHub README
+# CraftSpace GitHub Integration
 
-A modern Unity-based 3D environment for exploring digital archives, integrated with a SvelteKit web application.
+This document describes the GitHub-based continuous integration, continuous deployment (CI/CD), and development infrastructure for the CraftSpace project.
 
-## Project Overview
+## Overview
 
-SpaceShip is an interactive 3D environment called "CraftSpace" built in Unity, embedded in a modern SvelteKit web application. The application is designed to explore digital archives, particularly content from the Internet Archive.
+CraftSpace leverages GitHub Actions for automated building, testing, and deployment of its multi-component architecture. This infrastructure enables developers to work efficiently on different parts of the system while maintaining integration across components. The CI/CD system handles everything from Unity WebGL compilation to collection processing and deployment to various environments.
 
-The project consists of:
-- **SvelteKit frontend**: Modern web interface using Svelte 5 with runes
-- **Unity WebGL application**: 3D environment embedded in the web interface
-- **Docker-based server**: For API endpoints and backend functionality 
-
-## Repository Structure
+## .github Directory Structure
 
 ```
-/
-├── SvelteKit/BackSpace/          # SvelteKit web application
-│   ├── src/                      # Source code
-│   │   ├── routes/               # SvelteKit routes
-│   │   ├── lib/                  # Shared components and utilities
-│   │   │   └── components/       # Reusable components
-│   │   ├── static/                   # Static assets
-│   │   │   └── Build/WebGL/          # Unity WebGL build output
-│   │   ├── scripts/                  # Utility scripts
-│   │   ├── .github/workflows/        # GitHub Actions workflows
-│   │   └── Dockerfile                # Docker configuration for server
-│   │
-│   ├── Unity/CraftSpace/             # Unity project
-│   │   └── Assets/                   # Unity assets
-│   │
-│   └── Notes/                        # Documentation and notes
+.github/
+├── workflows/                                # GitHub Actions workflow definitions
+│   ├── build-deploy.yml                      # Main build and deployment workflow
+│   ├── update-collections.yml                # Collection update workflow
+│   ├── build-deploy-sveltekit.yml            # SvelteKit-only workflow
+│   ├── build-unity-webgl.yml                 # Unity WebGL-only workflow
+│   └── build-push-docker.yml                 # Docker build and push workflow
+├── scripts/                                  # Shared automation scripts
+│   ├── process-collections.sh                # Collection processing script
+│   ├── deploy-collections.sh                 # Collection deployment script
+│   └── unity-build.sh                        # Unity build helper script
+├── actions/                                  # Custom GitHub Actions
+│   └── unity-builder/                        # Custom Unity builder action
+└── templates/                                # Workflow templates and documentation
+    └── issue_template.md                     # Issue template for workflow problems
 ```
 
 ## Rapid Development & Pipeline Architecture
@@ -66,7 +60,7 @@ The CraftSpace project is built on a philosophy of rapid iteration through speci
 
 #### 1. SvelteKit Application (Minutes)
 
-**Workflow File**: `.github/workflows/build-deploy-sveltekit.yml.disabled`
+**Workflow File**: `.github/workflows/build-deploy-sveltekit.yml`
 
 For changes to the web application interface, API endpoints, or server logic:
 
@@ -79,7 +73,7 @@ For changes to the web application interface, API endpoints, or server logic:
 
 #### 2. Unity WebGL Application (Hours)
 
-**Workflow File**: `.github/workflows/build-unity-webgl.yml.disabled`
+**Workflow File**: `.github/workflows/build-unity-webgl.yml`
 
 For changes to C# code, Unity assets, prefabs, scenes, or shaders:
 
@@ -93,7 +87,7 @@ For changes to C# code, Unity assets, prefabs, scenes, or shaders:
 
 #### 3. Collection Content (Minutes)
 
-**Workflow File**: `.github/workflows/update-content.yml.disabled`
+**Workflow File**: `.github/workflows/update-content.yml`
 
 For changes to collection data, metadata, or texture atlases:
 
@@ -107,7 +101,7 @@ For changes to collection data, metadata, or texture atlases:
 
 #### 4. Unity JavaScript Extensions (Seconds)
 
-**Workflow File**: `.github/workflows/build-unity-scripts.yml.disabled`
+**Workflow File**: `.github/workflows/build-unity-scripts.yml`
 
 For changes to Unity behavior without modifying C# code:
 
@@ -121,7 +115,7 @@ For changes to Unity behavior without modifying C# code:
 
 #### 5. Full Release Build (Hours)
 
-**Workflow File**: `.github/workflows/build-deploy.yml.disabled`
+**Workflow File**: `.github/workflows/build-deploy.yml`
 
 For comprehensive releases with changes across all components:
 
@@ -175,7 +169,9 @@ For comprehensive releases with changes across all components:
 ### Practical Development Workflow
 
 1. **Initial Setup**: Full build of all components to establish baseline
-   - `gh workflow run build-deploy.yml`
+   ```bash
+   gh workflow run build-deploy.yml
+   ```
 
 2. **Daily Development**: Focused iteration on specific components
    - Working on SvelteKit: Use local dev server with hot reloading
@@ -197,9 +193,9 @@ For comprehensive releases with changes across all components:
 
 This project uses GitHub Actions to automate building and deployment:
 
-1. **SvelteKit Build and Deploy**: Builds the SvelteKit app and deploys to GitHub Pages
-2. **Docker Build and Push**: Builds and pushes the server Docker image to DockerHub
-3. **Unity WebGL Build**: Uses a self-hosted runner to build the Unity WebGL application
+1. **SvelteKit Build and Deploy**: Builds the SvelteKit app and deploys to the hosting environment
+2. **Unity WebGL Build**: Uses a self-hosted runner to build the Unity WebGL application
+3. **Collection Update**: Processes Internet Archive collections and deploys them to the hosting environment
 
 ## Setup Instructions
 
@@ -207,8 +203,14 @@ This project uses GitHub Actions to automate building and deployment:
 
 1. Create a new GitHub repository
 2. Add required secrets:
-   - `DOCKERHUB_USERNAME`: Your DockerHub username
-   - `DOCKERHUB_TOKEN`: DockerHub access token
+   - `UNITY_LICENSE`: Unity license for building WebGL
+   - `DIGITALOCEAN_ACCESS_TOKEN`: API token for Digital Ocean
+   - `DIGITALOCEAN_APP_ID`: App Platform application ID
+   - `SSH_PRIVATE_KEY`: SSH private key for deployment
+   - `DO_SPACES_KEY`: Digital Ocean Spaces access key
+   - `DO_SPACES_SECRET`: Digital Ocean Spaces secret
+   - `DO_SPACES_ENDPOINT`: Digital Ocean Spaces endpoint
+   - `DO_SPACES_BUCKET`: Digital Ocean Spaces bucket name
 
 ### 2. Setting Up a Self-Hosted GitHub Runner on MacBook Pro
 
@@ -278,7 +280,19 @@ using System.IO;
 
 public class BuildScript
 {
-    public static void BuildWebGL()
+    [MenuItem("Build/WebGL Development")]
+    public static void BuildWebGLDevelopment()
+    {
+        BuildWebGL(BuildOptions.Development);
+    }
+    
+    [MenuItem("Build/WebGL Production")]
+    public static void BuildWebGLProduction()
+    {
+        BuildWebGL(BuildOptions.None);
+    }
+    
+    private static void BuildWebGL(BuildOptions options)
     {
         string outputDir = "Build/WebGL";
         
@@ -294,7 +308,7 @@ public class BuildScript
             scenes = EditorBuildSettings.scenes,
             targetGroup = BuildTargetGroup.WebGL,
             target = BuildTarget.WebGL,
-            options = BuildOptions.None,
+            options = options,
             locationPathName = outputDir
         };
         
@@ -306,7 +320,7 @@ public class BuildScript
 
 2. Ensure your Unity path in the workflow file is correct:
    - Edit `.github/workflows/build-unity-webgl.yml`
-   - Update the `UNITY_PATH` variable to match your Unity installation path
+   - Update the Unity path variable to match your Unity installation path
 
 ### 4. SvelteKit Configuration
 
@@ -332,27 +346,39 @@ public class BuildScript
 
 ### 5. Docker Configuration
 
-The Docker setup is already configured in the `Dockerfile`. The GitHub workflow will build and push the Docker image automatically when changes are detected.
+The Docker setup is configured in the `Dockerfile`. The GitHub workflow builds and pushes the Docker image automatically when changes are detected:
+
+```bash
+# Manual build and push
+cd SvelteKit/BackSpace
+docker build -t do-registry.digitalocean.com/craftspace/backend:latest .
+docker push do-registry.digitalocean.com/craftspace/backend:latest
+```
 
 ## Deployment
 
-### GitHub Pages
+### Digital Ocean App Platform
 
-The SvelteKit application is automatically deployed to GitHub Pages with the custom domain `SpaceShip.DonHopkins.com`. 
+The application is deployed to Digital Ocean App Platform:
 
-To configure the custom domain:
-1. Go to repository Settings → Pages
-2. Enter `SpaceShip.DonHopkins.com` in the "Custom domain" field
-3. Ensure your DNS provider has a CNAME record pointing to `<username>.github.io`
+1. **Web Application**: The SvelteKit application serves as the web frontend and API layer
+2. **CDN Component**: Static assets are served through Digital Ocean Spaces with CDN enabled
+3. **Container Service**: Docker containers handle backend processing
+
+To configure deployment:
+1. Go to Digital Ocean App Platform
+2. Create a new app from GitHub repository
+3. Configure environment variables and resources
+4. Set up preview environments for staging/testing
 
 ### Server Deployment
 
-The server is deployed as a Docker container. You can deploy it to any platform that supports Docker containers:
+The server components are deployed as Docker containers to Digital Ocean App Platform:
 
-- Digital Ocean App Platform
-- AWS ECS/Fargate
-- Google Cloud Run
-- Self-hosted server
+```bash
+# Deploy manually (if needed)
+doctl apps create --spec .do/app.yaml
+```
 
 ## Development Workflow
 
@@ -369,6 +395,21 @@ The server is deployed as a Docker container. You can deploy it to any platform 
 3. Commit and push to trigger the Unity build workflow
 4. The build is automatically copied to the SvelteKit static directory and committed
 
+### Collection Development
+
+1. Register a new collection:
+   ```bash
+   cd SvelteKit/BackSpace
+   npm run ia:register mycollection "My Collection" "subject:mycollection"
+   ```
+
+2. Process the collection:
+   ```bash
+   npm run ia:process
+   ```
+
+3. Commit changes and push to trigger deployment
+
 ### Workflow Integration
 
 The integration between Unity and SvelteKit is handled through the `CraftSpace.svelte` component, which loads the Unity WebGL build at runtime.
@@ -381,8 +422,8 @@ The project includes scripts for downloading content from the Internet Archive:
 # Build TypeScript scripts
 npm run build:scripts
 
-# Download items
-npm run download-items output_directory
+# Download and process a collection
+npm run ia:process -- --collection=scifi
 ```
 
 ## Troubleshooting
@@ -405,26 +446,11 @@ npm run download-items output_directory
 - Ensure all dependencies are installed: `npm ci`
 - Clear the SvelteKit build cache: `rm -rf .svelte-kit`
 
-# GitHub Actions Configuration for CraftSpace
-
-This document explains the GitHub Actions workflows set up for the CraftSpace monorepo.
-
-> **Note:** All workflow files currently have a `.disabled` suffix to prevent them from running automatically. 
-> This is a temporary measure during development. To activate a workflow, rename it to remove the `.disabled` suffix.
-
-## Monorepo Structure
-
-The CraftSpace repository is organized as a monorepo containing:
-
-- **Unity/CraftSpace**: Unity WebGL application
-- **SvelteKit/BackSpace**: SvelteKit web application
-- **Collections**: Internet Archive collection data
-
 ## Workflow Overview
 
 ### 1. Main Build and Deploy Workflow
 
-**File**: `.github/workflows/build-deploy.yml.disabled`
+**File**: `.github/workflows/build-deploy.yml`
 
 This comprehensive workflow handles the complete build and deployment process:
 
@@ -433,11 +459,11 @@ This comprehensive workflow handles the complete build and deployment process:
 3. Builds the SvelteKit application
 4. Deploys everything to Digital Ocean
 
-**Trigger**: Manual workflow dispatch (with enable parameter)
+**Trigger**: Manual workflow dispatch
 
 ### 2. Collection Update Workflow
 
-**File**: `.github/workflows/update-collections.yml.disabled`
+**File**: `.github/workflows/update-collections.yml`
 
 This workflow updates the collection data without rebuilding the entire application:
 
@@ -450,7 +476,7 @@ This workflow updates the collection data without rebuilding the entire applicat
 
 ### 3. SvelteKit-Only Workflow
 
-**File**: `.github/workflows/build-deploy-sveltekit.yml.disabled`
+**File**: `.github/workflows/build-deploy-sveltekit.yml`
 
 For faster iterations on the web application without rebuilding Unity:
 
@@ -463,7 +489,7 @@ For faster iterations on the web application without rebuilding Unity:
 
 ### 4. Unity-Only Workflow
 
-**File**: `.github/workflows/build-unity-webgl.yml.disabled`
+**File**: `.github/workflows/build-unity-webgl.yml`
 
 For Unity-focused development:
 
@@ -473,19 +499,6 @@ For Unity-focused development:
 
 **Trigger**:
 - Push to main branch affecting Unity files
-- Manual workflow dispatch
-
-### 5. Docker Build and Push
-
-**File**: `.github/workflows/build-push-docker.yml.disabled`
-
-For containerized deployment:
-
-1. Builds a Docker image for the SvelteKit application
-2. Pushes to DockerHub registry
-
-**Trigger**:
-- Changes to Dockerfile or package.json
 - Manual workflow dispatch
 
 ## Shared Scripts
@@ -509,8 +522,7 @@ The following secrets need to be set in the GitHub repository:
 - `SSH_PRIVATE_KEY`: SSH private key
 
 ### Docker Registry
-- `DOCKERHUB_USERNAME`: Docker Hub username
-- `DOCKERHUB_TOKEN`: Docker Hub access token
+- `DO_REGISTRY_TOKEN`: Digital Ocean Container Registry token
 
 ### CDN/Storage
 - `DO_SPACES_KEY`: Digital Ocean Spaces access key
@@ -522,12 +534,11 @@ The following secrets need to be set in the GitHub repository:
 
 ### Manual Trigger
 
-1. First, rename the workflow by removing the `.disabled` suffix
-2. Go to "Actions" tab in the GitHub repository
-3. Select the workflow you want to run
-4. Click "Run workflow"
-5. Set "enable" to "true"
-6. Click "Run workflow" button
+1. Go to "Actions" tab in the GitHub repository
+2. Select the workflow you want to run
+3. Click "Run workflow"
+4. Set any workflow input parameters
+5. Click "Run workflow" button
 
 ### Adding New Components
 
@@ -569,7 +580,7 @@ This multi-tiered approach allows for:
 
 ## Content Development Workflow
 
-**File**: `.github/workflows/update-content.yml.disabled`
+**File**: `.github/workflows/update-content.yml`
 
 This specialized workflow is designed for rapid content iteration without rebuilding application code. It enables developers to update collection data, metadata, and even client-side functionality with minimal deployment overhead.
 
@@ -605,9 +616,9 @@ The content development pipeline allows:
               └─────────────────┬───────┘                        └───────────┬─────────────┘
                                 │                                            │
                                 ▼                                            ▼
-           ┌────────────────────────────────────┐          ┌────────────────────────────────────┐
-           │                                    │          │                                    │
-           ▼                      ▼             ▼          ▼                      ▼             ▼
+           ┌────────────────────────────────────┐          ┌─────────────────────────────────────────┐
+           │                      │             │          │                      │                  │
+           ▼                      ▼             ▼          ▼                      ▼                  ▼
 ┌──────────────────┐  ┌──────────────────┐  ┌──────┐  ┌──────────────────┐  ┌──────────────────┐  ┌──────┐
 │                  │  │                  │  │      │  │                  │  │                  │  │      │
 │ SvelteKit        │  │ Unity Client     │  │ CDN  │  │ SvelteKit        │  │ Unity Client     │  │ CDN  │
@@ -642,4 +653,33 @@ SvelteKit/BackSpace/static/js/unity-extensions/
     ├── display.json       # Visual configuration (hot-patchable)
     ├── collections.json   # Collection settings (hot-patchable)
     └── features.json      # Feature flags (hot-patchable)
-``` 
+```
+
+## Containerized GitHub Runners (Future Plan)
+
+To maximize hardware utilization and provide scalability, we plan to containerize our GitHub runner environment. This approach will allow us to run multiple Unity build jobs in parallel on a single high-performance machine.
+
+### Benefits
+
+- **Parallelism**: Run multiple Unity builds simultaneously on one machine
+- **Isolation**: Keep each build in its own container environment
+- **Resource Management**: Allocate appropriate CPU/memory to each build job
+- **Versioning**: Support multiple Unity versions in parallel
+- **Scaling**: Add more containers as resource availability permits
+
+### Implementation Strategy
+
+1. **Base Docker Image**: Create a Unity-ready Docker image with all dependencies
+2. **Runner Configuration**: Configure GitHub Actions runner in each container
+3. **Persistent Caching**: Mount shared caches for Library and Package dependencies
+4. **Resource Limits**: Configure container resource constraints
+5. **Job Orchestration**: Use labels to direct specific jobs to appropriate containers
+
+Example of future deployment:
+
+```bash
+# Launch multiple containerized runners on a powerful machine
+docker-compose up -d --scale unity-runner=4
+```
+
+This containerization approach will reduce build times by better utilizing multi-core CPUs and providing parallel processing capabilities for the Unity build pipeline.

@@ -1,212 +1,242 @@
-# CraftSpace Monorepo
+# CraftSpace Unity Client
 
-This repository contains all components of the CraftSpace project, an immersive 3D visualization platform for Internet Archive collections.
+This document describes the Unity-based 3D visualization component of the CraftSpace project.
 
-## Repository Structure
+## Overview
+
+The CraftSpace Unity client provides an immersive 3D environment for exploring Internet Archive collections. It renders collections in a spatial context, allowing users to browse, search, and interact with digital content in novel ways.
+
+Key features include:
+
+1. **Spatial Visualization**: Renders collections in 3D space with multiple organizational models
+2. **Multi-Resolution Display**: Efficiently displays thousands of items simultaneously
+3. **Interactive Navigation**: Intuitive camera controls for exploring the environment
+4. **Content Integration**: Seamless display of Internet Archive content and metadata
+5. **WebGL Deployment**: Runs directly in web browsers with no installation required
+
+## Architecture
+
+The CraftSpace Unity client follows a modular architecture:
 
 ```
-CraftSpace/
-├── .github/                  # GitHub Actions workflows and scripts
-├── Unity/                    # Unity WebGL application
-│   └── CraftSpace/           # Main Unity project
-├── SvelteKit/                # Web application components
-│   └── BackSpace/            # SvelteKit web application
-├── collections.json          # Collection configuration
-└── Notes/                    # Project documentation
+Unity/CraftSpace/
+├── Assets/
+│   ├── Scripts/                  # C# scripts
+│   │   ├── UI/                   # User interface components
+│   │   ├── Visualization/        # Visualization components
+│   │   ├── Data/                 # Data handling and processing
+│   │   ├── Navigation/           # Camera and movement control
+│   │   └── Integration/          # BackSpace API integration
+│   ├── Prefabs/                  # Reusable game objects
+│   ├── Scenes/                   # Unity scenes
+│   ├── Materials/                # Materials and shaders
+│   ├── Resources/                # Runtime-loadable assets
+│   │   └── Collections/          # Pre-bundled collections
+│   └── WebGLTemplates/           # WebGL page templates
+└── ProjectSettings/              # Unity project settings
 ```
 
-## Components
+## Core Components
 
-### 1. Unity Application (Unity/CraftSpace)
+### 1. Visualization System
 
-The 3D visualization client built with Unity WebGL that provides:
-- Immersive 3D browsing of digital collections
-- Multi-resolution rendering of book covers
-- Intelligent caching and progressive loading
+CraftSpace implements advanced visualization techniques to efficiently render large collections in 3D space. For detailed information about the multi-resolution representation system, texture atlases, and rendering strategies, see the [Visualization Techniques documentation](./README-VISUALIZATION.md).
 
-### 2. SvelteKit Application (SvelteKit/BackSpace)
+### 2. Navigation Controls
 
-The web application that:
-- Hosts the Unity WebGL build
-- Serves collection data
-- Provides API endpoints for dynamic queries
-- Handles collection processing
+The navigation system provides intuitive controls for exploring collections:
 
-### 3. Collections System
+- **Orbital Camera**: Pivot around collection focal points
+- **Pan and Zoom**: Move laterally and adjust distance
+- **Focus Controls**: Quickly focus on specific items or regions
+- **Context Awareness**: Camera adjusts behavior based on content layout
 
-A data pipeline that:
-- Fetches data from Internet Archive
-- Processes book covers at multiple resolutions
-- Generates optimized texture atlases
-- Implements multi-tiered caching
+### 3. User Interface
 
-## Texture Atlases in Unity
+The UI system provides several key interfaces:
 
-### Overview of Texture Atlases
+- **Control Panel**: Search, filter, and visualization options
+- **Information Panel**: Displays metadata for selected items
+- **Navigation Aids**: Breadcrumbs, minimap, and location markers
+- **Context Menu**: Item-specific actions and options
 
-Texture atlases are an optimization technique that combines multiple smaller textures into a single larger texture. In the context of CraftSpace, they are essential for efficiently rendering large collections of book covers at different resolutions and distances.
+### 4. Data Integration
 
-### Importance of Texture Gutters
+The data system connects to the BackSpace application:
 
-Even though CraftSpace implements a custom multi-resolution approach for book covers, gutters (padding between images in an atlas) remain important:
+- **Collection Loader**: Fetches collection data via API
+- **Progressive Loading**: Loads data based on visibility and priority
+- **Cache Management**: Handles local storage of collection data
+- **Realtime Updates**: Subscribes to changes in collection data
 
-1. **Prevents Texture Bleeding**: Without gutters, textures can "bleed" into neighboring textures during texture filtering.
+## Spatial Visualization Models
 
-2. **Bilinear/Trilinear Filtering**: Unity's texture filtering samples neighboring pixels, which can cross boundaries between atlas entries without adequate gutters.
+CraftSpace supports multiple ways to organize collections in space. For detailed information about the spatial organization models (Library View, Timeline View, Network View, Map View, etc.), see the [Spatial Organization Models section in the Visualization documentation](./README-VISUALIZATION.md#spatial-organization-models).
 
-3. **Perspective Distortion**: In 3D space, texture sampling can slightly overshoot intended UV coordinates due to perspective calculations.
+## Performance Optimization
 
-4. **UV Precision Issues**: Even with precise UV coordinates, floating-point precision in GPU calculations can cause sampling errors at boundaries.
+CraftSpace implements several techniques to maintain performance with large collections. For detailed information about rendering optimizations, memory management, and performance targets, see the [Performance Optimization Techniques section in the Visualization documentation](./README-VISUALIZATION.md#performance-optimization-techniques).
 
-### Recommended Gutter Sizes for CraftSpace
+## Multi-Device Experience
 
-For optimal visual quality in CraftSpace's multi-resolution system:
+CraftSpace supports various multi-device configurations:
 
-- **Low Resolutions (2x3, 4x6)**: 1-pixel gutters are typically sufficient
-- **Medium Resolutions (8x12, 16x24)**: 2-pixel gutters recommended
-- **High Resolutions (32x48, 64x96)**: 3-4 pixel gutters for best quality
+### Browser Tab Synchronization
 
-### Implementation Details
+Multiple browser tabs can be synchronized to create multi-display setups:
 
-CraftSpace uses custom atlas generation rather than Unity's built-in Sprite Atlas system:
+- **Main Display**: Primary visualization window
+- **Control Display**: UI and search interface
+- **Content Display**: Detailed content view for selected items
+- **Overview Display**: Zoomed-out map of the entire collection
 
-```csharp
-// Example of creating a texture atlas with appropriate gutters
-private Texture2D CreateBookAtlas(List<BookCoverData> books, int resolution) {
-    int booksPerRow = Mathf.CeilToInt(Mathf.Sqrt(books.Count));
-    
-    // Determine appropriate gutter size based on resolution
-    int gutterSize = resolution <= 6 ? 1 : (resolution <= 24 ? 2 : 4);
-    
-    // Size of each cell in the atlas (book size + gutters)
-    int cellSize = resolution + gutterSize;
-    
-    // Create texture with appropriate dimensions
-    int atlasSize = cellSize * booksPerRow;
-    Texture2D atlas = new Texture2D(atlasSize, atlasSize, TextureFormat.RGB24, false);
-    
-    // Fill atlas with books, leaving gutters between them
-    for (int i = 0; i < books.Count; i++) {
-        int x = (i % booksPerRow) * cellSize + gutterSize/2;
-        int y = (i / booksPerRow) * cellSize + gutterSize/2;
-        
-        // Copy book pixels to atlas, positioning to leave gutters
-        atlas.SetPixels(x, y, resolution, resolution, books[i].pixels);
-        
-        // Store UV coordinates for this book
-        books[i].uvRect = new Rect(
-            (float)x / atlasSize,
-            (float)y / atlasSize,
-            (float)resolution / atlasSize,
-            (float)resolution / atlasSize
-        );
-    }
-    
-    atlas.Apply();
-    return atlas;
-}
-```
+This allows for creative setups across multiple screens or devices without requiring special hardware.
 
-### UV Mapping & Texture Sampling
+### Mobile Integration
 
-When sampling from the atlas in shaders:
+Mobile devices can integrate with the main CraftSpace experience:
 
-1. **Inset UVs**: For maximum safety, inset UV coordinates slightly to avoid edge sampling:
+- **QR Login**: Scan code on main display to connect mobile device
+- **Remote Control**: Use mobile device to navigate the main display
+- **Personal Viewer**: View selected content on personal device
+- **Collaborative Annotation**: Add notes and highlights from mobile
 
-```glsl
-// Fragment shader excerpt for safer atlas sampling
-float2 AdjustUV(float2 uv, float2 atlasSize) {
-    // Pull sampling points inward slightly
-    float2 pixelSize = 1.0 / atlasSize;
-    float2 safeUV = uv + pixelSize * 0.5;
-    return safeUV;
-}
-```
+## Extended Use Cases
 
-2. **LOD Selection**: The shader should select the appropriate resolution level based on distance:
+### Interactive Exhibitions
 
-```csharp
-// C# code to select appropriate resolution
-void UpdateBookCoverLOD(Transform bookTransform, MeshRenderer renderer) {
-    float distanceToCamera = Vector3.Distance(Camera.main.transform.position, bookTransform.position);
-    
-    // Select appropriate resolution based on distance
-    string resolutionKey = distanceToCamera > 20f ? "2x3" :
-                          (distanceToCamera > 10f ? "8x12" :
-                          (distanceToCamera > 5f ? "16x24" : "64x96"));
-    
-    // Set the appropriate texture and UV rect for this resolution
-    MaterialPropertyBlock props = new MaterialPropertyBlock();
-    renderer.GetPropertyBlock(props);
-    props.SetTexture("_MainTex", atlases[resolutionKey]);
-    props.SetVector("_UVRect", books[bookId].uvRects[resolutionKey]);
-    renderer.SetPropertyBlock(props);
-}
-```
+CraftSpace can be configured for museum or library exhibitions:
 
-### Dynamic Atlas Generation
+- **Curated Collections**: Specially arranged content with curatorial notes
+- **Guided Tours**: Predefined paths through collections with commentary
+- **Interactive Stations**: Physical buttons/controls connected to web interfaces
+- **Projection Mapping**: Content visualized on physical structures
 
-For dynamic collections that aren't pre-generated during build:
+### Educational Settings
 
-1. Generate atlases at runtime for newly requested collections
-2. Consider adding low-resolution atlases first for immediate visualization
-3. Generate higher-resolution atlases in background threads if possible
-4. Update materials when higher resolution atlases become available
+For classrooms and educational environments:
 
-This approach allows for efficient rendering of book collections while maintaining visual quality at all viewing distances.
+- **Group Exploration**: Multiple users exploring shared collections
+- **Teacher Controls**: Instructor can guide and focus student attention
+- **Assignment Integration**: Tasks and questions embedded in collections
+- **Resource Collection**: Students can gather and organize research materials
 
-## Development Setup
+## Software Emulation Integration
 
-1. **Clone Repository**:
+For detailed information about the software emulation features (emulators, collaborative gameplay, etc.), see the [Special Features section in the Visualization documentation](./README-VISUALIZATION.md#special-features).
+
+## Development Workflow
+
+### Setting Up the Unity Project
+
+1. **Prerequisites**:
+   - Unity 2022.3.X LTS or newer
+   - Git LFS (for handling large binary files)
+
+2. **Clone the Repository**:
    ```bash
-   git clone https://github.com/SimHacker/CraftSpace.git
-   cd CraftSpace
+   git clone https://github.com/yourusername/craftspace.git
+   cd craftspace
+   git lfs pull
    ```
 
-2. **Unity Setup**:
-   - Open Unity Hub
-   - Add project from `Unity/CraftSpace`
-   - Use Unity version 2021.3.11f1 or later
+3. **Open in Unity**:
+   - Launch Unity Hub
+   - Add the `Unity/CraftSpace` directory as a project
+   - Open the project
 
-3. **SvelteKit Setup**:
+### Running in Development Mode
+
+1. **BackSpace Integration**:
    ```bash
+   # Start the BackSpace server
    cd SvelteKit/BackSpace
-   npm install
-   # Starts development server on http://localhost:5173
    npm run dev
    ```
 
-4. **Collection Processing**:
+2. **Unity Editor Play Mode**:
+   - Open the main scene in `Assets/Scenes`
+   - Press Play in the Unity Editor
+   - Development build will connect to local BackSpace server
+
+### WebGL Build Process
+
+1. **Build the Unity WebGL Project**:
+   - Open Unity Build Settings (File > Build Settings)
+   - Select WebGL platform
+   - Click "Build" and select the output directory
+
+2. **Integrate with BackSpace**:
    ```bash
+   # Option 1: Manual copy
+   cp -r WebGLBuild/* ../SvelteKit/BackSpace/static/unity/
+
+   # Option 2: Using build script
    cd SvelteKit/BackSpace
-   npm run build:scripts
-   npm run pipeline-full
+   npm run build:unity
    ```
 
-## Building and Deployment
+## Customization
 
-The project uses GitHub Actions for CI/CD. See [GITHUB-README.md](GITHUB-README.md) for details.
+### Scene Configuration
 
-Manual build process:
+The main scene can be configured through scriptable objects:
 
-1. **Process Collections**:
-   ```bash
-   cd SvelteKit/BackSpace
-   npm run build:scripts
-   npm run pipeline-full
-   ```
+- `Assets/ScriptableObjects/AppConfig.asset`: General application settings
+- `Assets/ScriptableObjects/VisualizationConfig.asset`: Visualization parameters
+- `Assets/ScriptableObjects/UIConfig.asset`: User interface settings
 
-2. **Build Unity WebGL**:
-   - Open Unity project
-   - File > Build Settings > WebGL > Build
-   - Output to `SvelteKit/BackSpace/static/unity`
+### Adding New Visualization Modes
 
-3. **Build SvelteKit App**:
-   ```bash
-   cd SvelteKit/BackSpace
-   npm run build
-   ```
+To implement a new visualization mode:
 
-4. **Deploy**:
-   - Deploy `SvelteKit/BackSpace/build` to web server
-   - Deploy collection data to CDN (optional)
+1. Create a new class that inherits from `BaseVisualizationMode`
+2. Implement the required methods for positioning and organizing items
+3. Register the mode in the `VisualizationManager`
+4. Add UI controls for the new mode
+
+## Integration with BackSpace
+
+### Communication Protocol
+
+CraftSpace communicates with the BackSpace application through:
+
+1. **Direct API Calls**: HTTP requests to BackSpace API endpoints
+2. **JavaScript Interop**: Two-way communication with the hosting page
+3. **WebSocket Updates**: Real-time updates for collaborative features
+
+### JavaScript Bridge
+
+The JavaScript bridge enables communication between Unity and SvelteKit:
+
+```javascript
+// Example of SvelteKit sending data to Unity
+function sendToUnity(eventName, data) {
+  if (window.unityInstance) {
+    window.unityInstance.SendMessage('JSBridge', 'HandleEvent', 
+      JSON.stringify({ event: eventName, data: data })
+    );
+  }
+}
+
+// Example of Unity sending data to SvelteKit
+// Called by Unity's JSBridge.cs
+function receiveFromUnity(jsonData) {
+  const event = JSON.parse(jsonData);
+  // Dispatch to SvelteKit event handlers
+}
+```
+
+## Future Directions
+
+Planned enhancements for the CraftSpace Unity client include:
+
+1. **Advanced Spatial UI**: More intuitive 3D user interfaces
+2. **Enhanced Navigation**: Additional navigation modes and controls
+3. **Performance Improvements**: Further optimization for larger collections
+4. **Mobile-Optimized Version**: Native mobile builds for enhanced performance
+5. **XR Support**: Virtual reality and augmented reality experiences
+
+For a complete list of planned visualization enhancements, see the [Future Visualization Enhancements section in the Visualization documentation](./README-VISUALIZATION.md#future-visualization-enhancements).
+
+This roadmap will be implemented incrementally, with each phase building on previous work while providing immediate value to users.

@@ -1,9 +1,0 @@
-- name: Install SvelteKit Dependencies
-  working-directory: ./SvelteKit/BackSpace
-  run: npm ci
-
-- name: Process Collections
-  working-directory: SvelteKit/BackSpace
-  run: |
-    npm run build:scripts
-    npm run pipeline-full 

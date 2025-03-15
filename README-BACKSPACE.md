@@ -10,6 +10,7 @@ BackSpace handles several key responsibilities:
 2. **Web Interface**: Hosts the Unity WebGL build and provides UI elements
 3. **API Server**: Provides endpoints for dynamic queries and data retrieval
 4. **Deployment**: Manages static and dynamic content delivery
+5. **Authentication**: User management and access control
 
 ## Project Structure
 
@@ -22,11 +23,20 @@ SvelteKit/BackSpace/
 │   └── ...
 ├── src/                     # SvelteKit application source
 │   ├── routes/              # Application routes
+│   │   ├── api/             # API endpoints
+│   │   ├── collections/     # Collection browsing views
+│   │   ├── explore/         # Exploration interface
+│   │   └── settings/        # User settings and administration
 │   ├── lib/                 # Shared components and utilities
+│   │   ├── components/      # Reusable UI components
+│   │   ├── stores/          # Svelte stores for state management
+│   │   ├── utils/           # Utility functions
+│   │   └── api/             # API client libraries
 │   └── ...
 ├── static/                  # Static assets
 │   ├── data/                # Collection data
 │   ├── unity/               # Unity WebGL build
+│   ├── js/unity-extensions/ # JavaScript extensions for Unity
 │   └── ...
 └── build/                   # Production build output
 ```
@@ -39,8 +49,8 @@ BackSpace uses a multi-tiered caching and deployment strategy for Internet Archi
 
 ```
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
-│  Internet       │         │  Data           │         │  Deployment      │
-│  Archive API    │ ──────► │  Processing     │ ──────► │  Destinations    │
+│  Internet       │         │  Data           │         │  Deployment     │
+│  Archive API    │ ──────► │  Processing     │ ──────► │  Destinations   │
 └─────────────────┘         └─────────────────┘         └─────────────────┘
                                       │
                                       │
@@ -59,84 +69,27 @@ BackSpace uses a multi-tiered caching and deployment strategy for Internet Archi
                  (Selected Sets)        (All Collections)
 ```
 
-### Book Cover Visualization Techniques
+### Primary Data Flows
 
-The system uses advanced techniques to visualize book covers at multiple resolutions, particularly in 3D space. This enables efficient rendering while maintaining recognizable representations even at extreme distances.
+1. **Collection Registration**:
+   - User registers a collection from Internet Archive
+   - System stores collection metadata locally
 
-#### Multi-Resolution Texture Atlas Hierarchy
+2. **Collection Processing**:
+   - Backend scripts download and process collection items
+   - Metadata is enhanced with extracted content features
+   - Texture atlases are generated for efficient visualization
 
-For efficiently displaying large collections of books at different distances, the system utilizes a hierarchy of representations:
+3. **Unity Data Delivery**:
+   - Unity client requests collection data via API
+   - BackSpace delivers optimized data for visualization
+   - Real-time updates maintain synchronization
 
-1. **Single Pixel (1x1)**: Single color representation
-2. **Ultra Low (2x3)**: Six-pixel color pattern representation 
-3. **Very Low (4x6)**: Minimal shape recognition
-4. **Low (8x12)**: Basic color blocking becomes visible
-5. **Medium (16x24)**: Simple cover design elements become visible
-6. **High (32x48)**: Text becomes somewhat readable
-7. **Original**: Full resolution for close-up viewing
+### Book Cover Visualization Overview
 
-Each level has approximately 2x the resolution of the previous level, maintaining the standard book aspect ratio of 2:3. This creates a mipmap-like structure ideal for LOD (Level of Detail) rendering.
+BackSpace processes book covers at multiple resolutions to support efficient visualization in 3D space. The system generates and manages various representations, from single-pixel color summaries to full-resolution covers. 
 
-#### Ultra-Low Resolution Techniques
-
-The most critical representations for distant viewing are the 1x1 and 2x3 pixel representations, which are embedded directly in the metadata JSON:
-
-**Single Color (1x1) Algorithm**:
-The system extracts a dominant non-white/black color from the cover using a weighted region sampling that prioritizes colors in the center of the image.
-
-**2x3 Pixel Color Icons**:
-For the 2x3 representation (just 6 pixels total), the algorithm:
-1. Divides the cover into six regions (2 columns × 3 rows)
-2. Extracts the most representative color from each region
-3. Uses color peaks instead of averages to preserve vibrant, distinctive hues
-4. Maintains spatial relationships with the original cover
-
-This approach creates a "color fingerprint" that remains surprisingly recognizable even at this extremely low resolution.
-
-**Error Diffusion Color Representation**:
-Even at just 2x3 pixels (6 total), the system ensures book covers remain recognizable through:
-- Spatial color distribution that preserves the original cover's layout
-- Optimized color selection that maximizes visual distinction
-- Error diffusion principles to maintain overall visual impression
-
-The color placement follows this pattern to maintain spatial relationships:
-```
-+-------+-------+
-|   1   |   2   |  Colors are placed to maintain
-+-------+-------+  spatial relationship with the
-|   3   |   4   |  original cover's color layout
-+-------+-------+
-|   5   |   6   |
-+-------+-------+
-```
-
-This technique delivers maximum visual distinction even at extreme distances, allowing users to recognize covers from afar before getting close enough to see details. As users approach books, the system seamlessly transitions through multiple LOD levels, gradually revealing more detail.
-
-#### Metadata-Embedded Icon Representations
-
-Low-resolution icons are embedded directly in metadata using compact encodings:
-
-1. **Raw Pixel Encoding**: All embedded images use raw uncompressed RGB pixel data (24-bit per pixel)
-   - Encoded as base64 strings without delimiters
-   - No image headers or compression formats (not PNG/JPG) to save space
-   - Fixed dimensions allow for predictable data size
-   - The entire metadata JSON file is gzipped during transport for maximum efficiency
-
-2. **1x1 Icons**: Single pixel encoded as base64 RGB data (4 characters)
-   - Example: `"ABCD"` (decoded to RGB: 0,17,34)
-   
-3. **2x3 Icons**: Six pixels encoded as base64 (16 characters)
-   - Example: `"ABCDEFGHIJKLMNop"`
-   - Position is implicitly understood (left-to-right, top-to-bottom)
-   
-4. **4x6 Icons**: Twenty-four pixels encoded as base64 (32 characters)
-   - Still small enough to embed directly in metadata for rapid visualization
-
-5. **Larger Resolutions**: 8x12 and above typically stored as separate atlas files
-   - PNG/JPG formats used for these larger images
-   - Downloaded on demand based on visibility and distance
-
-This approach maximizes space efficiency while ensuring immediate visualization with minimal download. The Unity client can parse these raw pixel values and dynamically generate textures without requiring separate image files for the smallest resolutions.
+For detailed information about the visualization techniques, including ultra-low resolution techniques, texture atlas generation, and multi-resolution display approaches, see the [Visualization Techniques documentation](./README-VISUALIZATION.md).
 
 ### Caching Strategy
 
@@ -181,41 +134,12 @@ The system handles two types of collections:
 4. **Progressive Loading**:
    - Collections bundled with Unity load instantly
    - Additional collections load from the server as needed
-   - Low-resolution icons (1x1, 2x3) load first for immediate visualization
+   - Low-resolution icons load first for immediate visualization
    - Higher resolution assets load progressively
 
 #### Cache Levels and Data Types
 
-For each collection item, the system provides multiple resolution levels with specific caching strategies:
-
-1. **Metadata Level**:
-   - `cacheLevel: "metadata"`
-   - Encoded as raw RGB pixel data (24-bit per pixel) in base64 without delimiters
-   - Embedded directly in JSON metadata files
-   - Always available without additional requests
-   - Gzipped during transport for maximum efficiency
-   - Typically used for 1x1, 2x3, and 4x6 pixel representations
-
-2. **Unity Level**:
-   - `cacheLevel: "unity"`
-   - Included in the Unity app bundle
-   - Stored in `Resources` directory for direct loading
-   - Available instantly after initial app download
-   - Typically used for 4x6 and 8x12 representation for high-priority collections
-
-3. **Server Level**:
-   - `cacheLevel: "server"`
-   - Stored on the server or CDN
-   - Loaded on demand via HTTP requests
-   - Typically used for higher resolutions (16x24 and above)
-   - Used for all resolutions of standard and low-priority collections
-
-4. **Optional Level**:
-   - `cacheLevel: "optional"`
-   - Not generated by default
-   - Created and stored only when specifically requested
-   - Typically used for full-resolution covers
-   - System may fetch from Internet Archive on demand
+For each collection item, the system provides multiple resolution levels with specific caching strategies. See the [Visualization Techniques documentation](./README-VISUALIZATION.md#multi-resolution-representation-system) for details on the resolution hierarchy and encoding approaches.
 
 #### Example Collection Configuration
 
@@ -261,18 +185,6 @@ For each collection item, the system provides multiple resolution levels with sp
 }
 ```
 
-### Visualization Pipeline
-
-The system implements a progressive visualization strategy:
-
-1. **Initial View**: Uses embedded 1x1 and 2x3 data from metadata
-2. **Approaching**: Loads 16x24 atlas for the visible section as user gets closer
-3. **Examination**: Loads 64x96 atlas when user is examining books closely
-4. **Interaction**: Loads full cover when user selects or interacts with a book
-5. **Extended Interaction**: For dynamic or special collections, may load additional metadata
-
-This ensures books are always visualized, even with connectivity issues.
-
 ### Cache Control and Versioning
 
 The system supports cache invalidation through query parameters:
@@ -282,6 +194,66 @@ The system supports cache invalidation through query parameters:
 - `?version={hash}` - Used for cache-busting when new collections are deployed
 
 These parameters are recognized by the SvelteKit app and passed to Unity.
+
+## Key SvelteKit Components
+
+### 1. Unity Integration Component
+
+The BackSpace application hosts and communicates with the Unity WebGL client:
+
+```
+<!-- Unity Container Component -->
+<div class="unity-container">
+  <!-- Unity WebGL will be loaded here -->
+  {#if unityStatus === 'loading'}
+    <div class="loading-overlay">Loading Unity WebGL...</div>
+  {/if}
+</div>
+```
+
+### 2. UI Components
+
+BackSpace includes several reusable UI components:
+
+1. **Collection Browser**: Grid and list views for browsing collections
+2. **Item Viewer**: Detail view for individual items with metadata
+3. **Search Interface**: Advanced search with filters and sorting
+4. **Unity Container**: Responsive container for the Unity WebGL client
+5. **Administration Tools**: Collection management interface
+
+### 3. Authentication System
+
+User authentication and authorization are handled through SvelteKit hooks:
+
+```
+// Authentication functionality is implemented in src/hooks.server.js
+// to protect routes and manage user sessions
+```
+
+## API Reference and Endpoints
+
+The BackSpace application provides several API endpoints:
+
+### Collections
+
+- `GET /api/collections`: List all available collections
+- `GET /api/collections/:prefix`: Get details for a specific collection
+- `GET /api/collections/:prefix/items`: Get items in a collection
+- `POST /api/collections`: Register a new collection (admin only)
+- `DELETE /api/collections/:prefix`: Remove a collection (admin only)
+
+### Items
+
+- `GET /api/items/:id`: Get details for a specific item
+- `GET /api/items/:id/content`: Get content for a specific item
+- `GET /api/items/:id/similar`: Find similar items
+
+### Search
+
+- `GET /api/search?q=query`: Search across collections
+- `GET /api/collections/:prefix/search?q=query`: Search within a collection
+
+All API endpoints return JSON responses and support standard HTTP status codes for error handling.
 
 ## Development Setup
 
@@ -336,76 +308,57 @@ To add a new collection:
 3. Run the pipeline to process the collection
 4. Update the Unity project if including in client
 
-## API Reference
+## Performance Considerations
 
-The BackSpace application provides several API endpoints:
+BackSpace implements several performance optimizations:
 
-- `/api/collections` - List all available collections
-- `/api/collections/:prefix` - Get details for a specific collection
-- `/api/search` - Perform dynamic queries against Internet Archive 
+1. **Incremental Static Regeneration**: Pre-render pages but update dynamically
+2. **API Response Caching**: Cache API responses to reduce load
+3. **Lazy Loading**: Load components and data only when needed
+4. **Asset Optimization**: Compress and optimize static assets
+5. **Unity WebGL Streaming**: Progressive loading of Unity content
 
-### Texture Atlas Generation
+## Deployment
 
-The BackSpace pipeline generates texture atlases for book covers at multiple resolutions. These atlases pack multiple book covers into single texture files for efficient rendering in Unity.
+BackSpace can be deployed to various environments:
 
-Key aspects of atlas generation include:
+1. **Static Hosting**: Export as static site with serverless functions
+2. **Container-based**: Deploy using Docker to cloud platforms
+3. **Node.js Server**: Run as a standalone Node.js application
 
-1. **Multiple Resolution Levels**: Atlases are generated for each resolution level (8x12, 16x24, 64x96)
-2. **Efficient Packing**: Books are arranged in a grid pattern with appropriate gutters/spacing
-3. **Metadata Output**: Each book's position in the atlas is recorded in the collection metadata
-4. **Incremental Processing**: Only changed or new books are regenerated during incremental updates
+The recommended deployment approach uses Digital Ocean App Platform for both static hosting and containerized backend services.
 
-```javascript
-// Example atlas generation code snippet
-function generateAtlas(collectionPrefix, resolution, books) {
-  // Calculate atlas dimensions based on book count
-  const booksPerRow = Math.ceil(Math.sqrt(books.length));
-  
-  // Determine appropriate gutter size based on resolution
-  const gutterSize = resolution <= 6 ? 1 : (resolution <= 24 ? 2 : 4);
-  
-  // Size of each cell in the atlas (book + gutters)
-  const cellSize = resolution + gutterSize;
-  
-  // Create canvas with appropriate dimensions
-  const atlasWidth = cellSize * booksPerRow;
-  const atlasHeight = cellSize * Math.ceil(books.length / booksPerRow);
-  const canvas = createCanvas(atlasWidth, atlasHeight);
-  const ctx = canvas.getContext('2d');
-  
-  // Fill atlas with books, tracking positions
-  for (let i = 0; i < books.length; i++) {
-    const x = (i % booksPerRow) * cellSize + gutterSize/2;
-    const y = Math.floor(i / booksPerRow) * cellSize + gutterSize/2;
-    
-    // Draw book at position (x,y)
-    ctx.drawImage(books[i].image, x, y, resolution, resolution);
-    
-    // Store atlas position in book metadata
-    books[i].atlas = books[i].atlas || {};
-    books[i].atlas[resolution] = {
-      index: 0, // Atlas file index if multiple atlas files
-      x, 
-      y, 
-      width: resolution,
-      height: resolution
-    };
-  }
-  
-  // Save atlas to file
-  const filename = `${collectionPrefix}_${resolution}.png`;
-  const outputPath = path.join(outputDir, filename);
-  fs.writeFileSync(outputPath, canvas.toBuffer('image/png'));
-  
-  // Return atlas metadata for collection
-  return {
-    filename,
-    width: atlasWidth, 
-    height: atlasHeight, 
-    resolution,
-    booksPerRow
-  };
-}
-```
+## Texture Atlas Generation
 
-For Unity-specific details on texture atlases, gutters, and optimization techniques used in the CraftSpace renderer, see the [Texture Atlases in Unity section in README-CRAFTSPACE.md](./README-CRAFTSPACE.md#texture-atlases-in-unity). 
+The BackSpace pipeline generates texture atlases for book covers at multiple resolutions. These atlases pack multiple book covers into single texture files for efficient rendering in Unity. For details on atlas generation techniques and optimization strategies, see the [Texture Atlas System section in the Visualization documentation](./README-VISUALIZATION.md#texture-atlas-system).
+
+For Unity-specific details on texture atlases, gutters, and optimization techniques used in the CraftSpace renderer, see the [Unity Rendering Implementation section in the Visualization documentation](./README-VISUALIZATION.md#unity-rendering-implementation).
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1. **Unity Loading Fails**:
+   - Check browser console for errors
+   - Verify Unity build files are correctly placed in `static/unity`
+   - Ensure browser supports WebGL 2.0
+
+2. **API Errors**:
+   - Check server logs for detailed error information
+   - Verify Internet Archive API credentials
+   - Check network connectivity and CORS configuration
+
+3. **Slow Collection Processing**:
+   - Adjust concurrency settings in configuration
+   - Verify disk space and memory availability
+   - Consider using batch processing for large collections
+
+## Future Enhancements
+
+Planned enhancements for BackSpace include:
+
+1. **Progressive Web App**: Full PWA support for offline capabilities 
+2. **Collaborative Features**: Real-time collaboration between users
+3. **Advanced Analytics**: Usage tracking and visualization patterns
+4. **Personalization**: User-specific collections and preferences
+5. **Internationalization**: Multi-language support 

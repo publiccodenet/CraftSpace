@@ -13,7 +13,8 @@ pnpm-debug.log
 
 # Environment variables
 .env
-.env.*
+.env*
+!.env-template
 !.env.example
 
 # TypeScript

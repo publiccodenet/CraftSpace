@@ -1,7 +1,12 @@
-import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	plugins: [sveltekit(), tailwindcss()]
-});
+  plugins: [sveltekit()],
+  server: {
+    fs: {
+      // Allow access to content files outside src directory
+      allow: ['..']
+    }
+  }
+}); 

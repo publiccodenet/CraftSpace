@@ -1,0 +1,53 @@
+# This file is designed to work both as part of the main repo 
+# and if Content directory is used standalone in another repo
+
+# Text files should have normalized line endings
+* text=auto
+
+# Treat these files as text with normalized line endings
+*.json text
+*.md text
+*.txt text
+*.csv text
+*.xml text
+*.yaml text
+*.yml text
+
+# Images: Use regular Git for small images, LFS for larger ones
+# Git 2.22.0+ supports size-based attributes
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.jpg !filter !diff !merge text size="<100k"
+*.png filter=lfs diff=lfs merge=lfs -text
+*.png !filter !diff !merge text size="<100k"
+*.gif filter=lfs diff=lfs merge=lfs -text
+*.gif !filter !diff !merge text size="<100k"
+*.webp filter=lfs diff=lfs merge=lfs -text
+*.webp !filter !diff !merge text size="<100k"
+
+# Texture atlases always go through LFS regardless of size
+*.atlas filter=lfs diff=lfs merge=lfs -text
+*-atlas.jpg filter=lfs diff=lfs merge=lfs -text
+*-atlas.png filter=lfs diff=lfs merge=lfs -text
+
+# Document files should use LFS
+*.pdf filter=lfs diff=lfs merge=lfs -text
+*.docx filter=lfs diff=lfs merge=lfs -text
+*.xlsx filter=lfs diff=lfs merge=lfs -text
+*.pptx filter=lfs diff=lfs merge=lfs -text
+
+# Archive files should use LFS
+*.zip filter=lfs diff=lfs merge=lfs -text
+*.gz filter=lfs diff=lfs merge=lfs -text
+*.tar filter=lfs diff=lfs merge=lfs -text
+*.7z filter=lfs diff=lfs merge=lfs -text
+
+# Media files should use LFS
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
+*.avi filter=lfs diff=lfs merge=lfs -text
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.flac filter=lfs diff=lfs merge=lfs -text
+
+# Override for specific files
+# metadata/*.json !filter !diff !merge text 
