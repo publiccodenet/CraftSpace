@@ -1,9 +1,11 @@
-using UnityEngine;
-using UnityEditor;
 using System;
 using System.IO;
+using System.Text;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
+using UnityEngine;
+using UnityEditor;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 /// <summary>
 /// Unity Editor tool to import JSON schemas and generate C# classes.
@@ -11,167 +13,396 @@ using System.Text.RegularExpressions;
 /// </summary>
 public class SchemaImporter : EditorWindow
 {
-    private string schemaDirectory = "";
-    private string outputDirectory = "";
-    private string namespaceName = "BackSpace.Models";
-    
-    [MenuItem("Tools/Schema Importer")]
+    private string schemaDirectory = "Assets/Schemas";
+    private string outputDirectory = "Assets/Scripts/Models/Generated";
+    private bool includeNamespace = true;
+    private string namespaceName = "CraftSpace.Models";
+    private bool overwriteExisting = true;
+    private Vector2 scrollPosition;
+    private List<string> availableSchemas = new List<string>();
+    private List<bool> selectedSchemas = new List<bool>();
+    private bool selectAll = true;
+    private string statusMessage = "";
+
+    [MenuItem("CraftSpace/Schema Importer")]
     public static void ShowWindow()
     {
         GetWindow<SchemaImporter>("Schema Importer");
     }
-    
+
     private void OnEnable()
     {
-        // Default paths relative to project
-        schemaDirectory = Path.Combine(Application.dataPath, "../Schemas");
-        outputDirectory = Path.Combine(Application.dataPath, "Scripts/Generated/Models");
+        RefreshSchemaList();
     }
-    
+
+    private void RefreshSchemaList()
+    {
+        availableSchemas.Clear();
+        selectedSchemas.Clear();
+        
+        if (!Directory.Exists(schemaDirectory))
+        {
+            statusMessage = $"Schema directory not found: {schemaDirectory}";
+            return;
+        }
+        
+        string[] schemaFiles = Directory.GetFiles(schemaDirectory, "*.json");
+        foreach (string schemaFile in schemaFiles)
+        {
+            availableSchemas.Add(Path.GetFileNameWithoutExtension(schemaFile));
+            selectedSchemas.Add(selectAll);
+        }
+        
+        statusMessage = $"Found {schemaFiles.Length} schema files.";
+    }
+
     private void OnGUI()
     {
-        GUILayout.Label("JSON Schema to C# Class Generator", EditorStyles.boldLabel);
-        
+        GUILayout.Label("Schema Importer", EditorStyles.boldLabel);
         EditorGUILayout.Space();
         
+        EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
         schemaDirectory = EditorGUILayout.TextField("Schema Directory", schemaDirectory);
         outputDirectory = EditorGUILayout.TextField("Output Directory", outputDirectory);
-        namespaceName = EditorGUILayout.TextField("Namespace", namespaceName);
+        includeNamespace = EditorGUILayout.Toggle("Include Namespace", includeNamespace);
+        
+        if (includeNamespace)
+        {
+            namespaceName = EditorGUILayout.TextField("Namespace", namespaceName);
+        }
+        
+        overwriteExisting = EditorGUILayout.Toggle("Overwrite Existing", overwriteExisting);
         
         EditorGUILayout.Space();
         
-        if (GUILayout.Button("Browse Schema Directory"))
+        if (GUILayout.Button("Refresh Schema List"))
         {
-            string path = EditorUtility.OpenFolderPanel("Select Schema Directory", schemaDirectory, "");
-            if (!string.IsNullOrEmpty(path))
-                schemaDirectory = path;
-        }
-        
-        if (GUILayout.Button("Browse Output Directory"))
-        {
-            string path = EditorUtility.OpenFolderPanel("Select Output Directory", outputDirectory, "");
-            if (!string.IsNullOrEmpty(path))
-                outputDirectory = path;
+            RefreshSchemaList();
         }
         
         EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Available Schemas", EditorStyles.boldLabel);
         
-        GUI.enabled = Directory.Exists(schemaDirectory);
+        bool newSelectAll = EditorGUILayout.Toggle("Select All", selectAll);
+        if (newSelectAll != selectAll)
+        {
+            selectAll = newSelectAll;
+            for (int i = 0; i < selectedSchemas.Count; i++)
+            {
+                selectedSchemas[i] = selectAll;
+            }
+        }
+        
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+        for (int i = 0; i < availableSchemas.Count; i++)
+        {
+            selectedSchemas[i] = EditorGUILayout.Toggle(availableSchemas[i], selectedSchemas[i]);
+        }
+        EditorGUILayout.EndScrollView();
+        
+        EditorGUILayout.Space();
+        
         if (GUILayout.Button("Generate C# Classes"))
         {
             GenerateClasses();
         }
-        GUI.enabled = true;
         
-        if (!Directory.Exists(schemaDirectory))
-        {
-            EditorGUILayout.HelpBox("Schema directory doesn't exist!", MessageType.Warning);
-        }
+        EditorGUILayout.Space();
+        EditorGUILayout.HelpBox(statusMessage, MessageType.Info);
     }
-    
+
     private void GenerateClasses()
-    {
-        if (!Directory.Exists(schemaDirectory))
-        {
-            Debug.LogError("Schema directory doesn't exist: " + schemaDirectory);
-            return;
-        }
-        
-        // Ensure output directory exists
-        if (!Directory.Exists(outputDirectory))
-        {
-            Directory.CreateDirectory(outputDirectory);
-        }
-        
-        // Find all JSON Schema files
-        string[] schemaFiles = Directory.GetFiles(schemaDirectory, "*.schema.json", SearchOption.TopDirectoryOnly);
-        
-        if (schemaFiles.Length == 0)
-        {
-            EditorUtility.DisplayDialog("No Schemas Found", 
-                "No JSON Schema files (*.schema.json) found in the selected directory.", "OK");
-            return;
-        }
-        
-        // Generate a class for each schema
-        int successCount = 0;
-        foreach (string schemaFile in schemaFiles)
-        {
-            try
-            {
-                string className = Path.GetFileNameWithoutExtension(schemaFile).Replace(".schema", "");
-                
-                // Call NJsonSchema code generation (see below)
-                if (GenerateClassFromSchema(schemaFile, className))
-                    successCount++;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Error processing {Path.GetFileName(schemaFile)}: {ex.Message}");
-            }
-        }
-        
-        AssetDatabase.Refresh();
-        
-        EditorUtility.DisplayDialog("Code Generation Complete", 
-            $"Successfully generated {successCount} of {schemaFiles.Length} C# classes.", "OK");
-    }
-    
-    private bool GenerateClassFromSchema(string schemaFilePath, string className)
     {
         try
         {
-            // Read the schema file
-            string schemaJson = File.ReadAllText(schemaFilePath);
+            Debug.Log($"Starting class generation from schemas in {schemaDirectory}");
             
-            // Generate C# code using NJsonSchema
-            // We'll use a simple template-based approach for now
-            string code = GenerateSimpleClass(schemaJson, className);
+            if (!Directory.Exists(schemaDirectory))
+            {
+                Debug.LogError($"Schema directory does not exist: {schemaDirectory}");
+                statusMessage = $"Error: Schema directory not found";
+                return;
+            }
             
-            // Write the output file
-            string outputPath = Path.Combine(outputDirectory, $"{className}.cs");
-            File.WriteAllText(outputPath, code);
+            // List all files in the schema directory
+            string[] allFiles = Directory.GetFiles(schemaDirectory);
+            Debug.Log($"All files in schema directory: {string.Join(", ", allFiles)}");
             
-            Debug.Log($"Generated: {outputPath}");
-            return true;
+            // List just JSON files
+            string[] schemaFiles = Directory.GetFiles(schemaDirectory, "*.json");
+            Debug.Log($"JSON files in schema directory: {string.Join(", ", schemaFiles)}");
+            
+            if (schemaFiles.Length == 0)
+            {
+                Debug.LogWarning("No JSON schema files found in directory");
+                statusMessage = "No schema files found";
+                return;
+            }
+            
+            if (!Directory.Exists(outputDirectory))
+            {
+                Debug.Log($"Creating output directory: {outputDirectory}");
+                Directory.CreateDirectory(outputDirectory);
+            }
+            
+            int generatedCount = 0;
+            
+            for (int i = 0; i < availableSchemas.Count; i++)
+            {
+                if (selectedSchemas[i])
+                {
+                    string schemaName = availableSchemas[i];
+                    string schemaPath = Path.Combine(schemaDirectory, $"{schemaName}.json");
+                    string outputPath = Path.Combine(outputDirectory, $"{schemaName}.cs");
+                    
+                    Debug.Log($"Processing schema: {schemaName}");
+                    Debug.Log($"Schema path: {schemaPath}");
+                    Debug.Log($"Output path: {outputPath}");
+                    
+                    if (!File.Exists(schemaPath))
+                    {
+                        Debug.LogError($"Schema file not found: {schemaPath}");
+                        continue;
+                    }
+                    
+                    if (File.Exists(outputPath) && !overwriteExisting)
+                    {
+                        Debug.LogWarning($"Skipping {schemaName} - file already exists and overwrite is disabled.");
+                        continue;
+                    }
+                    
+                    string json = File.ReadAllText(schemaPath);
+                    Debug.Log($"Schema file content (first 100 chars): {json.Substring(0, Math.Min(100, json.Length))}...");
+                    
+                    try
+                    {
+                        string csharpCode = ConvertJsonSchemaToClass(schemaName, json);
+                        
+                        if (string.IsNullOrEmpty(csharpCode))
+                        {
+                            Debug.LogError($"Generated C# code for {schemaName} was empty");
+                            continue;
+                        }
+                        
+                        Debug.Log($"Writing C# class to: {outputPath}");
+                        File.WriteAllText(outputPath, csharpCode);
+                        generatedCount++;
+                        Debug.Log($"Successfully generated class for: {schemaName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Error processing schema {schemaName}: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
+            
+            AssetDatabase.Refresh();
+            statusMessage = $"Generated {generatedCount} C# classes.";
+            Debug.Log(statusMessage);
         }
         catch (Exception ex)
         {
-            Debug.LogError($"Error generating class from {schemaFilePath}: {ex.Message}");
-            return false;
+            statusMessage = $"Error generating classes: {ex.Message}";
+            Debug.LogException(ex);
         }
     }
-    
-    private string GenerateSimpleClass(string schemaJson, string className)
+
+    private string ConvertJsonSchemaToClass(string className, string jsonSchema)
     {
-        // This is a simplified generator - in a real implementation,
-        // you would use NJsonSchema.CodeGeneration.CSharp for proper JSON Schema parsing
+        try
+        {
+            Debug.Log($"Parsing JSON schema for {className}");
+            JObject schema = JObject.Parse(jsonSchema);
+            
+            // Navigate to the actual schema data - handle $ref structure
+            JObject actualSchema = schema;
+            
+            // Check if we have a $ref at the root
+            string refPath = schema["$ref"]?.ToString();
+            if (!string.IsNullOrEmpty(refPath) && refPath.StartsWith("#/"))
+            {
+                // Parse the path - typical format is "#/definitions/SchemaName"
+                string[] pathParts = refPath.Substring(2).Split('/');
+                JToken current = schema;
+                
+                foreach (string part in pathParts)
+                {
+                    current = current[part];
+                    if (current == null)
+                    {
+                        Debug.LogError($"Could not resolve reference path: {refPath}");
+                        return $"// Error: Invalid reference path {refPath}";
+                    }
+                }
+                
+                actualSchema = current as JObject;
+                Debug.Log($"Resolved $ref to actual schema with {actualSchema?.Properties().Count()} properties");
+            }
+            
+            // Look for properties in the correct location
+            JObject properties = actualSchema["properties"] as JObject;
+            
+            // Log what we found for debugging
+            if (properties != null)
+            {
+                Debug.Log($"Found {properties.Count} properties in schema");
+                foreach (var prop in properties)
+                {
+                    Debug.Log($"  Property: {prop.Key}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"No properties found in {className} schema");
+                // Look in other places
+                if (actualSchema["type"]?.ToString() == "object")
+                {
+                    Debug.Log("Schema is an object type but couldn't find properties");
+                }
+                
+                // Dump full schema for debugging
+                Debug.Log($"Full schema: {actualSchema.ToString(Formatting.Indented).Substring(0, Math.Min(500, actualSchema.ToString().Length))}...");
+            }
+            
+            StringBuilder sb = new StringBuilder();
+            
+            // Add using directives
+            sb.AppendLine("using System;");
+            sb.AppendLine("using System.Collections.Generic;");
+            sb.AppendLine("using Newtonsoft.Json;");
+            sb.AppendLine();
+            
+            // Add namespace if requested
+            if (includeNamespace)
+            {
+                sb.AppendLine($"namespace {namespaceName}");
+                sb.AppendLine("{");
+            }
+            
+            // Add class documentation
+            string description = schema["description"]?.ToString() ?? $"Represents a {className}";
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// {description}");
+            sb.AppendLine("/// </summary>");
+            
+            // Begin class definition
+            sb.AppendLine($"public class {className}");
+            sb.AppendLine("{");
+            
+            // Process properties from schema
+            if (properties != null)
+            {
+                foreach (var property in properties)
+                {
+                    string propertyName = property.Key;
+                    JObject propertyObj = property.Value as JObject;
+                    
+                    if (propertyObj != null)
+                    {
+                        // Get property description for documentation
+                        string propertyDescription = propertyObj["description"]?.ToString() ?? $"Gets or sets the {propertyName}";
+                        
+                        sb.AppendLine("    /// <summary>");
+                        sb.AppendLine($"    /// {propertyDescription}");
+                        sb.AppendLine("    /// </summary>");
+                        
+                        // Determine property type
+                        string propertyType = GetCSharpType(propertyObj);
+                        
+                        // Generate property
+                        sb.AppendLine($"    [JsonProperty(\"{propertyName}\")]");
+                        sb.AppendLine($"    public {propertyType} {FormatPropertyName(propertyName)} {{ get; set; }}");
+                        sb.AppendLine();
+                    }
+                }
+            }
+            
+            // End class definition
+            sb.AppendLine("}");
+            
+            // End namespace if used
+            if (includeNamespace)
+            {
+                sb.AppendLine("}");
+            }
+            
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Error converting schema {className}: {ex.Message}\n{ex.StackTrace}");
+            return $"// Error generating class: {ex.Message}";
+        }
+    }
+
+    private string GetCSharpType(JObject propertyObj)
+    {
+        string type = propertyObj["type"]?.ToString();
         
-        // For now, we'll generate a basic class with Newtonsoft.Json attributes
-        var codeBuilder = new System.Text.StringBuilder();
+        if (type == null)
+        {
+            return "object";
+        }
         
-        codeBuilder.AppendLine("// <auto-generated>");
-        codeBuilder.AppendLine("// Generated from JSON Schema using SchemaImporter");
-        codeBuilder.AppendLine("// </auto-generated>");
-        codeBuilder.AppendLine();
-        codeBuilder.AppendLine("using System;");
-        codeBuilder.AppendLine("using System.Collections.Generic;");
-        codeBuilder.AppendLine("using Newtonsoft.Json;");
-        codeBuilder.AppendLine();
-        codeBuilder.AppendLine($"namespace {namespaceName}");
-        codeBuilder.AppendLine("{");
-        codeBuilder.AppendLine($"    public class {className.Replace("Schema", "")}");
-        codeBuilder.AppendLine("    {");
+        switch (type)
+        {
+            case "string":
+                string format = propertyObj["format"]?.ToString();
+                if (format == "date-time")
+                {
+                    return "DateTime";
+                }
+                return "string";
+                
+            case "integer":
+                return "int";
+                
+            case "number":
+                return "double";
+                
+            case "boolean":
+                return "bool";
+                
+            case "array":
+                JObject items = propertyObj["items"] as JObject;
+                if (items != null)
+                {
+                    string itemType = GetCSharpType(items);
+                    return $"List<{itemType}>";
+                }
+                return "List<object>";
+                
+            case "object":
+                return "Dictionary<string, object>";
+                
+            default:
+                return "object";
+        }
+    }
+
+    private string FormatPropertyName(string propertyName)
+    {
+        // Convert snake_case or kebab-case to PascalCase
+        StringBuilder sb = new StringBuilder();
+        bool capitalizeNext = true;
         
-        // Dummy properties - in a real implementation, these would be parsed from the schema
-        codeBuilder.AppendLine("        // TODO: Add actual properties from schema");
-        codeBuilder.AppendLine("        [JsonProperty(\"id\")]");
-        codeBuilder.AppendLine("        public string Id { get; set; }");
-        codeBuilder.AppendLine();
+        foreach (char c in propertyName)
+        {
+            if (c == '_' || c == '-')
+            {
+                capitalizeNext = true;
+            }
+            else if (capitalizeNext)
+            {
+                sb.Append(char.ToUpper(c));
+                capitalizeNext = false;
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
         
-        codeBuilder.AppendLine("    }");
-        codeBuilder.AppendLine("}");
-        
-        return codeBuilder.ToString();
+        return sb.ToString();
     }
 } 

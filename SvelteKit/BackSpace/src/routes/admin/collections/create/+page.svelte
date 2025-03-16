@@ -67,7 +67,7 @@
         type="text" 
         id="name" 
         bind:value={collection.name} 
-        on:input={updateId}
+        oninput={updateId}
         placeholder="Enter collection name" 
         required
       />

@@ -1,5 +1,18 @@
 import { json } from '@sveltejs/kit';
-import { InternetArchiveSDK } from 'internetarchive-sdk-js';
+// Try a more robust import approach
+let InternetArchiveSDK;
+try {
+  const mod = await import("internetarchive-sdk-js");
+  // Handle different export possibilities
+  InternetArchiveSDK = mod.default || mod.InternetArchiveSDK || mod;
+} catch (err) {
+  console.error("Error importing Internet Archive SDK:", err);
+  // Provide a fallback/mock if needed
+  InternetArchiveSDK = class MockSDK {
+    constructor() {}
+    async search() { return { response: { docs: [], numFound: 0 } }; }
+  };
+}
 
 const ia = new InternetArchiveSDK();
 

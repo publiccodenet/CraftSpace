@@ -1,60 +1,59 @@
 import { json } from '@sveltejs/kit';
-
-// Sample collections data 
-const sampleCollections = [
-  {
-    id: 'scifi-books',
-    name: 'Science Fiction Books',
-    query: 'collection:sciencefiction',
-    lastUpdated: new Date().toISOString(),
-    totalItems: 42,
-    description: 'A collection of classic science fiction works'
-  },
-  {
-    id: 'golden-age-comics',
-    name: 'Golden Age Comics',
-    query: 'collection:comics AND date:[1938 TO 1956]',
-    lastUpdated: new Date().toISOString(), 
-    totalItems: 24,
-    description: 'Comic books from the Golden Age era (1938-1956)'
-  },
-  {
-    id: 'vintage-software',
-    name: 'Vintage Software',
-    query: 'collection:softwarelibrary',
-    lastUpdated: new Date().toISOString(),
-    totalItems: 18,
-    description: 'Classic software and games from computing history'
-  }
-];
+import fs from 'fs-extra';
+import path from 'path';
+import { PATHS } from '$lib/constants';
 
 /**
- * GET handler for the /api/collections endpoint
- * @returns {Response} JSON response with collections data
+ * GET handler for collections API
+ * Returns list of all collections
  */
-export function GET() {
-  return json({
-    collections: sampleCollections
-  });
-}
-
-export async function POST({ request }) {
-  try {
-    const newCollection = await request.json();
-    
-    return json({
-      success: true,
-      collection: {
-        ...newCollection,
-        id: newCollection.id || `collection-${Date.now()}`,
-        lastUpdated: new Date().toISOString(),
-        totalItems: 0
-      }
-    }, { status: 201 });
-  } catch (error) {
-    return json({
-      success: false,
-      message: error.message || 'Failed to create collection'
-    }, { status: 400 });
-  }
+export async function GET() {
+    try {
+        // Path to collections directory
+        const collectionsDir = PATHS.COLLECTIONS_DIR;
+        
+        // Check if collections directory exists
+        if (!fs.existsSync(collectionsDir)) {
+            return json({ error: 'Collections directory not found' }, { status: 404 });
+        }
+        
+        // Get all subdirectories in the collections directory
+        const collections = fs.readdirSync(collectionsDir)
+            .filter(item => {
+                const itemPath = path.join(collectionsDir, item);
+                return fs.statSync(itemPath).isDirectory();
+            })
+            .map(collectionId => {
+                // Path to collection.json
+                const configPath = path.join(collectionsDir, collectionId, 'collection.json');
+                
+                if (fs.existsSync(configPath)) {
+                    try {
+                        // Read collection data
+                        const collectionData = fs.readJSONSync(configPath);
+                        return {
+                            id: collectionId,
+                            ...collectionData
+                        };
+                    } catch (error) {
+                        console.error(`Error reading collection ${collectionId}:`, error);
+                        return {
+                            id: collectionId,
+                            name: collectionId,
+                            error: 'Error reading collection data'
+                        };
+                    }
+                } else {
+                    return {
+                        id: collectionId,
+                        name: collectionId
+                    };
+                }
+            });
+        
+        return json(collections);
+    } catch (error) {
+        console.error('Error fetching collections:', error);
+        return json({ error: 'Error fetching collections' }, { status: 500 });
+    }
 } 

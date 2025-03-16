@@ -258,4 +258,12 @@ When updating a schema:
 - [JSON Schema](https://json-schema.org/)
 - [NJsonSchema](https://github.com/RicoSuter/NJsonSchema)
 - [JSON.NET](https://www.newtonsoft.com/json)
-- [Ajv Validator](https://ajv.js.org/) 
+- [Ajv Validator](https://ajv.js.org/)
+
+## Schema Design Principles
+
+* All schemas are defined using Zod for TypeScript type safety
+* Use `id` in model properties to align with JSON
+* Use camelCase for variable and parameter names: `collectionId`, `itemId`
+* Use snake_case for function names that handle these IDs: `get_collection()`, `update_item()`
+* Keep schemas focused on one responsibility/entity 

@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for the item"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Display title of the item"
+    },
+    "creator": {
+      "type": "string",
+      "description": "Author or creator of the item"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the item contents"
+    },
+    "date": {
+      "type": "string",
+      "description": "Publication or creation date"
+    },
+    "mediaType": {
+      "type": "string",
+      "description": "Type of media (texts, video, audio, etc.)"
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Subject categories or tags"
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp in the system"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Filename"
+          },
+          "format": {
+            "type": "string",
+            "description": "File format or extension"
+          },
+          "size": {
+            "type": "number",
+            "description": "File size in bytes"
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative path to the file"
+          }
+        },
+        "required": [
+          "name",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "id",
+    "collection_id",
+    "title"
+  ],
+  "additionalProperties": false,
+  "description": "Schema for Item"
+}

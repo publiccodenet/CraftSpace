@@ -48,3 +48,24 @@ collections/*
 */generated/
 */temp/
 */cache/
+
+# Ignore individual collection data files but keep directory structure
+*/items/**/*.json
+
+# Except for the scifi collection which should be preserved
+!scifi/items/**/*.json
+
+# Ignore large binary files
+**/*.pdf
+**/*.jpg
+**/*.png
+**/*.mp3
+**/*.mp4
+
+# But don't ignore thumbnails
+!**/thumbnails/*.jpg
+!**/thumbnails/*.png
+
+# Cache directories
+**/.cache
+**/temp

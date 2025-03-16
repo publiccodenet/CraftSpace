@@ -1,5 +1,5 @@
 {
-  "prefix": "scifi",
+  "id": "scifi",
   "name": "Science Fiction",
   "description": "",
   "query": "subject:science fiction mediatype:texts",
