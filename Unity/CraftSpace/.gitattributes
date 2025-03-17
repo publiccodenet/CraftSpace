@@ -1,0 +1,33 @@
+# Unity-specific .gitattributes
+# This contains rules specific to the Unity project
+
+# Unity-specific files
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+*.unity3d filter=lfs diff=lfs merge=lfs -text
+*.asset filter=lfs diff=lfs merge=lfs -text size=">1M"
+*.unity text
+*.mat text
+*.anim text
+*.controller text
+*.prefab text
+*.physicMaterial text
+*.meta text
+
+# Special Unity Content
+*.unity3d filter=lfs diff=lfs merge=lfs -text
+
+# Unity terrain files
+*.terrainlayer filter=lfs diff=lfs merge=lfs -text
+*.asset filter=lfs diff=lfs merge=lfs -text size=">1M"
+
+# Explicitly mark all text files as regular Git files first - these take precedence
+# This will override any parent directory rules trying to use LFS for these files
+*.txt text
+*.json text
+*.md text
+*.xml text
+*.yaml text
+*.yml text
+
+# Only use LFS for text files that are BIGGER than 1MB
+*.txt filter=lfs diff=lfs merge=lfs -text size=">1M" 

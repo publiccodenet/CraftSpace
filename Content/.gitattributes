@@ -1,6 +1,7 @@
-# This file is designed to work both as part of the main repo 
-# and if Content directory is used standalone in another repo
+# Content-specific .gitattributes
+# This contains rules specific to the Content directory
 
+# Ensure all text files are handled as text with normalized line endings
 # Text files should have normalized line endings
 * text=auto
 
@@ -49,5 +50,11 @@
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.flac filter=lfs diff=lfs merge=lfs -text
 
-# Override for specific files
-# metadata/*.json !filter !diff !merge text 
+# Ensure JSON files in collections directory are not tracked by LFS
+collections/**/*.json !filter !diff !merge text
+schemas/**/*.json !filter !diff !merge text
+
+# Make sure small text files are never tracked by LFS
+*.txt !filter !diff !merge text
+# Only use LFS for very large text files
+*.txt filter=lfs diff=lfs merge=lfs -text size=">1M" 
