@@ -1,16 +1,16 @@
-# CraftSpace
+# Spacecraft
 
 **A spatial visualization platform for Internet Archive collections**
 
 ## Executive Summary
 
-CraftSpace transforms Internet Archive collections into navigable 3D environments, enabling spatial exploration of digital knowledge. By bridging Internet Archive's vast content with immersive visualization techniques, CraftSpace offers new ways to discover, organize, and understand digital collections through spatial relationships and visual recognition patterns.
+Spacecraft transforms Internet Archive collections into navigable 3D environments, enabling spatial exploration of digital knowledge. By bridging Internet Archive's vast content with immersive visualization techniques, CraftSpace offers new ways to discover, organize, and understand digital collections through spatial relationships and visual recognition patterns.
 
 The platform uses multi-resolution processing to render thousands of items simultaneously while preserving their visual identity even at great distances. Its modular architecture separates content acquisition, processing, and visualization, allowing each to evolve independently while maintaining alignment with Internet Archive's content structure and metadata standards.
 
 ## Architecture Overview
 
-CraftSpace implements a multi-tier architecture that processes Internet Archive collections through specialized pipelines:
+Spacecraft implements a multi-tier architecture that processes Internet Archive collections through specialized pipelines:
 
 ```
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
@@ -43,7 +43,7 @@ CraftSpace implements a multi-tier architecture that processes Internet Archive 
 
 ### Multi-Resolution Visualization
 
-CraftSpace implements a hierarchical approach to item representation:
+Spacecraft implements a hierarchical approach to item representation:
 
 - **Ultra-Distant View** (In Progress, P3, Medium): Single-color (1×1 pixel) representation extracted from cover
 - **Distant View** (In Progress, P3, Medium): Six-color "fingerprint" (2×3 pixels) that preserves visual identity
@@ -160,7 +160,7 @@ Each collection maintains its original Internet Archive identifiers and metadata
 
 ## Development
 
-The CraftSpace project welcomes contributions. The development workflow separates content processing from visualization, enabling specialized work in different areas:
+The Spacecraft project welcomes contributions. The development workflow separates content processing from visualization, enabling specialized work in different areas:
 
 - **Content Pipeline**: Process Internet Archive collections into optimized formats
 - **Web Application**: Enhance the SvelteKit host application
@@ -169,4 +169,4 @@ The CraftSpace project welcomes contributions. The development workflow separate
 
 ## Acknowledgments
 
-This project builds upon the Internet Archive's mission of universal access to knowledge by adding spatial visualization capabilities to its digital collections. We gratefully acknowledge the Internet Archive's commitment to digital preservation and open access that makes projects like this possible.
+This project builds upon the Internet Archive's mission of universal access to knowledge by adding spatial visualization capabilities to its digital collections. We gratefully acknowledge the Internet Archive's commitment to digital preservation and open access, which makes projects like this possible.
