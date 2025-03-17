@@ -109,7 +109,7 @@ The schema pipeline works as follows:
 
 ```csharp
 // C# model aligns with JSON structure
-public class ItemData 
+public class Item
 {
     public string id; // matches JSON property
     // other properties...
@@ -121,4 +121,16 @@ public ItemData GetItemById(string collectionId, string itemId)
     // Implementation...
     return collection.items.Find(item => item.id == itemId);
 }
+``` 
+
+## JSON Data Structure
+
+Collection Index:
+```json
+["scifi", "history"]
+```
+
+Items Index:
+```json
+["item1", "item2", "item3"]
 ``` 

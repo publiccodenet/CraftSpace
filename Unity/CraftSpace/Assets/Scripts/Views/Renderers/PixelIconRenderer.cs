@@ -1,5 +1,5 @@
 using UnityEngine;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 using System.Collections.Generic;
 
 /// <summary>
@@ -92,7 +92,7 @@ public class PixelIconRenderer : ItemViewRenderer
         _iconObject.SetActive(false);
     }
     
-    private Texture2D GeneratePixelIcon(ItemData model)
+    private Texture2D GeneratePixelIcon(CraftSpace.Models.Schema.Generated.Item model)
     {
         // Create texture
         Texture2D texture = new Texture2D(_pixelSize, _pixelSize, TextureFormat.RGBA32, false);
@@ -100,9 +100,9 @@ public class PixelIconRenderer : ItemViewRenderer
         
         // Get primary color from model
         Color primaryColor = _defaultColor;
-        if (_useSubjectColors && model.subject.Count > 0)
+        if (_useSubjectColors && model.Subjects != null && model.Subjects.Count > 0)
         {
-            foreach (string subject in model.subject)
+            foreach (string subject in model.Subjects)
             {
                 foreach (var key in _subjectColors.Keys)
                 {
@@ -116,7 +116,7 @@ public class PixelIconRenderer : ItemViewRenderer
         }
         
         // Generate a simple icon based on first character
-        char firstChar = model.title.Length > 0 ? char.ToUpperInvariant(model.title[0]) : 'A';
+        char firstChar = !string.IsNullOrEmpty(model.Title) ? char.ToUpperInvariant(model.Title[0]) : 'A';
         int charValue = (int)firstChar - 65; // A=0, B=1, etc.
         
         // Create a pattern based on character value
@@ -211,7 +211,7 @@ public class PixelIconRenderer : ItemViewRenderer
         }
     }
     
-    public override void UpdateWithItemModel(ItemData model)
+    public override void UpdateWithItemModel(Item model)
     {
         if (model == null || _meshRenderer == null)
             return;

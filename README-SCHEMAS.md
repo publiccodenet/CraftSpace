@@ -20,7 +20,7 @@ This document outlines the schema-driven development approach used in BackSpace,
 import { z } from 'zod';
 
 export const CollectionSchema = z.object({
-  collection_id: z.string().min(1),
+  id: z.string().min(1),
   name: z.string().min(1),
   query: z.string().optional(),
   description: z.string().optional(),
@@ -70,7 +70,7 @@ import { CollectionSchema, type Collection } from '../lib/schemas/collection';
 
 // Type-safe usage
 const collection: Collection = {
-  collection_id: 'scifi',
+  id: 'scifi',
   name: 'Science Fiction',
   query: 'subject:science fiction',
   created: new Date().toISOString(),

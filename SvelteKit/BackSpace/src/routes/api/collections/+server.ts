@@ -1,20 +1,25 @@
 import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import fs from 'fs-extra';
 import path from 'path';
 import { PATHS } from '$lib/constants';
 
 /**
  * GET handler for collections API
- * Returns list of all collections
+ * Lists all collections
  */
-export async function GET() {
+export const GET: RequestHandler = async () => {
     try {
-        // Path to collections directory
         const collectionsDir = PATHS.COLLECTIONS_DIR;
         
-        // Check if collections directory exists
+        console.log('Collections directory path:', collectionsDir);
+        console.log('Directory exists:', fs.existsSync(collectionsDir));
+        
+        // If directory doesn't exist, create it
         if (!fs.existsSync(collectionsDir)) {
-            return json({ error: 'Collections directory not found' }, { status: 404 });
+            fs.mkdirSync(collectionsDir, { recursive: true });
+            console.log('Created collections directory');
+            return json({ collections: [] });
         }
         
         // Get all subdirectories in the collections directory
@@ -53,7 +58,7 @@ export async function GET() {
         
         return json(collections);
     } catch (error) {
-        console.error('Error fetching collections:', error);
-        return json({ error: 'Error fetching collections' }, { status: 500 });
+        console.error('Error listing collections:', error);
+        return json({ error: 'Error listing collections', details: error.message }, { status: 500 });
     }
-} 
+}; 

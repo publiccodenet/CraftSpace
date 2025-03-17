@@ -20,10 +20,6 @@
         <span class="status-value">{import.meta.env.MODE}</span>
       </div>
       <div class="status-item">
-        <span class="status-label">Content Directory:</span>
-        <span class="status-value">../../Content</span>
-      </div>
-      <div class="status-item">
         <span class="status-label">Server Time:</span>
         <span class="status-value">{new Date().toLocaleString()}</span>
       </div>

@@ -1,6 +1,7 @@
 using UnityEngine;
-using CraftSpace.Models;
 using System.Collections.Generic;
+using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 
 public class CollectionGridLayout : MonoBehaviour
 {
@@ -13,7 +14,7 @@ public class CollectionGridLayout : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform _container;
     [SerializeField] private GameObject _itemViewPrefab;
-    [SerializeField] private CollectionData _collection;
+    [SerializeField] private Collection _collection;
     
     private List<ItemView> _itemViews = new List<ItemView>();
     private Vector2Int _gridDimensions;
@@ -26,7 +27,7 @@ public class CollectionGridLayout : MonoBehaviour
         }
     }
     
-    public void SetCollection(CollectionData collection)
+    public void SetCollection(CraftSpace.Models.Schema.Generated.Collection collection)
     {
         _collection = collection;
         ClearGrid();
@@ -83,7 +84,7 @@ public class CollectionGridLayout : MonoBehaviour
         }
     }
     
-    private ItemView CreateItemView(ItemData itemData, Vector3 position)
+    private ItemView CreateItemView(Item itemData, Vector3 position)
     {
         if (_itemViewPrefab == null)
             return null;

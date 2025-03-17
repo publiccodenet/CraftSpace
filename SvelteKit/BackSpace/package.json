@@ -31,7 +31,9 @@
     "connector:manage": "tsx scripts/connector-manage.js",
     "export:manage": "tsx scripts/export-manage.js",
     "processor:manage": "tsx scripts/processor-manage.js",
-    "import:debug": "tsx scripts/import-debug.js"
+    "import:debug": "tsx scripts/import-debug.js",
+    "collection:validate": "tsx scripts/collection-exclude.js check",
+    "collection:excluded": "tsx scripts/collection-exclude.js list"
   },
   "dependencies": {
     "async-retry": "^1.3.3",

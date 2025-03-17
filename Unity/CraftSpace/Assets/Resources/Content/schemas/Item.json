@@ -4,12 +4,10 @@
   "properties": {
     "id": {
       "type": "string",
-      "minLength": 1,
       "description": "Unique identifier for the item"
     },
     "title": {
       "type": "string",
-      "minLength": 1,
       "description": "Display title of the item"
     },
     "creator": {
@@ -26,6 +24,7 @@
     },
     "mediaType": {
       "type": "string",
+      "default": "texts",
       "description": "Type of media (texts, video, audio, etc.)"
     },
     "subjects": {
@@ -33,53 +32,37 @@
       "items": {
         "type": "string"
       },
+      "default": [],
       "description": "Subject categories or tags"
+    },
+    "isFavorite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the item is a favorite"
+    },
+    "downloads": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of downloads"
     },
     "created": {
       "type": "string",
-      "format": "date-time",
       "description": "Creation timestamp in the system"
     },
     "lastUpdated": {
       "type": "string",
-      "format": "date-time",
       "description": "Last update timestamp"
     },
     "files": {
       "type": "array",
       "items": {
         "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Filename"
-          },
-          "format": {
-            "type": "string",
-            "description": "File format or extension"
-          },
-          "size": {
-            "type": "number",
-            "description": "File size in bytes"
-          },
-          "path": {
-            "type": "string",
-            "description": "Relative path to the file"
-          }
-        },
-        "required": [
-          "name",
-          "format"
-        ],
-        "additionalProperties": false
-      }
+        "additionalProperties": {}
+      },
+      "description": "Associated files"
     }
   },
-  "required": [
-    "id",
-    "collection_id",
-    "title"
-  ],
+  "required": [],
   "additionalProperties": false,
   "description": "Schema for Item"
 }

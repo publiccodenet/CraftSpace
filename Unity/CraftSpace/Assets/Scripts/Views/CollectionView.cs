@@ -1,11 +1,13 @@
 using UnityEngine;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 using System.Collections.Generic;
+using CraftSpace.Utils;
+using Type = CraftSpace.Utils.LoggerWrapper.Type;
 
 public class CollectionView : MonoBehaviour
 {
     [Header("Model Reference")]
-    [SerializeField] private CollectionData _model;
+    [SerializeField] private Collection _model;
     
     [Header("Child Item Views")]
     [SerializeField] private Transform _itemContainer;
@@ -16,7 +18,7 @@ public class CollectionView : MonoBehaviour
     private List<ItemView> _childItemViews = new List<ItemView>();
     
     // Property to get/set the model
-    public CollectionData Model 
+    public Collection Model 
     { 
         get { return _model; }
         set 
@@ -71,10 +73,7 @@ public class CollectionView : MonoBehaviour
     }
     
     // Called by model when it's updated
-    public virtual void OnModelUpdated()
-    {
-        UpdateView();
-    }
+    public event System.Action ModelUpdated;
     
     // Override in subclasses to provide specific visualization
     protected virtual void UpdateView()
@@ -88,6 +87,14 @@ public class CollectionView : MonoBehaviour
         {
             gameObject.name = "Collection: [No Model]";
         }
+        
+        ModelUpdated?.Invoke();
+        
+        LoggerWrapper.Success("CollectionView", "UpdateView", $"{Type.VIEW}{Type.SUCCESS} View updated", new Dictionary<string, object> {
+            { "collectionId", _model?.Id ?? "null" },
+            { "collectionName", _model?.Name ?? "null" },
+            { "itemCount", _model?.items?.Count ?? 0 }
+        }, this.gameObject);
     }
     
     // Create item views for all items in the collection
@@ -101,27 +108,24 @@ public class CollectionView : MonoBehaviour
             
         foreach (var item in _model.items)
         {
-            CreateItemView(item);
+            CreateItemView(item, Vector3.zero);
         }
     }
     
     // Create a view for a specific item
-    public ItemView CreateItemView(ItemData itemModel)
+    public ItemView CreateItemView(Item itemModel, Vector3 position)
     {
-        if (_itemViewPrefab == null || _itemContainer == null)
-            return null;
-            
-        GameObject itemViewObj = Instantiate(_itemViewPrefab, _itemContainer);
-        ItemView itemView = itemViewObj.GetComponent<ItemView>();
+        // Create a new GameObject for the item
+        GameObject itemViewObj = new GameObject($"ItemView_{itemModel.Id}");
+        itemViewObj.transform.parent = transform;
+        itemViewObj.transform.localPosition = position;
         
-        if (itemView != null)
-        {
-            itemView.Model = itemModel;
-            _childItemViews.Add(itemView);
-            return itemView;
-        }
+        // Add ItemView component
+        ItemView itemView = itemViewObj.AddComponent<ItemView>();
+        itemView.ParentCollectionView = this;
+        itemView.SetModel(itemModel);
         
-        return null;
+        return itemView;
     }
     
     // Clear all item views
@@ -136,5 +140,11 @@ public class CollectionView : MonoBehaviour
         }
         
         _childItemViews.Clear();
+    }
+
+    // Add a method for model to call
+    public virtual void HandleModelUpdated()
+    {
+        UpdateView();
     }
 } 

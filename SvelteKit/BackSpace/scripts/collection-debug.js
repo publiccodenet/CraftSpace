@@ -34,7 +34,7 @@ if (fs.existsSync(collectionsDir)) {
 // Test writing a simple collection file
 try {
   const testCollection = {
-    collection_id: 'test-debug',
+    id: 'test-debug',
     name: 'Test Debug Collection',
     query: 'test',
     lastUpdated: new Date().toISOString(),

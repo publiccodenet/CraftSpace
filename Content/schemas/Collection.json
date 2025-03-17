@@ -19,7 +19,6 @@
     },
     "lastUpdated": {
       "type": "string",
-      "format": "date-time",
       "description": "ISO date of last update"
     },
     "totalItems": {
@@ -41,6 +40,13 @@
       "minimum": 0,
       "default": 0,
       "description": "Maximum items (0 = unlimited)"
+    },
+    "excludedItemIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of items that failed validation and should be excluded"
     },
     "exportProfiles": {
       "anyOf": [
@@ -84,13 +90,7 @@
       "description": "Additional metadata for the collection"
     }
   },
-  "required": [
-    "id",
-    "name",
-    "query",
-    "lastUpdated",
-    "totalItems"
-  ],
+  "required": [],
   "additionalProperties": false,
   "description": "Schema for Collection"
 }

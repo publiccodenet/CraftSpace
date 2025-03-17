@@ -1,5 +1,5 @@
 using UnityEngine;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 
 /// <summary>
 /// Base abstract class for all view renderers
@@ -74,6 +74,8 @@ public abstract class BaseViewRenderer : MonoBehaviour
     
     // Render the model data
     public abstract void UpdateWithModel(object model);
+
+    public bool IsActive { get; protected set; }
 }
 
 /// <summary>
@@ -82,7 +84,7 @@ public abstract class BaseViewRenderer : MonoBehaviour
 public abstract class ItemViewRenderer : BaseViewRenderer
 {
     // Called to update the renderer with item data
-    public virtual void UpdateWithItemModel(ItemData model)
+    public virtual void UpdateWithItemModel(CraftSpace.Models.Schema.Generated.Item model)
     {
         UpdateWithModel(model);
     }
@@ -90,7 +92,7 @@ public abstract class ItemViewRenderer : BaseViewRenderer
     // Override to implement item-specific rendering
     public override void UpdateWithModel(object model)
     {
-        if (model is ItemData itemData)
+        if (model is Item itemData)
         {
             UpdateWithItemModel(itemData);
         }
@@ -103,7 +105,7 @@ public abstract class ItemViewRenderer : BaseViewRenderer
 public abstract class CollectionViewRenderer : BaseViewRenderer
 {
     // Called to update the renderer with collection data
-    public virtual void UpdateWithCollectionModel(CollectionData model)
+    public virtual void UpdateWithCollectionModel(Collection model)
     {
         UpdateWithModel(model);
     }
@@ -111,7 +113,7 @@ public abstract class CollectionViewRenderer : BaseViewRenderer
     // Override to implement collection-specific rendering
     public override void UpdateWithModel(object model)
     {
-        if (model is CollectionData collectionData)
+        if (model is Collection collectionData)
         {
             UpdateWithCollectionModel(collectionData);
         }

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using TMPro;
+using CraftSpace.Models.Schema.Generated;
 
 public class ContentBrowser : MonoBehaviour
 {
@@ -42,7 +43,7 @@ public class ContentBrowser : MonoBehaviour
             GameObject collectionObj = Instantiate(collectionPrefab, collectionsContainer);
             
             // Set up collection UI
-            collectionObj.GetComponentInChildren<TextMeshProUGUI>().text = collection.name;
+            collectionObj.GetComponentInChildren<TextMeshProUGUI>().text = collection.Name;
             Image image = collectionObj.GetComponentInChildren<Image>();
             if (image != null && collection.thumbnail != null)
             {
@@ -65,7 +66,7 @@ public class ContentBrowser : MonoBehaviour
         }
     }
     
-    void ShowCollectionItems(CraftSpace.Models.CollectionData collection)
+    void ShowCollectionItems(CraftSpace.Models.Schema.Generated.Collection collection)
     {
         // Clear existing items
         ClearItems();
@@ -75,7 +76,7 @@ public class ContentBrowser : MonoBehaviour
             GameObject itemObj = Instantiate(itemPrefab, itemsContainer);
             
             // Set up item UI
-            itemObj.GetComponentInChildren<TextMeshProUGUI>().text = item.title;
+            itemObj.GetComponentInChildren<TextMeshProUGUI>().text = item.Title;
             Image image = itemObj.GetComponentInChildren<Image>();
             if (image != null && item.cover != null)
             {
@@ -98,7 +99,7 @@ public class ContentBrowser : MonoBehaviour
         }
     }
     
-    void ShowItemDetail(CraftSpace.Models.ItemData item)
+    void ShowItemDetail(CraftSpace.Models.Schema.Generated.Item item)
     {
         if (detailCover != null && item.cover != null)
         {
@@ -110,13 +111,13 @@ public class ContentBrowser : MonoBehaviour
         }
         
         if (detailTitle != null)
-            detailTitle.text = item.title;
+            detailTitle.text = item.Title;
             
         if (detailAuthor != null)
-            detailAuthor.text = item.creator;
+            detailAuthor.text = item.Creator;
             
         if (detailDescription != null)
-            detailDescription.text = item.description;
+            detailDescription.text = item.Description;
     }
     
     void ClearCollections()

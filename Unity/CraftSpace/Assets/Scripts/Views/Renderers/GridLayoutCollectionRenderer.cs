@@ -27,14 +27,14 @@ public class GridLayoutCollectionRenderer : MonoBehaviour
         ConfigureLayout();
         
         // Subscribe to model updates
-        _collectionView.OnModelUpdated += UpdateLayout;
+        _collectionView.ModelUpdated += HandleModelUpdated;
     }
     
     private void OnDestroy()
     {
         if (_collectionView != null)
         {
-            _collectionView.OnModelUpdated -= UpdateLayout;
+            _collectionView.ModelUpdated -= HandleModelUpdated;
         }
     }
     
@@ -52,7 +52,7 @@ public class GridLayoutCollectionRenderer : MonoBehaviour
         }
     }
     
-    private void UpdateLayout()
+    private void HandleModelUpdated()
     {
         // This would be called when the collection model changes
         // Could adjust layout based on number of items, etc.

@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+
 // Try a more robust import approach
-let InternetArchiveSDK;
+let InternetArchiveSDK: any;
 try {
   const mod = await import("internetarchive-sdk-js");
   // Handle different export possibilities
@@ -10,7 +12,9 @@ try {
   // Provide a fallback/mock if needed
   InternetArchiveSDK = class MockSDK {
     constructor() {}
-    async search() { return { response: { docs: [], numFound: 0 } }; }
+    async search(): Promise<{response: {docs: any[], numFound: number}}> { 
+      return { response: { docs: [], numFound: 0 } }; 
+    }
   };
 }
 
@@ -18,14 +22,13 @@ const ia = new InternetArchiveSDK();
 
 /**
  * GET handler for the /api/openlibrary endpoint
- * @returns {Response} JSON response with OpenLibrary data
  */
-export async function GET({ url }) {
+export const GET: RequestHandler = async ({ url }) => {
     try {
         const query = url.searchParams.get('q') || '';
         const subject = url.searchParams.get('subject') || 'Science fiction';
-        const page = parseInt(url.searchParams.get('page') || '1');
-        const limit = parseInt(url.searchParams.get('limit') || '20');
+        const page = parseInt(url.searchParams.get('page') || '1', 10);
+        const limit = parseInt(url.searchParams.get('limit') || '20', 10);
         
         // Build search query combining user query, subject and collection
         let searchQuery = `collection:openlibrary AND mediatype:texts`;
@@ -61,4 +64,4 @@ export async function GET({ url }) {
         console.error('Error fetching OpenLibrary data:', error);
         return json({ error: 'Failed to fetch OpenLibrary data' }, { status: 500 });
     }
-} 
+}; 

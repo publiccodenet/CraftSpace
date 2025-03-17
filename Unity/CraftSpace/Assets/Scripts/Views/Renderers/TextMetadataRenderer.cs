@@ -1,6 +1,6 @@
 using UnityEngine;
 using TMPro;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 using System.Text;
 
 /// <summary>
@@ -19,6 +19,7 @@ public class TextMetadataRenderer : ItemViewRenderer
     
     [Header("Content Settings")]
     [SerializeField] private bool _showTitle = true;
+    private bool ShowTitle => _showTitle && _titleText != null;
     [SerializeField] private bool _showAuthor = true;
     [SerializeField] private bool _showDate = true;
     [SerializeField] private bool _showDescription = true;
@@ -73,7 +74,7 @@ public class TextMetadataRenderer : ItemViewRenderer
         _titleText.fontSize = 5;
         _titleText.color = _textColor;
         _titleText.rectTransform.sizeDelta = new Vector2(_width * 0.9f, _height * 0.3f);
-        _titleText.enableWordWrapping = true;
+        _titleText.textWrappingMode = TMPro.TextWrappingModes.Normal;
         
         // Create metadata text
         GameObject metadataObj = new GameObject("Metadata_Text");
@@ -86,7 +87,7 @@ public class TextMetadataRenderer : ItemViewRenderer
         _metadataText.fontSize = 3;
         _metadataText.color = _textColor;
         _metadataText.rectTransform.sizeDelta = new Vector2(_width * 0.9f, _height * 0.6f);
-        _metadataText.enableWordWrapping = true;
+        _metadataText.textWrappingMode = TMPro.TextWrappingModes.Normal;
         
         // Initially hide the container
         _textContainer.SetActive(false);
@@ -149,7 +150,7 @@ public class TextMetadataRenderer : ItemViewRenderer
         }
     }
     
-    public override void UpdateWithItemModel(ItemData model)
+    public override void UpdateWithItemModel(CraftSpace.Models.Schema.Generated.Item model)
     {
         if (model == null)
             return;
@@ -157,7 +158,7 @@ public class TextMetadataRenderer : ItemViewRenderer
         // Update title text
         if (_titleText != null)
         {
-            _titleText.text = model.title;
+            _titleText.text = model.Title ?? "";
         }
         
         // Update metadata text
@@ -165,31 +166,31 @@ public class TextMetadataRenderer : ItemViewRenderer
         {
             StringBuilder sb = new StringBuilder();
             
-            if (_showAuthor && !string.IsNullOrEmpty(model.creator))
+            if (_showAuthor && !string.IsNullOrEmpty(model.Creator))
             {
-                sb.AppendLine($"<b>By:</b> {model.creator}");
+                sb.AppendLine($"<b>By:</b> {model.Creator}");
             }
             
-            if (_showDate && !string.IsNullOrEmpty(model.date))
+            if (_showDate && !string.IsNullOrEmpty(model.Date))
             {
-                sb.AppendLine($"<b>Date:</b> {System.DateTime.Parse(model.date).Year}");
+                sb.AppendLine($"<b>Date:</b> {System.DateTime.Parse(model.Date).Year}");
             }
             
-            if (_showSubjects && model.subject.Count > 0)
+            if (_showSubjects && model.Subjects.Count > 0)
             {
                 sb.Append("<b>Subjects:</b> ");
-                for (int i = 0; i < Mathf.Min(3, model.subject.Count); i++)
+                for (int i = 0; i < Mathf.Min(3, model.Subjects.Count); i++)
                 {
-                    sb.Append(model.subject[i]);
-                    if (i < Mathf.Min(3, model.subject.Count) - 1)
+                    sb.Append(model.Subjects[i]);
+                    if (i < Mathf.Min(3, model.Subjects.Count) - 1)
                         sb.Append(", ");
                 }
                 sb.AppendLine();
             }
             
-            if (_showDescription && !string.IsNullOrEmpty(model.description))
+            if (_showDescription && !string.IsNullOrEmpty(model.Description))
             {
-                string description = model.description;
+                string description = model.Description;
                 if (description.Length > _maxDescriptionLength)
                 {
                     description = description.Substring(0, _maxDescriptionLength) + "...";

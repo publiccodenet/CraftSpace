@@ -65,8 +65,7 @@
     </div>
   {:else if collections.length === 0}
     <div class="empty-state">
-      <p>No collections found.</p>
-      <a href="/admin/collections/create" class="primary-button">Create New Collection</a>
+      <p>No collections found</p>
     </div>
   {:else}
     <div class="collections-table-wrapper">

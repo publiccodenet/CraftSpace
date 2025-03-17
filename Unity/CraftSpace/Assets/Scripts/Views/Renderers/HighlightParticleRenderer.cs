@@ -1,5 +1,5 @@
 using UnityEngine;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 using System.Collections.Generic;
 
 /// <summary>
@@ -204,7 +204,7 @@ public class HighlightParticleRenderer : ItemViewRenderer
         }
     }
     
-    public override void UpdateWithItemModel(ItemData model)
+    public override void UpdateWithItemModel(CraftSpace.Models.Schema.Generated.Item model)
     {
         if (model == null)
             return;
@@ -214,12 +214,12 @@ public class HighlightParticleRenderer : ItemViewRenderer
         
         // Example of highlighting based on properties:
         // Featured items
-        if (model.isFavorite)
+        if (model.IsFavorite ?? false)
         {
             highlightColor = _highlightColors["selected"];
         }
         // Popular items
-        else if (model.downloads > 5000)
+        else if ((model.Downloads ?? 0) > 5000)
         {
             highlightColor = _highlightColors["popular"];
         }

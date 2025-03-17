@@ -8,121 +8,166 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { EMOJI, PATHS } from '../src/lib/constants/index.ts';
+import chalk from 'chalk';
 
-// Input and output directories
+console.log(chalk.cyan('🏁 GENERATING C# MODEL CLASSES FROM SCHEMAS'));
+
+// Directory configuration
 const schemaDir = PATHS.SCHEMAS_DIR;
 const outputDir = PATHS.CRAFTSPACE_GENERATED_SCHEMAS_DIR;
 
-console.log(`${EMOJI.START} GENERATING C# MODEL CLASSES FROM SCHEMAS`);
 console.log(`Schema directory: ${schemaDir}`);
 console.log(`Output directory: ${outputDir}`);
 
 // Ensure output directory exists
 fs.ensureDirSync(outputDir);
 
-// Find all schema files
+// Find all JSON schema files
 const schemaFiles = fs.readdirSync(schemaDir)
   .filter(file => file.endsWith('.json'));
 
-console.log(`Found ${schemaFiles.length} schema files to process`);
+console.log(`Found ${schemaFiles.length} schema files to process\n`);
 
-// Type mapping from JSON Schema to C#
-const typeMap = {
-  'string': 'string',
-  'integer': 'int',
-  'number': 'float',
-  'boolean': 'bool',
-  'array': 'List<object>',
-  'object': 'Dictionary<string, object>'
-};
-
-// Process each schema
-for (const file of schemaFiles) {
-  const schemaPath = path.join(schemaDir, file);
-  const className = file.replace('.json', '');
-  console.log(`\nProcessing schema: ${file} -> ${className}.cs`);
+// Process each schema file
+for (const schemaFile of schemaFiles) {
+  const schemaPath = path.join(schemaDir, schemaFile);
+  const schema = fs.readJSONSync(schemaPath);
   
-  try {
-    const schema = fs.readJSONSync(schemaPath);
-    
-    // Check if it's a valid schema
-    if (!schema.type || !schema.properties) {
-      console.warn(`⚠️ Schema ${file} doesn't have required type and properties`);
-      // Try to look in definitions
-      if (schema.definitions) {
-        const refName = Object.keys(schema.definitions)[0];
-        if (schema.definitions[refName].properties) {
-          schema.properties = schema.definitions[refName].properties;
-          schema.required = schema.definitions[refName].required || [];
-          schema.type = schema.definitions[refName].type;
-          console.log(`Found properties in definitions.${refName}`);
-        }
-      }
-      
-      // If still no properties, skip this schema
-      if (!schema.properties) {
-        console.error(`❌ Cannot generate C# class for ${file}: No properties found`);
-        continue;
-      }
-    }
-    
-    // Start building C# class
-    let csharpCode = `using System;\nusing System.Collections.Generic;\nusing Newtonsoft.Json;\n\nnamespace CraftSpace.Models\n{\n`;
-    
-    // Add class description
-    csharpCode += `    /// <summary>\n`;
-    csharpCode += `    /// ${schema.description || `Represents a ${className}`}\n`;
-    csharpCode += `    /// </summary>\n`;
-    
-    // Start class definition
-    csharpCode += `    public class ${className}\n    {\n`;
-    
-    // Process properties
-    const properties = schema.properties;
-    for (const [propName, propDef] of Object.entries(properties)) {
-      // Determine property type
-      let csharpType = typeMap[propDef.type] || 'object';
-      
-      // Handle arrays with specific item types
-      if (propDef.type === 'array' && propDef.items) {
-        if (propDef.items.type) {
-          csharpType = `List<${typeMap[propDef.items.type] || 'object'}>`;
-        } else if (propDef.items.$ref) {
-          // Reference to another type
-          const refType = propDef.items.$ref.split('/').pop();
-          csharpType = `List<${refType}>`;
-        }
-      }
-      
-      // Add property description if available
-      if (propDef.description) {
-        csharpCode += `        /// <summary>\n`;
-        csharpCode += `        /// ${propDef.description}\n`;
-        csharpCode += `        /// </summary>\n`;
-      }
-      
-      // Add JsonProperty attribute
-      csharpCode += `        [JsonProperty("${propName}")]\n`;
-      
-      // Add property declaration
-      const nullableMark = !schema.required?.includes(propName) ? '?' : '';
-      csharpCode += `        public ${csharpType}${nullableMark} ${toPascalCase(propName)} { get; set; }\n\n`;
-    }
-    
-    // Close class and namespace
-    csharpCode += `    }\n}\n`;
-    
-    // Write C# file
-    const outputFile = path.join(outputDir, `${className}.cs`);
-    fs.writeFileSync(outputFile, csharpCode);
-    console.log(`Generated C# class: ${outputFile}`);
-    
-  } catch (error) {
-    console.error(`❌ Error processing schema ${file}:`, error.message);
-  }
+  // Extract class name from file name
+  const className = path.basename(schemaFile, '.json');
+  
+  // Generate C# class
+  // CHANGED NAMESPACE FROM CraftSpace.Models.Schema to CraftSpace.Models
+  const csharpCode = generateCSharpClass(className, schema, 'CraftSpace.Models.Schema.Generated');
+  
+  // Write to output file
+  const outputPath = path.join(outputDir, `${className}.cs`);
+  fs.writeFileSync(outputPath, csharpCode);
+  
+  console.log(`\nProcessing schema: ${schemaFile} -> ${className}.cs`);
+  console.log(chalk.green(`Generated C# class: ${outputPath}`));
 }
 
 console.log('\nC# GENERATION COMPLETE!');
+
+/**
+ * Generate a C# class from a JSON schema
+ */
+function generateCSharpClass(className, schema, namespace = 'CraftSpace.Models.Schema.Generated') {
+  // Generate properties with backing fields
+  const propertiesCode = generateProperties(schema.properties || {}, schema.required || []);
+  
+  // Generate PopulateFromJson method with assignments
+  const populateCode = generatePopulateMethod(schema.properties || {}, className);
+  
+  return `using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using UnityEngine;
+
+#nullable enable
+
+namespace ${namespace}
+{
+    /// <summary>
+    /// ${schema.description || 'Schema for ' + className}
+    /// </summary>
+    public partial class ${className} : ScriptableObject
+    {
+${propertiesCode}
+
+${populateCode}
+    }
+}
+`;
+}
+
+/**
+ * Generate C# properties from schema properties with backing fields
+ */
+function generateProperties(properties, required) {
+  let code = '';
+  
+  for (const [propName, propSchema] of Object.entries(properties)) {
+    // Add property description
+    if (propSchema.description) {
+      code += `        /// <summary>\n`;
+      code += `        /// ${propSchema.description}\n`;
+      code += `        /// </summary>\n`;
+    }
+    
+    // Add JsonProperty attribute for serialization
+    code += `        [JsonProperty("${propName}")]\n`;
+    
+    // Determine C# type
+    const propType = getPropertyType(propSchema, propName);
+    const isRequired = required.includes(propName);
+    const nullableSuffix = !isRequired ? '?' : '';
+    
+    // Generate backing field with SerializeField attribute
+    const backingFieldName = `_${propName}`;
+    code += `        [SerializeField] private ${propType}${nullableSuffix} ${backingFieldName};\n`;
+    
+    // Generate property with PascalCase name
+    const pascalPropName = toPascalCase(propName);
+    code += `        public ${propType}${nullableSuffix} ${pascalPropName} { get => ${backingFieldName}; set => ${backingFieldName} = value; }\n\n`;
+  }
+  
+  return code;
+}
+
+/**
+ * Generate a PopulateFromJson method to copy data from deserialized JSON
+ */
+function generatePopulateMethod(properties, className) {
+  let code = `        /// <summary>\n`;
+  code += `        /// Populate this object from JSON deserialization\n`;
+  code += `        /// </summary>\n`;
+  code += `        public void PopulateFromJson(CraftSpace.Models.Schema.Generated.${className} jsonData)\n`;
+  code += `        {\n`;
+  
+  // Generate assignments for all properties
+  for (const propName of Object.keys(properties)) {
+    const pascalPropName = toPascalCase(propName);
+    code += `            _${propName} = jsonData.${pascalPropName};\n`;
+  }
+  
+  // Add notification
+  code += `\n            // Notify views of update\n`;
+  code += `            NotifyViewsOfUpdate();\n`;
+  code += `        }\n`;
+  
+  return code;
+}
+
+/**
+ * Map JSON schema type to C# type
+ */
+function getPropertyType(property, propName) {
+  if (property.type === 'array') {
+    if (property.items && property.items.type === 'object') {
+      return 'List<Dictionary<string, object>>';
+    } else if (property.items && property.items.type === 'string') {
+      return 'List<string>';
+    } else {
+      return 'List<object>';
+    }
+  } else if (property.type === 'object') {
+    return 'Dictionary<string, object>';
+  } else if (property.type === 'string') {
+    return 'string';
+  } else if (property.type === 'number') {
+    return 'float';
+  } else if (property.type === 'integer') {
+    return 'int';
+  } else if (property.type === 'boolean') {
+    return 'bool';
+  } else if (property.anyOf || property.oneOf) {
+    return 'object';
+  } else {
+    return 'object';
+  }
+}
 
 // Helper function to convert to PascalCase
 function toPascalCase(str) {

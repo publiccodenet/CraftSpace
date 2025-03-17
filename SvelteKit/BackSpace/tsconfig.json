@@ -9,9 +9,10 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "module": "ESNext",
-    "target": "ESNext"
+    "target": "ESNext",
+    "allowSyntheticDefaultImports": true
   },
   "include": [
     ".svelte-kit/ambient.d.ts",

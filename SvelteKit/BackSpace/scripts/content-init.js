@@ -5,31 +5,29 @@
 import fs from 'fs-extra';
 import path from 'path';
 import chalk from 'chalk';
+import { PATHS } from '../src/lib/constants/index.ts';
 
-// Update the content path here
-const contentBasePath = path.resolve(
-  process.cwd(),
-  '../../Content'  // Change from './Content' to '../../Content'
-);
-
-// Use correct capitalization
-const BASE_DIRS = [
-  'Content',
-  'Content/collections',
-  'Content/config',
-  'Content/cache',
-  'Content/exports',
-  'Content/profiles'
-];
+// Use the consistent path from constants
+const contentBasePath = PATHS.CONTENT_DIR;
 
 console.log(chalk.blue('Initializing BackSpace content system...'));
+console.log(chalk.blue(`Content directory: ${contentBasePath}`));
+
+// Create base directories
+const BASE_DIRS = [
+  contentBasePath,
+  PATHS.COLLECTIONS_DIR,
+  path.join(contentBasePath, 'config'),
+  PATHS.CACHE_DIR,
+  PATHS.EXPORTS_DIR,
+  path.join(contentBasePath, 'profiles')
+];
 
 // Create base directories
 for (const dir of BASE_DIRS) {
-  const dirPath = path.resolve(dir);
-  if (!fs.existsSync(dirPath)) {
+  if (!fs.existsSync(dir)) {
     console.log(chalk.yellow(`Creating directory: ${dir}`));
-    fs.mkdirSync(dirPath, { recursive: true });
+    fs.mkdirSync(dir, { recursive: true });
   } else {
     console.log(chalk.green(`Directory exists: ${dir}`));
   }

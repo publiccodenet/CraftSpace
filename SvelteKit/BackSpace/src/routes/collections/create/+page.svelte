@@ -30,9 +30,9 @@
 <form use:form>
   <label>
     Collection ID
-    <input name="collection_id" required />
-    {#if $errors.collection_id}
-      <span class="error">{$errors.collection_id}</span>
+    <input name="collectionId" required />
+    {#if $errors.collectionId}
+      <span class="error">{$errors.collectionId}</span>
     {/if}
   </label>
   

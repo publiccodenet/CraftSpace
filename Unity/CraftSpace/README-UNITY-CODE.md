@@ -70,7 +70,7 @@ public class CollectionBrowserManager : MonoBehaviour
 ScriptableObject that stores collection metadata:
 
 ```csharp
-public class CollectionData : ScriptableObject
+public partial class Collection : ScriptableObject
 {
     public string id;
     public string name;
@@ -93,7 +93,7 @@ public class CollectionData : ScriptableObject
 ScriptableObject that stores item metadata:
 
 ```csharp
-public class ItemData : ScriptableObject
+public partial class Item : ScriptableObject
 {
     public string id;
     public string title;
@@ -404,8 +404,8 @@ First, make sure you have these packages installed (Window > Package Manager):
 The following scripts must be created in your project:
 
 1. **Models/**
-   - CollectionData.cs
-   - ItemData.cs
+   - Collection.cs
+   - Item.cs
 2. **Views/**
    - CollectionView.cs
    - ItemView.cs

@@ -15,18 +15,18 @@ public class SimpleItemCardRenderer : MonoBehaviour
     private void Awake()
     {
         _itemView = GetComponent<ItemView>();
-        _itemView.OnModelUpdated += UpdateRenderer;
+        _itemView.ModelUpdated += HandleModelUpdated;
     }
     
     private void OnDestroy()
     {
         if (_itemView != null)
         {
-            _itemView.OnModelUpdated -= UpdateRenderer;
+            _itemView.ModelUpdated -= HandleModelUpdated;
         }
     }
     
-    private void UpdateRenderer()
+    private void HandleModelUpdated()
     {
         var model = _itemView.Model;
         if (model == null)
@@ -49,9 +49,9 @@ public class SimpleItemCardRenderer : MonoBehaviour
         
         // Update text fields
         if (_titleText != null)
-            _titleText.text = model.title;
+            _titleText.text = model.Title;
             
         if (_authorText != null)
-            _authorText.text = model.creator;
+            _authorText.text = model.Creator;
     }
 } 

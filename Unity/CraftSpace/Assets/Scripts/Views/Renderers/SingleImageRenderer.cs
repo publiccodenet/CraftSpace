@@ -1,5 +1,5 @@
 using UnityEngine;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 
 /// <summary>
 /// Renders an item as a single image/texture (book cover, etc)
@@ -128,7 +128,7 @@ public class SingleImageRenderer : ItemViewRenderer
         }
     }
     
-    public override void UpdateWithItemModel(ItemData model)
+    public override void UpdateWithItemModel(CraftSpace.Models.Schema.Generated.Item model)
     {
         if (model == null || _meshRenderer == null)
             return;
@@ -169,9 +169,9 @@ public class SingleImageRenderer : ItemViewRenderer
             _meshRenderer.material.mainTexture = null;
             
             // Use a color based on title
-            if (!string.IsNullOrEmpty(model.title))
+            if (!string.IsNullOrEmpty(model.Title))
             {
-                char firstChar = char.ToUpperInvariant(model.title[0]);
+                char firstChar = !string.IsNullOrEmpty(model.Title) ? char.ToUpperInvariant(model.Title[0]) : 'A';
                 float hue = (firstChar - 'A') / 26f;
                 _meshRenderer.material.color = Color.HSVToRGB(hue, 0.7f, 0.8f);
             }

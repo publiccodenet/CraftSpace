@@ -1,11 +1,13 @@
 using UnityEngine;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 using System.Collections.Generic;
+using CraftSpace.Utils;
+using Type = CraftSpace.Utils.LoggerWrapper.Type;
 
 public class ItemView : MonoBehaviour
 {
     [Header("Model Reference")]
-    [SerializeField] private ItemData _model;
+    [SerializeField] private Item _model;
     
     [Header("Renderer Settings")]
     [SerializeField] private bool _autoInitializeRenderers = true;
@@ -23,7 +25,7 @@ public class ItemView : MonoBehaviour
     private const float DISTANCE_CHECK_INTERVAL = 0.5f;
     
     // Property to get/set the model
-    public ItemData Model 
+    public Item Model 
     { 
         get { return _model; }
         set 
@@ -52,7 +54,9 @@ public class ItemView : MonoBehaviour
     
     // Event for notifying renderers of model updates
     public delegate void ModelUpdatedHandler();
-    public event ModelUpdatedHandler OnModelUpdated;
+    public event ModelUpdatedHandler ModelUpdated;
+    
+    public CollectionView ParentCollectionView { get; set; }
     
     private void Awake()
     {
@@ -93,7 +97,7 @@ public class ItemView : MonoBehaviour
             ShowRenderer<PixelIconRenderer>(false);
             
             // Show highlight for closest items
-            if (distance <= _closeDistance * 0.5f && _model != null && _model.isFavorite)
+            if (distance <= _closeDistance * 0.5f && _model != null && (_model.IsFavorite ?? false))
             {
                 ShowRenderer<HighlightParticleRenderer>(true);
             }
@@ -141,7 +145,7 @@ public class ItemView : MonoBehaviour
     }
     
     // Called by model when it's updated
-    public virtual void OnModelUpdated()
+    public virtual void HandleModelUpdated()
     {
         UpdateView();
     }
@@ -149,10 +153,17 @@ public class ItemView : MonoBehaviour
     // Update all active renderers
     protected virtual void UpdateView()
     {
+        LoggerWrapper.ModelUpdated("ItemView", "UpdateView", "Item", new Dictionary<string, object> {
+            { "itemId", _model?.Id ?? "null" },
+            { "title", _model?.Title ?? "null" },
+            { "activeRenderers", _activeRenderers.Count },
+            { "viewName", gameObject.name }
+        }, this.gameObject);
+        
         // Base class just updates name for debugging
         if (_model != null)
         {
-            gameObject.name = $"Item: {_model.title}";
+            gameObject.name = $"Item: {_model.Title}";
             
             // Update all renderers with new model data
             foreach (var renderer in _renderers.Values)
@@ -164,11 +175,21 @@ public class ItemView : MonoBehaviour
             }
             
             // Notify event subscribers
-            OnModelUpdated?.Invoke();
+            ModelUpdated?.Invoke();
+            
+            LoggerWrapper.Success("ItemView", "UpdateView", $"{Type.VIEW}{Type.SUCCESS} View updated successfully", new Dictionary<string, object> {
+                { "activeRenderers", _activeRenderers.Count },
+                { "viewPosition", transform.position.ToString("F2") },
+                { "isVisible", IsVisible() }
+            }, this.gameObject);
         }
         else
         {
             gameObject.name = "Item: [No Model]";
+            LoggerWrapper.Warning("ItemView", "UpdateView", $"{Type.MODEL}{Type.ERROR} Cannot update view, model is null", new Dictionary<string, object> {
+                { "objectName", gameObject.name },
+                { "objectPath", GetGameObjectPath() }
+            }, this.gameObject);
         }
     }
     
@@ -215,6 +236,11 @@ public class ItemView : MonoBehaviour
         {
             if (!_activeRenderers.Contains(renderer))
             {
+                LoggerWrapper.Info("ItemView", "ShowRenderer", $"{Type.RENDER}{Type.CREATE} Activating renderer", new Dictionary<string, object> {
+                    { "rendererType", typeof(T).Name },
+                    { "itemId", _model?.Id ?? "null" },
+                    { "distance", _mainCamera != null ? Vector3.Distance(transform.position, _mainCamera.transform.position).ToString("F2") : "unknown" }
+                }, this.gameObject);
                 _activeRenderers.Add(renderer);
                 renderer.Activate();
                 renderer.UpdateWithModel(_model);
@@ -224,6 +250,12 @@ public class ItemView : MonoBehaviour
         {
             if (_activeRenderers.Contains(renderer))
             {
+                LoggerWrapper.Info("ItemView", "ShowRenderer", $"{Type.RENDER}{Type.DELETE} Deactivating renderer", new Dictionary<string, object> {
+                    { "rendererType", typeof(T).Name },
+                    { "itemId", _model?.Id ?? "null" },
+                    { "wasActive", renderer is BaseViewRenderer ? ((BaseViewRenderer)renderer).IsActive : false },
+                    { "reason", "Distance or visibility change" }
+                }, this.gameObject);
                 _activeRenderers.Remove(renderer);
                 renderer.Deactivate();
             }
@@ -241,5 +273,39 @@ public class ItemView : MonoBehaviour
             }
         }
         _activeRenderers.Clear();
+    }
+
+    public void SetModel(Item model)
+    {
+        Model = model;
+        
+        // Register with the model
+        if (Model != null)
+        {
+            Model.RegisterView(this);
+            // Ensure we have the collectionId
+            if (Model.parentCollection != null && string.IsNullOrEmpty(Model.collectionId)) {
+                Model.collectionId = Model.parentCollection.Id;
+            }
+        }
+    }
+
+    private bool IsVisible()
+    {
+        if (_mainCamera == null) return false;
+        Vector3 screenPoint = _mainCamera.WorldToViewportPoint(transform.position);
+        return screenPoint.z > 0 && screenPoint.x > 0 && screenPoint.x < 1 && screenPoint.y > 0 && screenPoint.y < 1;
+    }
+
+    private string GetGameObjectPath()
+    {
+        string path = gameObject.name;
+        Transform parent = transform.parent;
+        while (parent != null)
+        {
+            path = parent.name + "/" + path;
+            parent = parent.parent;
+        }
+        return path;
     }
 } 

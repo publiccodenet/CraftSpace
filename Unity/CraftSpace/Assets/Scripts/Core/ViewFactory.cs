@@ -1,5 +1,5 @@
 using UnityEngine;
-using CraftSpace.Models;
+using CraftSpace.Models.Schema.Generated;
 
 public class ViewFactory : MonoBehaviour
 {
@@ -12,7 +12,7 @@ public class ViewFactory : MonoBehaviour
     [SerializeField] private Transform _defaultItemContainer;
     
     // Create a collection view
-    public CollectionView CreateCollectionView(CollectionData model, Transform container = null)
+    public CollectionView CreateCollectionView(CraftSpace.Models.Schema.Generated.Collection model, Transform container = null)
     {
         if (_collectionViewPrefab == null)
             return null;
@@ -35,7 +35,7 @@ public class ViewFactory : MonoBehaviour
     }
     
     // Create an item view
-    public ItemView CreateItemView(ItemData model, Transform container = null)
+    public ItemView CreateItemView(CraftSpace.Models.Schema.Generated.Item model, Transform container = null)
     {
         if (_itemViewPrefab == null)
             return null;

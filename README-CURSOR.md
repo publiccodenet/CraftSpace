@@ -29,11 +29,12 @@
 ### ID and Naming Conventions
 
 - **Type-Specific IDs**: Use `collectionId`, `itemId` instead of generic `id`, except in models that correspond to JSON Schema that just use `id`
-- **Consistent ID Format**: Lowercase alphanumeric with hyphens
-- **Snake Case for IDs**: Use Pascal case for all identifier fields (e.g., `collectionId` not `collection_id`)
+- **Naming Convention for IDs**: 
+  - In JSON models/properties: Use `id` (not `collectionId` or `itemId`)
+  - In function signatures, variables: Use camelCase `collectionId`, `itemId` for clarity
+  - In directory names: Use kebab-case `my-collection`
 - **Directory = ID**: Directory names must match object IDs 
 - **Use `id` in model properties to align with JSON structure**
-- **Use explicit names like `itemId` and `collectionId` in parameters, variables, and function signatures for clarity**
 - **Use consistent property names across formats (e.g., the same property name in JSON, JavaScript, and database)**
 - **In API URLs, route parameters and JavaScript variables, use camelCase: `collectionId`, `itemId`**
 

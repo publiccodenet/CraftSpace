@@ -57,9 +57,8 @@ program
   .description('Manage BackSpace collections')
   .version('1.0.0');
 
-// Use the correct content path - point to root Content directory
-const contentBasePath = path.resolve(process.cwd(), '../../Content');
-const collectionsPath = path.join(contentBasePath, 'collections');
+// Use the path constants for all path operations
+const collectionsDir = PATHS.COLLECTIONS_DIR;
 
 // List collections
 program
@@ -210,7 +209,7 @@ program
   .action(async (options) => {
     try {
       const { id, limit } = options;
-      const collectionDir = path.join(collectionsPath, id);
+      const collectionDir = path.join(collectionsDir, id);
       const collectionFile = path.join(collectionDir, 'collection.json');
       
       // Check if collection exists
