@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-Spacecraft transforms Internet Archive collections into navigable 3D environments, enabling spatial exploration of digital knowledge. By bridging Internet Archive's vast content with immersive visualization techniques, CraftSpace offers new ways to discover, organize, and understand digital collections through spatial relationships and visual recognition patterns.
+Spacecraft transforms Internet Archive collections into navigable 3D environments, enabling spatial exploration of digital knowledge. By bridging Internet Archive's vast content with immersive visualization techniques, Spacecraft offers new ways to discover, organize, and understand digital collections through spatial relationships and visual recognition patterns.
 
 The platform uses multi-resolution processing to render thousands of items simultaneously while preserving their visual identity even at great distances. Its modular architecture separates content acquisition, processing, and visualization, allowing each to evolve independently while maintaining alignment with Internet Archive's content structure and metadata standards.
 
