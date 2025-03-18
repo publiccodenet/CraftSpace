@@ -26,12 +26,12 @@ jobs:
         with:
           lfs: true
         
-      - name: Create _headers file
+      - name: Create Jekyll config
         run: |
-          echo "/*" > WebSites/spacetime/_headers
-          echo "  Access-Control-Allow-Origin: *" >> WebSites/spacetime/_headers
-          echo "/Build/*.gz" >> WebSites/spacetime/_headers
-          echo "  Content-Encoding: gzip" >> WebSites/spacetime/_headers
+          echo "webrick:" > WebSites/spacetime/_config.yml
+          echo "  headers:" >> WebSites/spacetime/_config.yml
+          echo "    Build/:" >> WebSites/spacetime/_config.yml
+          echo "      Content-Encoding: gzip" >> WebSites/spacetime/_config.yml
         
       - name: Setup Pages
         uses: actions/configure-pages@v4
