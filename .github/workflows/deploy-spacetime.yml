@@ -26,11 +26,6 @@ jobs:
         with:
           lfs: true
         
-      - name: Unzip gzipped files
-        run: |
-          cd WebSites/spacetime/Build
-          gunzip -k *.gz
-        
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
