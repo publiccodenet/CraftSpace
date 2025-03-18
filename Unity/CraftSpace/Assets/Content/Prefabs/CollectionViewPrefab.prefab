@@ -69,7 +69,7 @@ MonoBehaviour:
   _itemMarginLeft: 0.01
   _itemMarginRight: 0.01
   _itemGapVertical: 0.2
-  _itemGapHorizontal: 0.001
+  _itemGapHorizontal: 0.2
   _centerGrid: 1
   _container: {fileID: 464012571170886491}
   _itemViewPrefab: {fileID: 4331697567644932370, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
