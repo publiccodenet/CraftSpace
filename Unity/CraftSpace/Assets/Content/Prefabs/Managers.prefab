@@ -121,7 +121,7 @@ MonoBehaviour:
   _minZ: -25
   _maxZ: 25
   _invertDrag: 0
-  _zoomSpeed: 0.5
+  _zoomSpeed: 0.2
   _minZoom: 0.05
   _maxZoom: 200
   _keyboardZoomSpeed: 5
