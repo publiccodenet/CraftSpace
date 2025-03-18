@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
+using Newtonsoft.Json.Linq;
 
 #nullable enable
 
@@ -96,7 +97,12 @@ namespace CraftSpace.Models.Schema.Generated
         [SerializeField] private List<Dictionary<string, object>>? _files;
         public List<Dictionary<string, object>>? Files { get => _files; set => _files = value; }
 
-
+        /// <summary>
+        /// Collection identifier
+        /// </summary>
+        [JsonProperty("collection_id")]
+        [SerializeField] private string? _collectionId;
+        public string? CollectionId { get => _collectionId; set => _collectionId = value; }
 
         /// <summary>
         /// Populate this object from JSON deserialization
@@ -115,9 +121,66 @@ namespace CraftSpace.Models.Schema.Generated
             _created = jsonData.Created;
             _lastUpdated = jsonData.LastUpdated;
             _files = jsonData.Files;
+            _collectionId = jsonData.CollectionId;
 
             // Notify views of update
             NotifyViewsOfUpdate();
+        }
+
+        public void ParseFromJson(string json)
+        {
+            try
+            {
+                JObject jsonObj = JObject.Parse(json);
+                ParseFromJObject(jsonObj);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error parsing Item JSON: {ex.Message}\n{json.Substring(0, Math.Min(json.Length, 100))}...");
+            }
+        }
+
+        public void ParseFromJObject(JObject jsonObj)
+        {
+            try
+            {
+                // Set properties based on JSON - with null checks
+                this.Id = jsonObj["id"]?.ToString();
+                this.Title = jsonObj["title"]?.ToString();
+                this.Description = jsonObj["description"]?.ToString();
+                this.Creator = jsonObj["creator"]?.ToString();
+                
+                // Change CollectionIdentifier to a property that exists in the class
+                if (jsonObj["collection_id"] != null)
+                    this.CollectionId = jsonObj["collection_id"].ToString();
+                
+                // Handle arrays
+                if (jsonObj["subject"] != null && jsonObj["subject"].Type == JTokenType.Array)
+                {
+                    this.Subjects = new List<string>();
+                    foreach (var token in jsonObj["subject"])
+                    {
+                        this.Subjects.Add(token.ToString());
+                    }
+                }
+                
+                // Special handling for media type
+                this.MediaType = jsonObj["mediatype"]?.ToString();
+                
+                // Add null check before string interpolation
+                if (this.Id != null && this.Title != null)
+                {
+                    Debug.Log($"Successfully parsed Item JSON: {this.Id} - {this.Title}");
+                }
+                else
+                {
+                    Debug.Log("Successfully parsed Item JSON (ID or Title missing)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error mapping Item properties from JObject: {ex.Message}");
+            }
         }
 
     }

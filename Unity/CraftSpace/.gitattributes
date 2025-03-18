@@ -30,4 +30,58 @@
 *.yml text
 
 # Only use LFS for text files that are BIGGER than 1MB
-*.txt filter=lfs diff=lfs merge=lfs -text size=">1M" 
+*.txt filter=lfs diff=lfs merge=lfs -text size=">1M"
+
+# Unity files
+*.cs diff=csharp text
+*.cginc text
+*.shader text
+
+# Image files must be treated as binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.tga binary
+*.tif binary
+*.tiff binary
+*.ico binary
+*.exr binary
+*.hdr binary
+*.psd binary
+
+# Audio files
+*.mp3 binary
+*.wav binary
+*.ogg binary
+
+# Video files
+*.mp4 binary
+*.mov binary
+*.avi binary
+
+# 3D model files
+*.fbx binary
+*.obj binary
+*.max binary
+*.blend binary
+*.dae binary
+*.mb binary
+*.ma binary
+*.3ds binary
+*.dfx binary
+*.c4d binary
+*.lwo binary
+*.lwo2 binary
+*.abc binary
+*.3dm binary
+
+# Unity specific
+*.unity binary
+*.prefab binary
+*.asset binary
+*.meta text
+*.mat binary
+*.anim binary
+*.controller binary
+*.mask binary 

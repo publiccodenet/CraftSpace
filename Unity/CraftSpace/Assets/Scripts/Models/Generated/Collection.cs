@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
+using Newtonsoft.Json.Linq;
 
 #nullable enable
 
@@ -10,6 +11,7 @@ namespace CraftSpace.Models.Schema.Generated
     /// <summary>
     /// Schema for Collection
     /// </summary>
+    [CreateAssetMenu(fileName = "Collection", menuName = "CraftSpace/Collection", order = 1)]
     public partial class Collection : ScriptableObject
     {
         /// <summary>
@@ -103,8 +105,6 @@ namespace CraftSpace.Models.Schema.Generated
         [SerializeField] private Dictionary<string, object>? _metadata;
         public Dictionary<string, object>? Metadata { get => _metadata; set => _metadata = value; }
 
-
-
         /// <summary>
         /// Populate this object from JSON deserialization
         /// </summary>
@@ -128,5 +128,43 @@ namespace CraftSpace.Models.Schema.Generated
             NotifyViewsOfUpdate();
         }
 
+        public void ParseFromJson(string json)
+        {
+            try
+            {
+                JObject jsonObj = JObject.Parse(json);
+                ParseFromJObject(jsonObj);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error parsing Collection JSON: {ex.Message}\n{json.Substring(0, Math.Min(json.Length, 100))}...");
+            }
+        }
+
+        public void ParseFromJObject(JObject jsonObj)
+        {
+            try
+            {
+                // Set properties based on JSON - with null checks
+                this.Id = jsonObj["id"]?.ToString();
+                this.Description = jsonObj["description"]?.ToString();
+                this.Name = jsonObj["name"]?.ToString();
+                this.Query = jsonObj["query"]?.ToString();
+                
+                // Add null check before string interpolation
+                if (this.Id != null && this.Name != null)
+                {
+                    Debug.Log($"Successfully parsed Collection JSON: {this.Id} - {this.Name}");
+                }
+                else
+                {
+                    Debug.Log("Successfully parsed Collection JSON (ID or Name missing)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error mapping Collection properties from JObject: {ex.Message}");
+            }
+        }
     }
 }

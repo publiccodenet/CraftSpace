@@ -1,7 +1,12 @@
 using UnityEngine;
+using System.Collections;
 
 public class CameraController : MonoBehaviour
 {
+    [Header("Camera Reference")]
+    [SerializeField] private Camera _targetCamera; // Direct reference to camera
+    [Tooltip("Set this to the camera you want to control")]
+    
     [Header("Movement Settings")]
     [SerializeField] private float _moveSpeed = 5f;
     [SerializeField] private float _fastMoveSpeed = 15f;
@@ -25,7 +30,15 @@ public class CameraController : MonoBehaviour
     
     private void Awake()
     {
-        _cameraTransform = Camera.main.transform;
+        // Use the directly referenced camera instead of Camera.main
+        if (_targetCamera == null)
+        {
+            Debug.LogError("CameraController: No camera assigned! Please assign a camera in the inspector.");
+            enabled = false; // Disable the script to prevent further errors
+            return;
+        }
+        
+        _cameraTransform = _targetCamera.transform;
         _currentZoomLevel = Vector3.Distance(_cameraTransform.position, transform.position);
     }
     

@@ -1,10 +1,8 @@
 using UnityEngine;
 using CraftSpace.Models.Schema.Generated;
 using TMPro;
-using System.Collections;
-using CraftSpace.Utils;
 using System.Collections.Generic;
-using UnityEngine.Networking;
+using CraftSpace.Utils;
 using Type = CraftSpace.Utils.LoggerWrapper.Type;
 
 [RequireComponent(typeof(ItemView))]
@@ -29,8 +27,6 @@ public class ArchiveTileRenderer : ItemViewRenderer
     private MeshRenderer _tileRenderer;
     private TextMeshPro _titleText;
     private ItemView _itemView;
-    private Coroutine _loadImageCoroutine;
-    private bool _isImageLoading = false;
     
     protected override void Awake()
     {
@@ -108,14 +104,6 @@ public class ArchiveTileRenderer : ItemViewRenderer
             _tileObject.SetActive(false);
             _titleObject.SetActive(false);
         }
-        
-        // Cancel image loading if in progress
-        if (_loadImageCoroutine != null)
-        {
-            StopCoroutine(_loadImageCoroutine);
-            _loadImageCoroutine = null;
-            _isImageLoading = false;
-        }
     }
     
     protected override void OnAlphaChanged(float alpha)
@@ -180,108 +168,54 @@ public class ArchiveTileRenderer : ItemViewRenderer
         }
         else
         {
-            // Get tile image URL
-            string imageUrl = GetTileImageUrl(model);
+            // Load from Resources
+            string resourcePath = GetTileImageUrl(model);
             
-            if (!string.IsNullOrEmpty(imageUrl) && !_isImageLoading)
+            if (!string.IsNullOrEmpty(resourcePath))
             {
-                LoggerWrapper.ImageLoading("ArchiveTileRenderer", "UpdateWithItemModel", imageUrl, new Dictionary<string, object> {
-                    { "itemId", model.Id },
-                    { "url", imageUrl },
-                    { "attemptCount", 1 }
-                }, this.gameObject);
-                
-                // Load image asynchronously
-                _isImageLoading = true;
-                _loadImageCoroutine = StartCoroutine(
-                    ImageLoader.LoadImageFromUrl(
-                        imageUrl,
-                        OnImageLoaded,
-                        OnImageLoadError
-                    )
-                );
-            }
-            else if (string.IsNullOrEmpty(imageUrl))
-            {
-                LoggerWrapper.Warning("ArchiveTileRenderer", "UpdateWithItemModel", $"{Type.IMAGE}{Type.ERROR} No image URL available", new Dictionary<string, object> {
-                    { "itemId", model.Id },
-                    { "usingColorPlaceholder", true }
-                });
+                Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+                if (texture != null)
+                {
+                    OnImageLoaded(texture);
+                }
+                else 
+                {
+                    GenerateRandomColorForItem();
+                }
             }
         }
     }
     
     private string GetTileImageUrl(Item model)
     {
-        LoggerWrapper.Info("ArchiveTileRenderer", "GetTileImageUrl", "Generating image URL", new Dictionary<string, object> { { "itemId", model?.Id ?? "null" }, { "hasValidId", !string.IsNullOrEmpty(model?.Id) }, { "modelTitle", model?.Title } }, this.gameObject);
+        LoggerWrapper.Info("ArchiveTileRenderer", "GetTileImageUrl", "Getting resource path", new Dictionary<string, object> { { "itemId", model?.Id ?? "null" } }, this.gameObject);
         
-        // First try the standard Internet Archive thumbnail
         if (!string.IsNullOrEmpty(model.Id))
         {
-            // Construct URL from item ID (Internet Archive standard service)
-            string url = $"https://archive.org/services/img/{model.Id}";
-            LoggerWrapper.NetworkRequest("ArchiveTileRenderer", "GetTileImageUrl", "Image", new Dictionary<string, object> { { "itemId", model.Id }, { "url", url }, { "serviceType", "archive.org standard" } }, this.gameObject);
-            return url;
+            // Don't include file extension - Unity will find the right asset type
+            string resourcePath = $"Content/collections/{model.collectionId}/items/{model.Id}/cover";
+            return resourcePath;
         }
         
-        LoggerWrapper.Warning("ArchiveTileRenderer", "GetTileImageUrl", "Cannot generate URL, no valid ID", new Dictionary<string, object> { { "itemId", model?.Id ?? "null" }, { "modelTitle", model?.Title }, { "reason", "Empty or null ID" } }, this.gameObject);
+        LoggerWrapper.Warning("ArchiveTileRenderer", "GetTileImageUrl", "Cannot get resource path, no valid ID", new Dictionary<string, object> { { "itemId", model?.Id ?? "null" }, { "modelTitle", model?.Title } }, this.gameObject);
         return null;
     }
     
     private void OnImageLoaded(Texture2D texture)
     {
-        _isImageLoading = false;
-        _loadImageCoroutine = null;
-        
         if (texture != null && _tileRenderer != null)
         {
-            LoggerWrapper.ImageLoaded("ArchiveTileRenderer", "OnImageLoaded", new Dictionary<string, object> {
-                { "textureSize", $"{texture.width}x{texture.height}" },
-                { "itemId", _itemView?.Model?.Id ?? "unknown" },
-                { "format", texture.format.ToString() },
-                { "memorySize", $"{(texture.width * texture.height * 4)/1024}KB" }
-            }, this.gameObject);
-            
-            // Apply texture
+            // Apply texture from Resources
             _tileRenderer.material.shader = Shader.Find("Unlit/Texture");
             _tileRenderer.material.mainTexture = texture;
             _tileRenderer.material.color = Color.white;
             
-            // Update model to cache the texture if possible
+            // Cache in model if possible
             if (_itemView?.Model != null)
             {
                 _itemView.Model.cover = texture;
-                LoggerWrapper.ObjectCache("ArchiveTileRenderer", "OnImageLoaded", "Store", new Dictionary<string, object> {
-                    { "itemId", _itemView.Model.Id },
-                    { "cacheLocation", "Model.cover" },
-                    { "textureSize", $"{texture.width}x{texture.height}" }
-                }, this.gameObject);
             }
         }
-        else
-        {
-            LoggerWrapper.Warning("ArchiveTileRenderer", "OnImageLoaded", "Texture or renderer is null", new Dictionary<string, object> {
-                { "textureLoaded", texture != null },
-                { "rendererAvailable", _tileRenderer != null },
-                { "modelAvailable", _itemView?.Model != null }
-            }, this.gameObject);
-        }
-    }
-    
-    private void OnImageLoadError(string error)
-    {
-        _isImageLoading = false;
-        _loadImageCoroutine = null;
-        
-        LoggerWrapper.NetworkResponse("ArchiveTileRenderer", "OnImageLoadError", "Failed", new Dictionary<string, object> {
-            { "error", error },
-            { "itemId", _itemView?.Model?.Id ?? "unknown" },
-            { "usingColorPlaceholder", true },
-            { "fallbackStrategy", "GenerateRandomColorForItem" }
-        }, this.gameObject);
-        
-        // Fall back to placeholder with random color
-        GenerateRandomColorForItem();
     }
     
     private void GenerateRandomColorForItem()

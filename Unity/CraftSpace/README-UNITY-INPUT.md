@@ -16,14 +16,14 @@ This input architecture abstracts physical inputs into logical actions, allowing
 
 The system is built around semantic actions rather than device-specific inputs:
 
-| Action       | Desktop         | Mobile         | Multi-User      |
-|--------------|-----------------|----------------|-----------------|
-| Navigate     | WASD/Arrows     | Touch drag     | Device tilt     |
-| Select       | Mouse click     | Tap            | Tap             |
-| Zoom         | Mouse wheel     | Pinch          | Move device     |
+| Action       | Desktop         | Mobile           | Multi-User      |
+|--------------|-----------------|------------------|-----------------|
+| Navigate     | WASD/Arrows     | Touch drag       | Device tilt     |
+| Select       | Mouse click     | Tap              | Tap             |
+| Zoom         | Mouse wheel     | Pinch            | Move device     |
 | Rotate       | Right-drag      | Two-finger twist | Device rotation |
-| Context Menu | Right-click     | Long press     | Two-finger tap  |
-| Quick Action | Space           | Quick flick    | Device shake    |
+| Context Menu | Right-click     | Long press       | Two-finger tap  |
+| Quick Action | Space           | Quick flick      | Device shake    |
 
 ## Gesture Recognition
 

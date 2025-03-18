@@ -7,15 +7,14 @@ public class CollectionBrowserManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform _collectionsContainer;
     [SerializeField] private GameObject _itemViewPrefab;
-    [SerializeField] private GameObject _collectionLayoutPrefab;
-    [SerializeField] private Transform _cameraRig;
+    [SerializeField] private GameObject _collectionViewPrefab;
+    [SerializeField] private CameraController _cameraController;
     
     [Header("Layout Settings")]
     [SerializeField] private float _collectionSpacing = 5f;
     
     private List<CollectionGridLayout> _collectionLayouts = new List<CollectionGridLayout>();
     private Brewster _brewster;
-    private CameraController _cameraController;
     
     private void Start()
     {
@@ -25,8 +24,6 @@ public class CollectionBrowserManager : MonoBehaviour
             Debug.LogError("Brewster component not found!");
             return;
         }
-        
-        _cameraController = _cameraRig?.GetComponent<CameraController>();
         
         // Subscribe to Brewster's loading completion
         // Since Brewster might not have a built-in event, we can check in Update
@@ -43,7 +40,7 @@ public class CollectionBrowserManager : MonoBehaviour
     
     private void CreateCollectionLayouts()
     {
-        if (_collectionsContainer == null || _collectionLayoutPrefab == null)
+        if (_collectionsContainer == null || _collectionViewPrefab == null)
             return;
             
         // Clear any existing layouts
@@ -63,7 +60,7 @@ public class CollectionBrowserManager : MonoBehaviour
         foreach (var collection in _brewster.collections)
         {
             // Create temporary layout to calculate size
-            GameObject tempLayout = Instantiate(_collectionLayoutPrefab);
+            GameObject tempLayout = Instantiate(_collectionViewPrefab);
             CollectionGridLayout gridLayout = tempLayout.GetComponent<CollectionGridLayout>();
             gridLayout.SetCollection(collection);
             

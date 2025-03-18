@@ -6,9 +6,14 @@ using CraftSpace.Models.Schema.Generated;
 public class CollectionGridLayout : MonoBehaviour
 {
     [Header("Grid Settings")]
-    [SerializeField] private float _itemWidth = 2.0f;
-    [SerializeField] private float _itemHeight = 2.5f; // Includes title area
-    [SerializeField] private float _itemSpacing = 0.5f;
+    [SerializeField] private float _itemWidth = 2.0f;  // Horizontal spacing
+    [SerializeField] private float _itemHeight = 2.0f; // Forward/back spacing
+    [SerializeField] private float _itemMarginTop = 0.2f;
+    [SerializeField] private float _itemMarginBottom = 0.2f;
+    [SerializeField] private float _itemMarginLeft = 0.2f;
+    [SerializeField] private float _itemMarginRight = 0.2f;
+    [SerializeField] private float _itemGapVertical = 0.5f;
+    [SerializeField] private float _itemGapHorizontal = 0.5f;
     [SerializeField] private bool _centerGrid = true;
     
     [Header("References")]
@@ -43,6 +48,10 @@ public class CollectionGridLayout : MonoBehaviour
         if (_collection == null || _itemViewPrefab == null)
             return;
             
+        // Calculate total item dimensions including margins
+        float totalItemWidth = _itemWidth + _itemMarginLeft + _itemMarginRight;
+        float totalItemHeight = _itemHeight + _itemMarginTop + _itemMarginBottom;
+        
         // Calculate grid dimensions
         int itemCount = _collection.items.Count;
         int columns = Mathf.CeilToInt(Mathf.Sqrt(itemCount));
@@ -52,16 +61,16 @@ public class CollectionGridLayout : MonoBehaviour
         
         _gridDimensions = new Vector2Int(columns, rows);
         
-        // Calculate total grid size
-        float gridWidth = columns * _itemWidth + (columns - 1) * _itemSpacing;
-        float gridHeight = rows * _itemHeight + (rows - 1) * _itemSpacing;
+        // Calculate total grid size with gaps
+        float gridWidth = columns * totalItemWidth + (columns - 1) * _itemGapHorizontal;
+        float gridHeight = rows * totalItemHeight + (rows - 1) * _itemGapVertical;
         
         // Calculate start position (top left of grid)
         Vector3 startPos = Vector3.zero;
         if (_centerGrid)
         {
-            startPos.x = -gridWidth / 2 + _itemWidth / 2;
-            startPos.z = gridHeight / 2 - _itemHeight / 2;
+            startPos.x = -gridWidth / 2 + totalItemWidth / 2;
+            startPos.z = gridHeight / 2 - totalItemHeight / 2;
         }
         
         // Create items
@@ -71,9 +80,9 @@ public class CollectionGridLayout : MonoBehaviour
             int col = i % columns;
             
             Vector3 itemPosition = new Vector3(
-                startPos.x + col * (_itemWidth + _itemSpacing),
+                startPos.x + col * (totalItemWidth + _itemGapHorizontal),
                 0,
-                startPos.z - row * (_itemHeight + _itemSpacing)
+                startPos.z - row * (totalItemHeight + _itemGapVertical)
             );
             
             ItemView itemView = CreateItemView(_collection.items[i], itemPosition);
@@ -97,14 +106,16 @@ public class CollectionGridLayout : MonoBehaviour
         ItemView itemView = itemObject.GetComponent<ItemView>();
         if (itemView != null)
         {
-            itemView.Model = itemData;
-            
-            // Ensure the ArchiveTileRenderer is added
-            if (itemView.GetComponent<ArchiveTileRenderer>() == null)
+            // Configure the ItemView with dimensions that match our layout
+            if (itemView is ItemView typedItemView)
             {
-                ArchiveTileRenderer renderer = itemView.gameObject.AddComponent<ArchiveTileRenderer>();
-                renderer.Activate();
+                // Configure item dimensions if exposed through properties
+                // This assumes you've added public properties or methods to ItemView
+                // to adjust its dimensions
             }
+            
+            // Set the model data
+            itemView.Model = itemData;
         }
         
         return itemView;
@@ -127,8 +138,8 @@ public class CollectionGridLayout : MonoBehaviour
     public Vector2 GetGridSize()
     {
         return new Vector2(
-            _gridDimensions.x * _itemWidth + (_gridDimensions.x - 1) * _itemSpacing,
-            _gridDimensions.y * _itemHeight + (_gridDimensions.y - 1) * _itemSpacing
+            _gridDimensions.x * _itemWidth + (_gridDimensions.x - 1) * _itemGapHorizontal,
+            _gridDimensions.y * _itemHeight + (_gridDimensions.y - 1) * _itemGapVertical
         );
     }
 } 

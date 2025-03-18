@@ -33,7 +33,8 @@
     "processor:manage": "tsx scripts/processor-manage.js",
     "import:debug": "tsx scripts/import-debug.js",
     "collection:validate": "tsx scripts/collection-exclude.js check",
-    "collection:excluded": "tsx scripts/collection-exclude.js list"
+    "collection:excluded": "tsx scripts/collection-exclude.js list",
+    "copy-items-to-unity": "node Scripts/copy-items-to-unity.js"
   },
   "dependencies": {
     "async-retry": "^1.3.3",
