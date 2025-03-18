@@ -119,24 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &899724358 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 1927188702752892539, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-  m_PrefabInstance: {fileID: 3454230032371047925}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &899724361
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 899724358}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3a2223b9042584a80984e508f795a659, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  backgroundColor: {r: 0.1970452, g: 0.1970452, b: 0.33962262, a: 1}
 --- !u!1001 &3454230032371047925
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -185,50 +167,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _maxX
-      value: 25
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _maxZ
-      value: 25
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _minX
-      value: -25
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _minZ
-      value: -25
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _maxZoom
-      value: 100
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _minZoom
-      value: 0.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _panSpeed
-      value: 3
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _bounceFactor
-      value: 0.9
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _frictionFactor
-      value: 0.999
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _baseVelocityThreshold
-      value: 0.005
-      objectReference: {fileID: 0}
-    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      propertyPath: _velocitySmoothingFactor
-      value: 0.1
-      objectReference: {fileID: 0}
     - target: {fileID: 4720751228182595418, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: m_Name
       value: Managers
@@ -236,10 +174,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 1927188702752892539, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 899724361}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

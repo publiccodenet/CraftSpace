@@ -201,7 +201,7 @@ public class ItemView : MonoBehaviour
             // Configure the item label
             if (_itemLabel != null && Model != null)
             {
-                _itemLabel.SetText($"{Model.Title}\n{Model.Id}");
+                _itemLabel.SetText(Model.Title);
             }
         }
         else
@@ -438,7 +438,7 @@ public class ItemView : MonoBehaviour
         // Set the label text to show both title and ID
         if (_itemLabel != null)
         {
-            _itemLabel.SetText($"{Model.Title}\n{Model.Id}");
+            _itemLabel.SetText(Model.Title);
         }
     }
 

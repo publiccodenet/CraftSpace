@@ -142,12 +142,7 @@ public class ArchiveTileRenderer : ItemViewRenderer
         // Set title text
         if (_titleText != null)
         {
-            string titleText = model.Title;
-            if (titleText.Length > _maxTitleLength)
-            {
-                titleText = titleText.Substring(0, _maxTitleLength) + "...";
-            }
-            _titleText.text = titleText;
+            _titleText.text = model.Title;  // Just set the title directly, let TMP handle it
         }
         
         // First show placeholder color while loading
