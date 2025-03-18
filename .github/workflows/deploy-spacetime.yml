@@ -54,4 +54,9 @@ jobs:
           
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4 
+        uses: actions/deploy-pages@v4
+
+      - name: Copy Unity build files
+        run: |
+          mkdir -p WebSites/spacetime/Build
+          cp -r SvelteKit/BackSpace/static/Build/WebGL/* WebSites/spacetime/Build/ 

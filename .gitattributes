@@ -4,3 +4,4 @@
 *.asset filter=lfs diff=lfs merge=lfs -text
 *.unity binary
 *.prefab binary
+*.gz filter=lfs diff=lfs merge=lfs -text
