@@ -26,12 +26,10 @@ jobs:
         with:
           lfs: true
         
-      - name: Create Jekyll config
+      - name: Unzip gzipped files
         run: |
-          echo "webrick:" > WebSites/spacetime/_config.yml
-          echo "  headers:" >> WebSites/spacetime/_config.yml
-          echo "    Build/:" >> WebSites/spacetime/_config.yml
-          echo "      Content-Encoding: gzip" >> WebSites/spacetime/_config.yml
+          cd WebSites/spacetime/Build
+          gunzip -k *.gz
         
       - name: Setup Pages
         uses: actions/configure-pages@v4
