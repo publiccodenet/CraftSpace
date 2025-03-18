@@ -26,24 +26,6 @@ jobs:
         with:
           lfs: true
         
-      - name: Diagnostic - Check LFS and Build files
-        run: |
-          echo "=== LFS Status ==="
-          git lfs ls-files
-          git lfs status
-          
-          echo "=== WebSites/spacetime contents ==="
-          ls -la WebSites/spacetime/
-          
-          echo "=== Build directory contents ==="
-          ls -la WebSites/spacetime/Build/
-          
-          echo "=== Check .gz files ==="
-          find WebSites/spacetime/Build -name "*.gz" -ls
-          
-          echo "=== File sizes ==="
-          du -h WebSites/spacetime/Build/*
-        
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
