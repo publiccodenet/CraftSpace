@@ -26,6 +26,13 @@ jobs:
         with:
           lfs: true
         
+      - name: Create _headers file
+        run: |
+          echo "/*" > WebSites/spacetime/_headers
+          echo "  Access-Control-Allow-Origin: *" >> WebSites/spacetime/_headers
+          echo "/Build/*.gz" >> WebSites/spacetime/_headers
+          echo "  Content-Encoding: gzip" >> WebSites/spacetime/_headers
+        
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
