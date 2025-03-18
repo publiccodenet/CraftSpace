@@ -26,28 +26,26 @@ jobs:
         with:
           lfs: true
         
-      - name: Diagnostic - Check LFS
+      - name: Diagnostic - Check LFS and Build files
         run: |
-          git lfs ls-files
           echo "=== LFS Status ==="
+          git lfs ls-files
           git lfs status
           
-      - name: Diagnostic - Check WebSites directory
-        run: |
           echo "=== WebSites/spacetime contents ==="
           ls -la WebSites/spacetime/
-          echo "=== Build directory ==="
-          ls -la WebSites/spacetime/Build/
-          echo "=== Template directory ==="
-          ls -la WebSites/spacetime/TemplateData/
           
+          echo "=== Build directory contents ==="
+          ls -la WebSites/spacetime/Build/
+          
+          echo "=== Check .gz files ==="
+          find WebSites/spacetime/Build -name "*.gz" -ls
+          
+          echo "=== File sizes ==="
+          du -h WebSites/spacetime/Build/*
+        
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        
-      - name: Diagnostic - Check artifact contents
-        run: |
-          echo "=== Files to be uploaded ==="
-          find ./WebSites/spacetime -type f
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
