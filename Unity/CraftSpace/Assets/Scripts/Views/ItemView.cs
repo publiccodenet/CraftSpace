@@ -27,6 +27,16 @@ public class ItemView : MonoBehaviour
     [Header("Materials")]
     [SerializeField] private Material _loadingMaterial;
     
+    [Header("Highlighting")]
+    [SerializeField] private Material _highlightMaterial;
+    private GameObject _highlightMesh;
+    
+    [Header("Highlight Margins")]
+    [SerializeField] private float _highlightMarginTop = 0.3f;    // Extra space for title
+    [SerializeField] private float _highlightMarginBottom = 0f;
+    [SerializeField] private float _highlightMarginLeft = 0f;
+    [SerializeField] private float _highlightMarginRight = 0f;
+    
     // Tracked renderers
     private Dictionary<System.Type, BaseViewRenderer> _renderers = new Dictionary<System.Type, BaseViewRenderer>();
     private List<BaseViewRenderer> _activeRenderers = new List<BaseViewRenderer>();
@@ -419,23 +429,54 @@ public class ItemView : MonoBehaviour
         // If we don't have a texture yet, create a standard book-shaped mesh
         if (GetComponent<MeshRenderer>()?.material?.mainTexture == null)
         {
+            BoxCollider boxCollider = GetComponent<BoxCollider>();
+            if (boxCollider == null) return;
+
+            // Get collider dimensions
+            float colliderWidth = boxCollider.size.x;
+            float colliderHeight = boxCollider.size.z;  // Using Z since we're flat on the ground
+
+            // Use standard book aspect ratio for placeholder (2:3)
+            float defaultAspect = 2f/3f;  // width:height ratio
+
+            // Calculate dimensions to fill collider while maintaining aspect ratio
+            float width, height;
+            
+            // Since defaultAspect is < 1.0 (tall book), we'll use full height
+            height = colliderHeight;
+            width = height * defaultAspect;
+
+            // Create/update mesh
             MeshFilter meshFilter = GetComponent<MeshFilter>();
             if (meshFilter == null)
                 meshFilter = gameObject.AddComponent<MeshFilter>();
             
-            // Use sharedMesh consistently
-            meshFilter.sharedMesh = ItemLoader.CreateBookCoverMesh();
+            if (meshFilter.sharedMesh == null)
+            {
+                meshFilter.sharedMesh = MeshGenerator.CreateCoverMesh(width, height);
+            }
+            else
+            {
+                MeshGenerator.ResizeQuadMesh(meshFilter.sharedMesh, width, height);
+            }
             
             // Create a simple unlit material for the placeholder
             MeshRenderer renderer = GetComponent<MeshRenderer>();
             if (renderer != null)
             {
                 Material material = new Material(Shader.Find("Unlit/Texture"));
-                renderer.material = material;
+                if (_loadingMaterial != null)
+                {
+                    renderer.material = _loadingMaterial;
+                }
+                else
+                {
+                    renderer.material = material;
+                }
             }
         }
         
-        // Set the label text to show both title and ID
+        // Set the label text
         if (_itemLabel != null)
         {
             _itemLabel.SetText(Model.Title);
@@ -509,33 +550,45 @@ public class ItemView : MonoBehaviour
     {
         if (texture == null) return;
 
-        // Calculate aspect ratio of the image
-        float aspectRatio = (float)texture.width / texture.height;
+        BoxCollider boxCollider = GetComponent<BoxCollider>();
+        if (boxCollider == null) return;
+
+        // Get collider dimensions
+        float colliderWidth = boxCollider.size.x;
+        float colliderHeight = boxCollider.size.z;  // This is our height in XZ plane
+
+        // Get actual texture aspect ratio (width/height)
+        float textureAspect = (float)texture.width / texture.height;
         
-        // Force book cover proportions (1:1.5)
-        float width = _itemWidth;
-        float height = width * 1.5f;
-        if (height > _itemHeight)
+        float width, height;
+        
+        // Scale by the LONGEST dimension first, then let the other one be proportionally smaller
+        if (textureAspect >= 1.0f)  // Width is longest dimension
         {
-            height = _itemHeight;
-            width = height / 1.5f;
+            width = colliderWidth;  // Fill width
+            height = width / textureAspect;  // Height will be smaller, creating gaps top/bottom
+        }
+        else  // Height is longest dimension
+        {
+            height = colliderHeight;  // Fill height
+            width = height * textureAspect;  // Width will be smaller, creating gaps left/right
         }
 
-        // First ensure we have a mesh filter and create the mesh
+        // Create/update mesh with these dimensions
         MeshFilter meshFilter = GetComponent<MeshFilter>();
         if (meshFilter == null)
             meshFilter = gameObject.AddComponent<MeshFilter>();
         
-        // Create the mesh if it doesn't exist
         if (meshFilter.sharedMesh == null)
         {
-            meshFilter.sharedMesh = ItemLoader.CreateBookCoverMesh();
+            meshFilter.sharedMesh = MeshGenerator.CreateCoverMesh(width, height);
         }
-        
-        // Then resize it
-        MeshGenerator.ResizeQuadMesh(meshFilter.sharedMesh, width, height);
+        else
+        {
+            MeshGenerator.ResizeQuadMesh(meshFilter.sharedMesh, width, height);
+        }
 
-        // Finally set up the material with the texture
+        // Set up material
         MeshRenderer renderer = GetComponent<MeshRenderer>();
         if (renderer != null)
         {
@@ -543,7 +596,75 @@ public class ItemView : MonoBehaviour
             material.mainTexture = texture;
             renderer.material = material;
         }
+    }
 
-        SetupItemUI();
+    private void CreateHighlightMesh()
+    {
+        if (_highlightMesh == null)
+        {
+            _highlightMesh = new GameObject("Highlight");
+            _highlightMesh.transform.SetParent(transform);
+            
+            MeshFilter meshFilter = _highlightMesh.AddComponent<MeshFilter>();
+            MeshRenderer meshRenderer = _highlightMesh.AddComponent<MeshRenderer>();
+            
+            Mesh mesh = new Mesh();
+            BoxCollider boxCollider = GetComponent<BoxCollider>();
+            
+            // Get base size from collider
+            float baseWidth = boxCollider != null ? boxCollider.size.x : 1f;
+            float baseLength = boxCollider != null ? boxCollider.size.z : 1f;
+            
+            // Calculate asymmetric positions
+            float left = -baseWidth/2 - _highlightMarginLeft;
+            float right = baseWidth/2 + _highlightMarginRight;
+            float bottom = -baseLength/2 - _highlightMarginBottom;
+            float top = baseLength/2 + _highlightMarginTop;
+            
+            // Create vertices with asymmetric margins
+            Vector3[] vertices = new Vector3[4]
+            {
+                new Vector3(left, 0, bottom),   // Bottom left
+                new Vector3(right, 0, bottom),  // Bottom right
+                new Vector3(left, 0, top),      // Top left
+                new Vector3(right, 0, top)      // Top right
+            };
+            
+            // UV coordinates
+            Vector2[] uv = new Vector2[4]
+            {
+                new Vector2(0, 0),
+                new Vector2(1, 0),
+                new Vector2(0, 1),
+                new Vector2(1, 1)
+            };
+            
+            // Triangles
+            int[] triangles = new int[6]
+            {
+                0, 2, 1,
+                2, 3, 1
+            };
+            
+            mesh.vertices = vertices;
+            mesh.uv = uv;
+            mesh.triangles = triangles;
+            mesh.RecalculateNormals();
+            
+            meshFilter.mesh = mesh;
+            meshRenderer.material = _highlightMaterial;
+            
+            _highlightMesh.transform.localPosition = new Vector3(0, -0.02f, 0);
+            _highlightMesh.SetActive(false);
+        }
+    }
+
+    public void SetHighlighted(bool highlighted)
+    {
+        if (_highlightMesh == null)
+        {
+            CreateHighlightMesh();
+        }
+        _highlightMesh.SetActive(highlighted);
     }
 } 

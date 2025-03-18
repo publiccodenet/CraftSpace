@@ -1,4 +1,7 @@
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using CraftSpace.UI;
 
 namespace CraftSpace.Core
 {
@@ -28,6 +31,14 @@ namespace CraftSpace.Core
         [SerializeField] private float _frictionFactor = 0.98f;
         [SerializeField] private float _bounceFactor = 0.8f;
 
+        [Header("UI References")]
+        [SerializeField] private ItemInfoPanel _itemInfoPanel;
+        [SerializeField] private LayerMask _itemLayer;
+        [SerializeField] private TextMeshProUGUI _infoText;
+
+        [Header("UI Settings")]
+        [SerializeField] private float _descriptionScale = 0.8f;
+
         // State variables
         private bool _isDragging = false;
         private Vector3 _previousMousePosition;
@@ -35,6 +46,8 @@ namespace CraftSpace.Core
         private Vector3 _filteredVelocity = Vector3.zero;
         private bool _physicsEnabled = true;
         private float _lastDragTime;
+        private ItemView _hoveredItem;
+        private ItemView _currentHighlightedItem;
 
         private void Start()
         {
@@ -52,6 +65,7 @@ namespace CraftSpace.Core
         {
             // Only handle input capture in Update
             HandleInput();
+            UpdateHoveredItem();
         }
 
         private void HandleInput()
@@ -290,6 +304,49 @@ namespace CraftSpace.Core
             
             screenPos.z = _camera.nearClipPlane;
             return _camera.ScreenToWorldPoint(screenPos);
+        }
+
+        private void UpdateHoveredItem()
+        {
+            Ray ray = _camera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+            
+            ItemView newHoveredItem = null;
+            
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity, _itemLayer))
+            {
+                ItemView itemView = hit.collider.GetComponent<ItemView>();
+                if (itemView != null && itemView.Model != null)
+                {
+                    newHoveredItem = itemView;
+                    _itemInfoPanel.UpdateInfo(itemView.Model.Title);
+                    _itemInfoPanel.gameObject.SetActive(true);  // Show the panel
+                }
+                else
+                {
+                    _itemInfoPanel.Clear();
+                    _itemInfoPanel.gameObject.SetActive(false);  // Hide the panel
+                }
+            }
+            else
+            {
+                _itemInfoPanel.Clear();
+                _itemInfoPanel.gameObject.SetActive(false);  // Hide the panel if no hit
+            }
+
+            // Update highlighting
+            if (_currentHighlightedItem != newHoveredItem)
+            {
+                if (_currentHighlightedItem != null)
+                {
+                    _currentHighlightedItem.SetHighlighted(false);
+                }
+                _currentHighlightedItem = newHoveredItem;
+                if (_currentHighlightedItem != null)
+                {
+                    _currentHighlightedItem.SetHighlighted(true);
+                }
+            }
         }
     }
 } 

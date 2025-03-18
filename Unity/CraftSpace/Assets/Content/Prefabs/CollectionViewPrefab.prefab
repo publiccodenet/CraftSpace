@@ -64,11 +64,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _itemWidth: 1.5
   _itemHeight: 1.5
-  _itemMarginTop: 0.2
+  _itemMarginTop: 0.3
   _itemMarginBottom: 0.01
   _itemMarginLeft: 0.01
   _itemMarginRight: 0.01
-  _itemGapVertical: 0.2
+  _itemGapVertical: 0.6
   _itemGapHorizontal: 0.2
   _centerGrid: 1
   _container: {fileID: 464012571170886491}

@@ -55,6 +55,11 @@ MonoBehaviour:
   _itemWidth: 1.2
   _itemHeight: 1
   _loadingMaterial: {fileID: 2100000, guid: 0e29a213f7529450cb3eb75e25f24c03, type: 2}
+  _highlightMaterial: {fileID: 2100000, guid: 7e59c25f9c2ba48568b8e1c87e9e1a7b, type: 2}
+  _highlightMarginTop: 0.7
+  _highlightMarginBottom: 0.1
+  _highlightMarginLeft: 0.1
+  _highlightMarginRight: 0.1
 --- !u!65 &1945117689957070442
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -103,7 +108,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7511191356403708219}
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: 1.25}
+  m_LocalPosition: {x: 0, y: 0, z: 1.536}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
