@@ -1,10 +1,10 @@
-# CraftSpace Data Architecture
+# Spacecraft Data Architecture
 
-This document outlines the data architecture of CraftSpace, describing how content flows from Internet Archive through processing pipelines to various deployment targets.
+This document outlines the data architecture of Spacecraft, describing how content flows from Internet Archive through processing pipelines to various deployment targets.
 
 ## Collection Data Flow
 
-The CraftSpace data architecture implements a multi-level content flow:
+The Spacecraft data architecture implements a multi-level content flow:
 
 ```
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
@@ -21,7 +21,7 @@ The CraftSpace data architecture implements a multi-level content flow:
 
 ## Caching Strategy
 
-CraftSpace implements a multi-level caching strategy to balance performance, storage, and bandwidth:
+Spacecraft implements a multi-level caching strategy to balance performance, storage, and bandwidth:
 
 ### 1. Static vs. Dynamic Collections
 
