@@ -1,3 +1,51 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:73212922b7765932305a428f14d1189cc7bc12ca853b7fcf8e79f8c02f5bde27
-size 1321
+Ben, Max, Brewster
+immersive archive visualization project, long term
+codebase, organization
+blender, blender game engine
+upbge - blender game engine
+evaluage viability of blender game engine
+python client, internet archive data sources
+ia - internet archive
+grant from brewster
+sponsored by brewster and ia
+make demo with grant
+ia thinking about moving to europe
+receiptive environment
+make something like german sovern tech fund
+use blender and collaborate with them
+recognizing that blender is cultural infrastructure
+
+Internet Archive Spacecraft Demo Spec
+https://docs.google.com/document/d/1UyM1XFsocvDBDoQ0FIas2uvwTgHMXje0GhcgAF_rZdo/edit?tab=t.0#heading=h.gpdc15w0d2hs
+
+injection of data less important than putting blender game engine through its paces
+
+sam and max
+
+consider godot but really want to use blender
+build a reason to work with ton
+sleuthing in contributer charts of blender game engine, how can we support them to continue doing it?
+
+Seep Seek - Chinese
+Deep Ak - Deep AWK
+
+----
+
+Internet Archive command line interface
+
+https://archive.org/developers/internetarchive/cli.html
+
+cd ~/.local/bin
+curl -LOs https://archive.org/download/ia-pex/ia
+chmod +x ia
+ia -h
+
+----
+
+https://archive.org/details/iacl
+
+https://archive.org/details/vhsvault
+
+https://gifcities.org/
+
+npm install internetarchive-sdk-js

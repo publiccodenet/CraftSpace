@@ -17,57 +17,56 @@
 *.yaml text
 *.yml text
 # 3D model files
-*.blend filter=lfs diff=lfs merge=lfs -text
-*.obj filter=lfs diff=lfs merge=lfs -text
-*.fbx filter=lfs diff=lfs merge=lfs -text
-*.3ds filter=lfs diff=lfs merge=lfs -text
-*.gltf filter=lfs diff=lfs merge=lfs -text
-*.glb filter=lfs diff=lfs merge=lfs -text
+*.blend binary
+*.obj binary
+*.fbx binary
+*.3ds binary
+*.gltf binary
+*.glb binary
 # Archive files
-*.zip filter=lfs diff=lfs merge=lfs -text
-*.rar filter=lfs diff=lfs merge=lfs -text
-*.7z filter=lfs diff=lfs merge=lfs -text
-*.tar filter=lfs diff=lfs merge=lfs -text
-*.tgz filter=lfs diff=lfs merge=lfs -text
-*.tar.gz filter=lfs diff=lfs merge=lfs -text
+*.zip binary
+*.rar binary
+*.7z binary
+*.tar binary
+*.tgz binary
+*.tar.gz binary
 # Common media files - basic rules, subdirectories may override
 *.jpg !filter !diff !merge text size="<100k"
 *.png !filter !diff !merge text size="<100k"
-*.webm filter=lfs diff=lfs merge=lfs -text
-*.mp3 filter=lfs diff=lfs merge=lfs -text
-*.wav filter=lfs diff=lfs merge=lfs -text
+*.webm binary
+*.mp3 binary
+*.wav binary
 # Document files
-*.pdf filter=lfs diff=lfs merge=lfs -text
-*.epub filter=lfs diff=lfs merge=lfs -text
-*.mobi filter=lfs diff=lfs merge=lfs -text
-*.djvu filter=lfs diff=lfs merge=lfs -text
+*.pdf binary
+*.epub binary
+*.mobi binary
+*.djvu binary
 # Only use LFS for text files that are BIGGER than 1MB
-*.txt filter=lfs diff=lfs merge=lfs -text size=">1M"
 # Images
-*.jpeg filter=lfs diff=lfs merge=lfs -text
-*.tif filter=lfs diff=lfs merge=lfs -text
-*.tiff filter=lfs diff=lfs merge=lfs -text
-*.webp filter=lfs diff=lfs merge=lfs -text
+*.jpeg binary
+*.tif binary
+*.tiff binary
+*.webp binary
 # Audio
-*.flac filter=lfs diff=lfs merge=lfs -text
-*.ogg filter=lfs diff=lfs merge=lfs -text
-*.m4a filter=lfs diff=lfs merge=lfs -text
+*.flac binary
+*.ogg binary
+*.m4a binary
 # Video
-*.mkv filter=lfs diff=lfs merge=lfs -text
-*.avi filter=lfs diff=lfs merge=lfs -text
-*.mov filter=lfs diff=lfs merge=lfs -text
+*.mkv binary
+*.avi binary
+*.mov binary
 # Tile pyramids and atlases
-*_tiles/** filter=lfs diff=lfs merge=lfs -text
-*_atlas_*.jpg filter=lfs diff=lfs merge=lfs -text
-*_atlas_*.png filter=lfs diff=lfs merge=lfs -text
+*_tiles/** binary
+*_atlas_*.jpg binary
+*_atlas_*.png binary
 # CI/CD special patterns - allow smarter checkouts
 # These patterns help CI/CD jobs skip LFS content when not needed
-/Collections/** filter=lfs diff=lfs merge=lfs -text
+/Collections/** binary
 /Collections/**/items/*.json -filter -diff -merge text
 /Collections/**/collection.json -filter -diff -merge text
 /Collections/**/index.json -filter -diff -merge text
 # E-book files
-*.azw3 filter=lfs diff=lfs merge=lfs -text
+*.azw3 binary
 # Common large files tracked with LFS
 # Specific paths might override general rules
 # E.g., always treat certain path JSON files as text regardless of parent rules
