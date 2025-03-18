@@ -78,3 +78,46 @@
 /Content/**/*.json -filter -diff -merge text
 Unity/CraftSpace/Assets/TextMesh[[:space:]]Pro/**/*.txt !text !filter !merge !diff
 SvelteKit/BackSpace/static/icons/icon-*.png !text !filter !merge !diff
+
+# Declare all binary files at root level
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.tga binary
+*.tif binary
+*.tiff binary
+*.ico binary
+*.exr binary
+*.hdr binary
+*.psd binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.mp4 binary
+*.mov binary
+*.avi binary
+*.fbx binary
+*.obj binary
+*.max binary
+*.blend binary
+*.dae binary
+*.mb binary
+*.ma binary
+*.3ds binary
+*.dfx binary
+*.c4d binary
+*.lwo binary
+*.lwo2 binary
+*.abc binary
+*.3dm binary
+*.unity binary
+*.prefab binary
+*.asset binary
+*.mat binary
+*.anim binary
+*.controller binary
+*.mask binary
+*.unitypackage binary
+*.unity3d binary
+*.terrainlayer binary
