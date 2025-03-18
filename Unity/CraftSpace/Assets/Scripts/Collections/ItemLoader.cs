@@ -74,7 +74,7 @@ public class ItemLoader : MonoBehaviour
     }
     
     // Create a basic book cover mesh
-    private Mesh CreateBookCoverMesh()
+    public static Mesh CreateBookCoverMesh()
     {
         Mesh mesh = new Mesh();
         

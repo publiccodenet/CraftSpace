@@ -26,8 +26,6 @@ public class ItemView : MonoBehaviour
 
     [Header("Materials")]
     [SerializeField] private Material _loadingMaterial;
-    [SerializeField] private Texture2D _loadingTexture;
-    [SerializeField] private Material _imageMaterial;
     
     // Tracked renderers
     private Dictionary<System.Type, BaseViewRenderer> _renderers = new Dictionary<System.Type, BaseViewRenderer>();
@@ -203,7 +201,7 @@ public class ItemView : MonoBehaviour
             // Configure the item label
             if (_itemLabel != null && Model != null)
             {
-                _itemLabel.SetText(Model.Title);
+                _itemLabel.SetText($"{Model.Title}\n{Model.Id}");
             }
         }
         else
@@ -343,11 +341,10 @@ public class ItemView : MonoBehaviour
         if (meshRenderer == null)
             meshRenderer = gameObject.AddComponent<MeshRenderer>();
         
-        // Create new mesh or update existing one
+        // Create or update mesh
         if (meshFilter.sharedMesh == null)
         {
-            Mesh newMesh = MeshGenerator.CreateFlatQuad(width, height);
-            meshFilter.sharedMesh = newMesh;
+            meshFilter.sharedMesh = MeshGenerator.CreateFlatQuad(width, height);
         }
         else
         {
@@ -422,21 +419,26 @@ public class ItemView : MonoBehaviour
         // If we don't have a texture yet, create a standard book-shaped mesh
         if (GetComponent<MeshRenderer>()?.material?.mainTexture == null)
         {
-            // Get a mesh filter or add one
             MeshFilter meshFilter = GetComponent<MeshFilter>();
             if (meshFilter == null)
                 meshFilter = gameObject.AddComponent<MeshFilter>();
             
-            // Use our helper method to create a standard book cover shape
-            float maxWidth = _itemWidth * 0.85f;  // Leave some margin
-            float maxHeight = _itemHeight * 0.85f; // Leave room for title
-            meshFilter.sharedMesh = MeshGenerator.CreateStandardBookCoverMesh(maxWidth, maxHeight);
+            // Use sharedMesh consistently
+            meshFilter.sharedMesh = ItemLoader.CreateBookCoverMesh();
+            
+            // Create a simple unlit material for the placeholder
+            MeshRenderer renderer = GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                Material material = new Material(Shader.Find("Unlit/Texture"));
+                renderer.material = material;
+            }
         }
         
-        // Set the label text
+        // Set the label text to show both title and ID
         if (_itemLabel != null)
         {
-            _itemLabel.SetText(Model.Title ?? "Unknown");
+            _itemLabel.SetText($"{Model.Title}\n{Model.Id}");
         }
     }
 
@@ -465,40 +467,32 @@ public class ItemView : MonoBehaviour
         if (Model == null || string.IsNullOrEmpty(Model.Id))
             return;
 
-        // Set initial loading state
+        // Create initial mesh and renderer
+        MeshFilter meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter == null)
+            meshFilter = gameObject.AddComponent<MeshFilter>();
+        
         MeshRenderer renderer = GetComponent<MeshRenderer>();
-        if (renderer != null)
+        if (renderer == null)
+            renderer = gameObject.AddComponent<MeshRenderer>();
+
+        // Set initial loading state with proper book cover proportions
+        if (_loadingMaterial != null)
         {
-            if (_loadingMaterial != null)
-            {
-                renderer.material = _loadingMaterial;
-            }
-            else
-            {
-                Material loadingMat = new Material(Shader.Find("Unlit/Texture"));
-                if (_loadingTexture != null)
-                {
-                    loadingMat.mainTexture = _loadingTexture;
-                }
-                else
-                {
-                    loadingMat.color = new Color(0.8f, 0.8f, 0.8f);
-                }
-                renderer.material = loadingMat;
-            }
-            
-            // Create standard book cover mesh for loading state
-            float loadingWidth = _itemWidth * 0.8f;
-            float loadingHeight = loadingWidth * 1.5f;
-            if (loadingHeight > _itemHeight)
-            {
-                loadingHeight = _itemHeight * 0.9f;
-                loadingWidth = loadingHeight / 1.5f;
-            }
-            CreateOrUpdateCoverMesh(loadingWidth, loadingHeight);
+            renderer.material = _loadingMaterial;
         }
 
-        // ONLY load from Resources, never from web
+        // Create standard book cover mesh for loading state
+        float loadingWidth = _itemWidth;
+        float loadingHeight = _itemWidth * 1.5f; // Book cover aspect ratio
+        if (loadingHeight > _itemHeight)
+        {
+            loadingHeight = _itemHeight;
+            loadingWidth = loadingHeight / 1.5f;
+        }
+        CreateOrUpdateCoverMesh(loadingWidth, loadingHeight);
+
+        // Load texture from Resources
         string resourcePath = GetItemThumbnailUrl(Model.Id);
         Texture2D texture = Resources.Load<Texture2D>(resourcePath);
         if (texture != null)
@@ -513,73 +507,43 @@ public class ItemView : MonoBehaviour
 
     private void ApplyLoadedTexture(Texture2D texture)
     {
-        if (texture == null)
-        {
-            Debug.LogWarning($"Null texture received for item {Model?.Id}");
-            return;
-        }
-        
+        if (texture == null) return;
+
         // Calculate aspect ratio of the image
         float aspectRatio = (float)texture.width / texture.height;
         
-        // Calculate dimensions to fit within item area while preserving aspect ratio
-        float width, height;
-        
-        if (aspectRatio >= 1f) // Landscape or square
+        // Force book cover proportions (1:1.5)
+        float width = _itemWidth;
+        float height = width * 1.5f;
+        if (height > _itemHeight)
         {
-            width = _itemWidth * 0.9f; // Slightly smaller than max width
-            height = width / aspectRatio;
-            
-            // Ensure height doesn't exceed max
-            if (height > _itemHeight * 0.9f)
-            {
-                height = _itemHeight * 0.9f;
-                width = height * aspectRatio;
-            }
+            height = _itemHeight;
+            width = height / 1.5f;
         }
-        else // Portrait (like book covers)
+
+        // First ensure we have a mesh filter and create the mesh
+        MeshFilter meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter == null)
+            meshFilter = gameObject.AddComponent<MeshFilter>();
+        
+        // Create the mesh if it doesn't exist
+        if (meshFilter.sharedMesh == null)
         {
-            height = _itemHeight * 0.9f; // Slightly smaller than max height
-            width = height * aspectRatio;
-            
-            // Ensure width doesn't exceed max
-            if (width > _itemWidth * 0.9f)
-            {
-                width = _itemWidth * 0.9f;
-                height = width / aspectRatio;
-            }
+            meshFilter.sharedMesh = ItemLoader.CreateBookCoverMesh();
         }
         
-        // Log the dimensions for debugging
-        Debug.Log($"Image dimensions for {Model?.Id}: {texture.width}x{texture.height}, " +
-                  $"Aspect ratio: {aspectRatio}, Displayed at: {width}x{height}");
-        
-        // Resize mesh to match image aspect ratio
-        CreateOrUpdateCoverMesh(width, height);
-        
-        // Apply texture to material
+        // Then resize it
+        MeshGenerator.ResizeQuadMesh(meshFilter.sharedMesh, width, height);
+
+        // Finally set up the material with the texture
         MeshRenderer renderer = GetComponent<MeshRenderer>();
         if (renderer != null)
         {
-            Material instanceMaterial;
-            
-            // Use custom material if provided, otherwise create a new one with built-in shader
-            if (_imageMaterial != null)
-            {
-                instanceMaterial = new Material(_imageMaterial);
-            }
-            else
-            {
-                // Use the built-in Unlit/Texture shader
-                instanceMaterial = new Material(Shader.Find("Unlit/Texture"));
-            }
-            
-            // Apply the downloaded texture
-            instanceMaterial.mainTexture = texture;
-            renderer.material = instanceMaterial;
+            Material material = new Material(Shader.Find("Unlit/Texture"));
+            material.mainTexture = texture;
+            renderer.material = material;
         }
-        
-        // Update UI
+
         SetupItemUI();
     }
 } 

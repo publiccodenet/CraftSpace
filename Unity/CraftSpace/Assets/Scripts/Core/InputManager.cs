@@ -23,10 +23,10 @@ namespace CraftSpace.Core
         [SerializeField] private float _keyboardZoomSpeed = 5f;
 
         [Header("Physics Settings")]
-        [SerializeField] private float _velocitySmoothingFactor = 0.2f; // Lower = more smoothing
-        [SerializeField] private float _velocityThreshold = 0.1f; // Below this is considered "stopped"
-        [SerializeField] private float _frictionFactor = 0.98f; // Slow down over time (< 1.0)
-        [SerializeField] private float _bounceFactor = 0.8f; // Energy retained after bouncing (< 1.0)
+        [SerializeField] private float _baseVelocityThreshold = 0.1f; // Renamed to indicate this is the base value
+        [SerializeField] private float _velocitySmoothingFactor = 0.8f;
+        [SerializeField] private float _frictionFactor = 0.98f;
+        [SerializeField] private float _bounceFactor = 0.8f;
 
         // State variables
         private bool _isDragging = false;
@@ -50,77 +50,66 @@ namespace CraftSpace.Core
 
         private void Update()
         {
-            // DRAG HANDLING - EXACTLY AS BEFORE
+            // Only handle input capture in Update
+            HandleInput();
+        }
+
+        private void HandleInput()
+        {
             if (Input.GetMouseButtonDown(0))
             {
                 _isDragging = true;
-                _previousMousePosition = GetMouseWorldPosition();
-                _lastDragTime = Time.time;
-                
-                // Disable physics while dragging
+                _previousMousePosition = Input.mousePosition;
+                _lastDragTime = Time.realtimeSinceStartup;
                 _physicsEnabled = false;
                 _cameraVelocity = Vector3.zero;
-                _filteredVelocity = Vector3.zero;
             }
-            
-            if (_isDragging)
-            {
-                // Get current mouse position in world space
-                Vector3 currentMousePosition = GetMouseWorldPosition();
-                float deltaTime = Time.time - _lastDragTime;
-                _lastDragTime = Time.time;
-                
-                // Calculate the world space delta from last frame
-                Vector3 worldDelta = _previousMousePosition - currentMousePosition;
-                worldDelta.y = 0;
-                
-                if (_invertDrag) worldDelta = -worldDelta;
-                
-                // TRACK VELOCITY FOR THROW WITHOUT APPLYING IT
-                if (deltaTime > 0.001f)
-                {
-                    Vector3 instantVelocity = worldDelta / deltaTime;
-                    _filteredVelocity = Vector3.Lerp(_filteredVelocity, instantVelocity, _velocitySmoothingFactor);
-                }
-                
-                // Move the camera directly - NO PHYSICS DURING DRAG
-                Vector3 newPosition = _cameraRig.position + worldDelta;
-                newPosition.x = Mathf.Clamp(newPosition.x, _minX, _maxX);
-                newPosition.z = Mathf.Clamp(newPosition.z, _minZ, _maxZ);
-                _cameraRig.position = newPosition;
-                
-                // Update for next frame
-                _previousMousePosition = GetMouseWorldPosition();
-            }
-            
-            // END DRAG AND APPLY THROW VELOCITY
-            if (Input.GetMouseButtonUp(0) && _isDragging)
+            else if (Input.GetMouseButtonUp(0))
             {
                 _isDragging = false;
-                
-                // Apply throw velocity if above threshold
-                if (_filteredVelocity.magnitude < _velocityThreshold)
+                if (_filteredVelocity.magnitude > GetScaledVelocityThreshold())
                 {
-                    _cameraVelocity = Vector3.zero; // No throw - stop completely
+                    _cameraVelocity = _filteredVelocity;
+                    _physicsEnabled = true;
                 }
-                else
-                {
-                    _cameraVelocity = _filteredVelocity; // Apply throw velocity
-                }
-                
-                // Re-enable physics for momentum
-                _physicsEnabled = true;
             }
             
-            // Only apply physics when not dragging
-            if (_physicsEnabled && !_isDragging)
+            // Handle active dragging AND velocity calculation in ONE place
+            if (_isDragging)
+            {
+                float currentTime = Time.realtimeSinceStartup;
+                float deltaTime = currentTime - _lastDragTime;
+                
+                if (deltaTime > 0.001f)
+                {
+                    // Get ACTUAL world positions
+                    Vector3 oldWorldPos = GetMouseWorldPosition(_previousMousePosition);
+                    Vector3 newWorldPos = GetMouseWorldPosition(Input.mousePosition);
+                    Vector3 worldDelta = oldWorldPos - newWorldPos;  // Direction matches camera movement
+                    
+                    // Update tracking
+                    _previousMousePosition = Input.mousePosition;
+                    _lastDragTime = currentTime;
+                    
+                    // Calculate velocity from actual world movement
+                    Vector3 instantVelocity = worldDelta / deltaTime;
+                    _filteredVelocity = Vector3.Lerp(_filteredVelocity, instantVelocity, _velocitySmoothingFactor);
+                    
+                    // Move camera
+                    Vector3 newPosition = _cameraRig.position + worldDelta;
+                    newPosition.x = Mathf.Clamp(newPosition.x, _minX, _maxX);
+                    newPosition.z = Mathf.Clamp(newPosition.z, _minZ, _maxZ);
+                    _cameraRig.position = newPosition;
+                }
+            }
+
+            HandleKeyboardPan();
+            HandleZoom();
+            
+            if (_physicsEnabled)
             {
                 ApplyPhysics();
             }
-            
-            // Regular input handling
-            HandleKeyboardPan();
-            HandleZoom();
         }
 
         // Physics simulation for momentum and bouncing
@@ -281,6 +270,26 @@ namespace CraftSpace.Core
             Vector3 mousePos = Input.mousePosition;
             mousePos.z = _camera.nearClipPlane;
             return _camera.ScreenToWorldPoint(mousePos);
+        }
+
+        private float GetScaledVelocityThreshold()
+        {
+            return _baseVelocityThreshold * (_camera.orthographicSize / _minZoom);
+        }
+
+        // Add overload to handle arbitrary screen positions
+        private Vector3 GetMouseWorldPosition(Vector3 screenPos)
+        {
+            Plane plane = new Plane(Vector3.up, Vector3.zero);
+            Ray ray = _camera.ScreenPointToRay(screenPos);
+            
+            if (plane.Raycast(ray, out float enter))
+            {
+                return ray.GetPoint(enter);
+            }
+            
+            screenPos.z = _camera.nearClipPlane;
+            return _camera.ScreenToWorldPoint(screenPos);
         }
     }
 } 

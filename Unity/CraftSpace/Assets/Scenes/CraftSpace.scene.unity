@@ -119,6 +119,66 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1001 &349404568
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 4331697567644932370, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_Name
+      value: ItemViewPrefab
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6021631261349080873, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7511191356403708219, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
+  m_SourcePrefab: {fileID: 100100000, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
 --- !u!1 &899724358 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1927188702752892539, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
@@ -187,19 +247,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: _maxX
-      value: 12
+      value: 40
       objectReference: {fileID: 0}
     - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: _maxZ
-      value: 12
+      value: 40
       objectReference: {fileID: 0}
     - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: _minX
-      value: -12
+      value: -40
       objectReference: {fileID: 0}
     - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: _minZ
-      value: -12
+      value: -40
       objectReference: {fileID: 0}
     - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: _maxZoom
@@ -221,6 +281,14 @@ PrefabInstance:
       propertyPath: _frictionFactor
       value: 0.999
       objectReference: {fileID: 0}
+    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
+      propertyPath: _baseVelocityThreshold
+      value: 0.005
+      objectReference: {fileID: 0}
+    - target: {fileID: 3806827983699418000, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
+      propertyPath: _velocitySmoothingFactor
+      value: 0.1
+      objectReference: {fileID: 0}
     - target: {fileID: 4720751228182595418, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: m_Name
       value: Managers
@@ -238,3 +306,4 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 3454230032371047925}
+  - {fileID: 349404568}

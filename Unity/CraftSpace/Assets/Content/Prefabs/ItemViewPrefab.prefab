@@ -55,8 +55,6 @@ MonoBehaviour:
   _itemWidth: 1.2
   _itemHeight: 1
   _loadingMaterial: {fileID: 2100000, guid: 0e29a213f7529450cb3eb75e25f24c03, type: 2}
-  _loadingTexture: {fileID: 0}
-  _imageMaterial: {fileID: 0}
 --- !u!65 &1945117689957070442
 BoxCollider:
   m_ObjectHideFlags: 0
