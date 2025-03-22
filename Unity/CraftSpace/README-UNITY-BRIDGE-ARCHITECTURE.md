@@ -25,7 +25,8 @@ The Unity Bridge system consists of several key components that dovetail togethe
 
 5. **JSON Messaging**
    - Asynchronous messaging protocol between JavaScript and Unity
-   - Allows JavaScript to instantiate, configure, and control Unity objects
+   - Allows JavaScript to instantiate, configure, control, and 
+     handle events from Unity objects
 
 ## Core Architecture Components
 
