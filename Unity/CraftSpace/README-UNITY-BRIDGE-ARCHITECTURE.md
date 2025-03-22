@@ -18,7 +18,8 @@ The Unity Bridge system consists of several key components that dovetail togethe
 
 3. **JSON <=> C# Conversion Utilities**
    - Automatically converts between JSON and C# objects
-   - Handles Unity-specific types like Vector3, Quaternion, etc.
+   - Handles Unity-specific types like Vector3, Quaternion, 
+     Material, ParticleSystem, etc.
 
 4. **Accessor Path Expressions**
    - Path syntax for traversing and modifying Unity objects with JSON
