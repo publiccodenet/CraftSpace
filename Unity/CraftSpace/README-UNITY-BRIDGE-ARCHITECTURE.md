@@ -11,6 +11,8 @@ The Unity Bridge system consists of several key components that dovetail togethe
 1. **Cross Platform Web Browser and JavaScript Engine**
    - Integrates native web browser/JavaScript with Unity
    - Hides platform-specific implementations from the developer
+   - Enables live coding and debugging to greatly accelerate 
+     iterative development without recompiling the Unity app
 
 2. **JavaScript/Unity3D Bridge**
    - Enables bidirectional communication between Unity and JavaScript
