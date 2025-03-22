@@ -4,6 +4,29 @@
 
 The Unity Bridge system enables real-time communication between Unity and web technologies, facilitating seamless integration of web content, JavaScript execution, data exchange, and interactive UI elements. This system allows developers to leverage the power of web technologies within Unity applications and provides a robust framework for creating rich, interactive experiences.
 
+## Key Integration Components
+
+The Unity Bridge system consists of several key components that dovetail together:
+
+1. **Cross Platform Web Browser and JavaScript Engine**
+   - Integrates native web browser/JavaScript with Unity
+   - Hides platform-specific implementations from the developer
+
+2. **JavaScript/Unity3D Bridge**
+   - Enables bidirectional communication between Unity and JavaScript
+   - Provides access to Unity objects, components, and functionality
+
+3. **JSON <=> C# Conversion Utilities**
+   - Automatically converts between JSON and C# objects
+   - Handles Unity-specific types like Vector3, Quaternion, etc.
+
+4. **Accessor Path Expressions**
+   - Path syntax for traversing and modifying Unity objects with JSON
+
+5. **JSON Messaging**
+   - Asynchronous messaging protocol between JavaScript and Unity
+   - Allows JavaScript to instantiate, configure, and control Unity objects
+
 ## Core Architecture Components
 
 The Bridge architecture consists of several interconnected components:
@@ -574,27 +597,3 @@ Example event sequence for testing the bridge:
 4. **Cleanup**: Properly dispose bridge objects and resources when no longer needed
 5. **Debugging**: Enable console logging to diagnose communication issues
 
-## Key Integration Components
-
-The Unity Bridge system consists of several key components that work together:
-
-1. **Cross Platform Web Browser and JavaScript Engine**
-   - Integrates native web browser/JavaScript with Unity
-   - Hides platform-specific implementations from the developer
-
-2. **JavaScript/Unity3D Bridge**
-   - Enables bidirectional communication between Unity and JavaScript
-   - Provides access to Unity objects, components, and functionality
-
-3. **JSON <=> C# Conversion Utilities**
-   - Automatically converts between JSON and C# objects
-   - Handles Unity-specific types like Vector3, Quaternion, etc.
-
-4. **Accessor Path Expressions**
-   - Path syntax for traversing and modifying Unity objects with JSON
-
-5. **JSON Messaging**
-   - Asynchronous messaging protocol between JavaScript and Unity
-   - Allows JavaScript to instantiate, configure, and control Unity objects
-
-  
