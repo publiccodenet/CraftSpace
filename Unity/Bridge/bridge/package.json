@@ -1,0 +1,16 @@
+{
+    "name": "com.groundupsoftware.bridge.unity",
+    "displayName": "Ground Up Software Unity Bridge",
+    "version": "1.0.0",
+    "unity": "2020.1",
+    "keywords": [
+        "bridge"
+    ],
+    "description": "This is the Unity Bridge.",
+    "dependencies": {
+    },
+    "repository": {
+        "url": "https://github.com/SimHacker/bridge.git",
+        "type": "git"
+    }
+}
