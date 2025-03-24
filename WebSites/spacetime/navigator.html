@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Spacecraft Navigator</title>
+    <link rel="icon" type="image/png" href="thumbnail.png">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  </head>
+  <body style="padding:0;margin:0;touch-action:none">
+    <div id="target" style="height: 100vh"></div>
+    <script>
+        // Create a single supabase client for interacting with your database
+        const client = supabase.createClient('https://gwodhwyvuftyrvbymmvc.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3b2Rod3l2dWZ0eXJ2YnltbXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDkyMDMsImV4cCI6MjA1NzkyNTIwM30.APVpyOupY84gQ7c0vBZkY-GqoJRPhb4oD4Lcj9CEzlc')
+
+        const channel = client.channel("navigators")
+
+        let subscribed = false;
+        channel.subscribe((status) => {
+          console.log('subscribe', status)
+          if (status === 'SUBSCRIBED') {
+            subscribed = true;
+          }
+        })
+
+        // dummy log method
+        const log = () => {};
+
+        // Global vars to cache event state
+        const evCache = [];
+        let prevDiff = -1;
+        let prevX = 0;
+        let prevY = 0;
+
+        function removeEvent(ev) {
+          // Remove this event from the target's cache
+          const index = evCache.findIndex(
+            (cachedEv) => cachedEv.pointerId === ev.pointerId,
+          );
+          evCache.splice(index, 1);
+        }
+
+        function pointerdownHandler(ev) {
+          // The pointerdown event signals the start of a touch interaction.
+          // This event is cached to support 2-finger gestures
+          evCache.push(ev);
+          log("pointerDown", ev);
+        }
+
+        function pointermoveHandler(ev) {
+          // This function implements a 2-pointer horizontal pinch/zoom gesture.
+          //
+          // If the distance between the two pointers has increased (zoom in),
+          // the target element's background is changed to "pink" and if the
+          // distance is decreasing (zoom out), the color is changed to "lightblue".
+          //
+          // This function sets the target element's border to "dashed" to visually
+          // indicate the pointer's target received a move event.
+          log("pointerMove", ev);
+          // ev.target.style.border = "dashed";
+
+          // Find this event in the cache and update its record with this event
+          const index = evCache.findIndex(
+            (cachedEv) => cachedEv.pointerId === ev.pointerId,
+          );
+          evCache[index] = ev;
+
+          // If two pointers are down, check for pinch gestures
+          if (evCache.length === 2) {
+            // Calculate the distance between the two pointers
+            const curDiff = Math.abs(evCache[0].clientX - evCache[1].clientX);
+
+            if (prevDiff > 0) {
+              if (curDiff > prevDiff) {
+                // The distance between the two pointers has increased
+                log("Pinch moving OUT -> Zoom in", ev);
+                ev.target.style.background = "pink";
+              }
+              if (curDiff < prevDiff) {
+                // The distance between the two pointers has decreased
+                log("Pinch moving IN -> Zoom out", ev);
+                ev.target.style.background = "lightblue";
+              }
+            }
+
+            // Cache the distance for the next move event
+            prevDiff = curDiff;
+          } else if (evCache.length === 1) {
+            // single pointer
+            let relX = evCache[0].clientX - prevX;
+            if (prevX === 0) relX = 0;
+            let relY = evCache[0].clientY - prevY;
+            if (prevY === 0) relY = 0;
+
+            prevX = evCache[0].clientX
+            prevY = evCache[0].clientY
+
+            if (subscribed) {
+              const payload = { x: relX, y: relY }
+              console.log('sending ', payload)
+              channel.send({
+                type: 'broadcast',
+                event: 'pos',
+                payload,
+              })
+            }
+          }
+        }
+
+        function pointerupHandler(ev) {
+          log(ev.type, ev);
+          // Remove this pointer from the cache and reset the target's
+          // background and border
+          removeEvent(ev);
+          ev.target.style.background = "white";
+          // ev.target.style.border = "1px solid black";
+
+          // If the number of pointers down is less than two then reset diff tracker
+          if (evCache.length < 2) {
+            prevDiff = -1;
+          }
+        }
+
+        function wheelHandler(ev) {
+          // prevent wheel from zooming
+          if( ev.ctrlKey ) ev.preventDefault()
+          const payload = { zoom: ev.deltaY}
+          console.log('wheel', payload)
+          channel.send({
+            type: 'broadcast',
+            event: 'zoom',
+            payload,
+          })
+          return false
+        }
+
+        window.addEventListener( 'wheel', wheelHandler, { passive: false })
+
+        // Install event handlers for the pointer target
+        const el = document.getElementById("target");
+        el.onpointerdown = pointerdownHandler;
+        el.onpointermove = pointermoveHandler;
+
+        // Use same handler for pointer{up,cancel,out,leave} events since
+        // the semantics for these events - in this app - are the same.
+        el.onpointerup = pointerupHandler;
+        el.onpointercancel = pointerupHandler;
+        el.onpointerout = pointerupHandler;
+        el.onpointerleave = pointerupHandler;
+    </script>
+  </body>
+</html>
