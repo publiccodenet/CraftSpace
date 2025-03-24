@@ -24,6 +24,16 @@
           }
         })
 
+        function sendEvent(event, payload) {
+          if (! subscribed) return;
+          console.log('sendEvent', name, payload)
+          channel.send({
+            type: 'broadcast',
+            event,
+            payload,
+          })
+        }
+
         // dummy log method
         const log = () => {};
 
@@ -72,6 +82,7 @@
             const curDiff = Math.abs(evCache[0].clientX - evCache[1].clientX);
 
             if (prevDiff > 0) {
+              sendEvent('zoom', { zoom: curDiff - prevDiff})
               if (curDiff > prevDiff) {
                 // The distance between the two pointers has increased
                 log("Pinch moving OUT -> Zoom in", ev);
@@ -92,19 +103,10 @@
             if (prevX === 0) relX = 0;
             let relY = evCache[0].clientY - prevY;
             if (prevY === 0) relY = 0;
+            sendEvent('pos', { x: relX, y: relY })
 
             prevX = evCache[0].clientX
             prevY = evCache[0].clientY
-
-            if (subscribed) {
-              const payload = { x: relX, y: relY }
-              console.log('sending ', payload)
-              channel.send({
-                type: 'broadcast',
-                event: 'pos',
-                payload,
-              })
-            }
           }
         }
 
@@ -125,14 +127,7 @@
         function wheelHandler(ev) {
           // prevent wheel from zooming
           if( ev.ctrlKey ) ev.preventDefault()
-          const payload = { zoom: ev.deltaY}
-          console.log('wheel', payload)
-          channel.send({
-            type: 'broadcast',
-            event: 'zoom',
-            payload,
-          })
-          return false
+          sendEvent('zoom', { zoom: ev.deltaY})
         }
 
         window.addEventListener( 'wheel', wheelHandler, { passive: false })
