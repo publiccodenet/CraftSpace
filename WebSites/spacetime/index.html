@@ -32,12 +32,12 @@
         })
       }
 
-      function handlePos(data) {
-        console.log('handlePos', data.payload)
+      function handlePos(payload) {
+        console.log('handlePos', payload)
       }
 
-      function handleZoom(data) {
-        console.log('handleZoom', data.payload.zoom)
+      function handleZoom(zoom) {
+        console.log('handleZoom', zoom)
       }
 
       // Subscribe to the Channel
@@ -45,12 +45,12 @@
         .on(
           'broadcast',
           { event: 'pos' },
-          (payload) => handlePos(payload)
+          (data) => handlePos(data.payload)
         )
         .on(
           'broadcast',
           { event: 'zoom' },
-          (payload) => handleZoom(payload)
+          (data) => handleZoom(data.payload.zoom)
         )
     </script>
     <canvas id="unity-canvas" width=960 height=600 tabindex="-1" style="width: 100%; height: 100%; position: fixed; top: 0; left: 0; background: #1F1F20"></canvas>
