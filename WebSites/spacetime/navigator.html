@@ -99,9 +99,7 @@
 
             // Cache the distance for the next move event
             prevDiff = curDiff;
-          }
-
-          if (evCache.length > 0) {
+          } else if (evCache.length == 1) {
             // use first pointer
             let relX = ev.clientX - prevX;
             if (prevX === 0) relX = 0;
