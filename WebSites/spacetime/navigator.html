@@ -101,15 +101,17 @@
             prevDiff = curDiff;
           }
 
-          // use first pointer
-          let relX = ev.clientX - prevX;
-          if (prevX === 0) relX = 0;
-          let relY = ev.clientY - prevY;
-          if (prevY === 0) relY = 0;
-          sendEvent('pos', { x: relX, y: relY })
+          if (evCache.length > 0) {
+            // use first pointer
+            let relX = ev.clientX - prevX;
+            if (prevX === 0) relX = 0;
+            let relY = ev.clientY - prevY;
+            if (prevY === 0) relY = 0;
+            sendEvent('pos', { x: relX, y: relY })
 
-          prevX = ev.clientX
-          prevY = ev.clientY
+            prevX = ev.clientX
+            prevY = ev.clientY
+          }
         }
 
         function pointerupHandler(ev) {
