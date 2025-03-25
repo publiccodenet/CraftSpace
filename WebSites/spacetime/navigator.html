@@ -20,11 +20,18 @@
       }
       body {
         font-family: "Mulish", Helvetica;
+         padding: 0;
+         border: 0;
+         margin: 0;
+         width: 100vw;
+         height: 100vh;
+         overflow: hidden;
+         touch-action: none;
       }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   </head>
-  <body style="padding:0;margin:0;touch-action:none">
+  <body>
     <div class="unselectable" style="margin:20px;"><h4>Navigator</h4>
     drag to move, mousewheel or pinch/zoom to scale.</div>
     <div id="target" style="height: 100vh"></div>
@@ -44,7 +51,7 @@
 
         function sendEvent(event, payload) {
           if (! subscribed) return;
-          console.log('sendEvent', name, payload)
+          console.log('sendEvent', event, payload)
           channel.send({
             type: 'broadcast',
             event,
