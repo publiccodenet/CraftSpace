@@ -115,17 +115,17 @@
 
             // Cache the distance for the next move event
             prevDiff = curDiff;
-          } else if (evCache.length === 1) {
-            // single pointer
-            let relX = evCache[0].clientX - prevX;
-            if (prevX === 0) relX = 0;
-            let relY = evCache[0].clientY - prevY;
-            if (prevY === 0) relY = 0;
-            sendEvent('pos', { x: relX, y: relY })
-
-            prevX = evCache[0].clientX
-            prevY = evCache[0].clientY
           }
+
+          // use first pointer
+          let relX = ev.clientX - prevX;
+          if (prevX === 0) relX = 0;
+          let relY = ev.clientY - prevY;
+          if (prevY === 0) relY = 0;
+          sendEvent('pos', { x: relX, y: relY })
+
+          prevX = ev.clientX
+          prevY = ev.clientY
         }
 
         function pointerupHandler(ev) {
