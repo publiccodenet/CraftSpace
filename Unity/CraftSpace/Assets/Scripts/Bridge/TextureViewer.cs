@@ -11,9 +11,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class TextureViewer : Tracker {
 
 
@@ -132,9 +129,6 @@ public class TextureViewer : Tracker {
         }
 
     }
-
-
-}
 
 
 }

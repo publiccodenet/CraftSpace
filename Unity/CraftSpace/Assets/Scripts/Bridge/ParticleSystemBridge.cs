@@ -10,9 +10,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class ParticleSystemHelper : Tracker {
 
 
@@ -158,8 +155,6 @@ public class ParticleSystemHelper : Tracker {
         }
 
     }
-
-}
 
 
 }

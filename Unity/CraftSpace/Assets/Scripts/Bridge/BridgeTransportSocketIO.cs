@@ -3,8 +3,6 @@
 // Copyright (C) 2018 by Don Hopkins, Ground Up Software.
 
 
-#if false
-
 #if USE_SOCKETIO && UNITY_EDITOR
 
 
@@ -16,194 +14,187 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using Dpoch.SocketIO;
+using System;
+using System.Threading.Tasks;
 
 
-namespace Bridge {
+public class BridgeTransportSocketIO : BridgeTransport
+{
+
+    public SocketIO socket;
+    public string scriptingEngineID = "";
+    public string scriptingEngineType = "";
+    public static Dictionary<int, byte[]> blobs = new Dictionary<int, byte[]>();
 
 
-    public class BridgeTransportSocketIO : BridgeTransport
+    public override void HandleInit()
     {
+        Debug.Log("BridgeTransportSocketIO: HandleStart: this: " + this + " bridge: " + bridge);
 
-        public SocketIO socket;
-        public string scriptingEngineID = "";
-        public string scriptingEngineType = "";
-        public static Dictionary<int, byte[]> blobs = new Dictionary<int, byte[]>();
+        driver = "SocketIO";
 
+        socket = new SocketIO(bridge.socketIOAddress);
 
-        public override void HandleInit()
-        {
-            Debug.Log("BridgeTransportSocketIO: HandleStart: this: " + this + " bridge: " + bridge);
+        socket.OnOpen += () => {
+            Debug.Log("Socket open!");
+            startedBridge = true;
 
-            driver = "SocketIO";
+            JObject message = new JObject();
+            message.Add("engineType", "DisplayEngine");
+            socket.Emit("Hello", message);
 
-            socket = new SocketIO(bridge.socketIOAddress);
+            Debug.Log("BridgeTransportSocketIO: HandleStart: OnOpen: sent Hello message: " + message);
 
-            socket.OnOpen += () => {
-                Debug.Log("Socket open!");
-                startedBridge = true;
+            //bridge.HandleTransportStarted();
+        };
 
-                JObject message = new JObject();
-                message.Add("engineType", "DisplayEngine");
-                socket.Emit("Hello", message);
+        socket.OnConnectFailed += () => {
+            Debug.Log("Socket failed to connect!");
+        };
 
-                Debug.Log("BridgeTransportSocketIO: HandleStart: OnOpen: sent Hello message: " + message);
+        socket.OnClose += () => {
+            Debug.Log("Socket closed!");
+        };
 
-                //bridge.HandleTransportStarted();
-            };
+        socket.OnError += (err) => {
+            Debug.Log("Socket Error: " + err);
+        };
 
-            socket.OnConnectFailed += () => {
-                Debug.Log("Socket failed to connect!");
-            };
+        socket.On("AddFriend", (ev) => {
+            Debug.Log("BridgeTransportSocketIO: HandleStart: On AddFriend: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
+            JObject message = (JObject)ev.Data[0];
+            string id = (string)message["id"];
+            string engineType = (string)message["engineType"];
+            switch (engineType) {
 
-            socket.OnClose += () => {
-                Debug.Log("Socket closed!");
-            };
+                case "ScriptingEngine":
+                    scriptingEngineID = id;
+                    scriptingEngineType = engineType;
+                    Debug.Log("BridgeTransportSocketIO: HandleStart: On AddFriend: ScriptingEngine: Starting ScriptingEngine SocketIO transport.");
+                    bridge.HandleTransportStarted();
+                    break;
 
-            socket.OnError += (err) => {
-                Debug.Log("Socket Error: " + err);
-            };
+                default:
+                    Debug.Log("BridgeTransportSocketIO: HandleStart: On AddFriend: unknown engineType: " + engineType);
+                    break;
 
-            socket.On("AddFriend", (ev) => {
-                Debug.Log("BridgeTransportSocketIO: HandleStart: On AddFriend: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
-                JObject message = (JObject)ev.Data[0];
-                string id = (string)message["id"];
-                string engineType = (string)message["engineType"];
-                switch (engineType) {
-
-                    case "ScriptingEngine":
-                        scriptingEngineID = id;
-                        scriptingEngineType = engineType;
-                        Debug.Log("BridgeTransportSocketIO: HandleStart: On AddFriend: ScriptingEngine: Starting ScriptingEngine SocketIO transport.");
-                        bridge.HandleTransportStarted();
-                        break;
-
-                    default:
-                        Debug.Log("BridgeTransportSocketIO: HandleStart: On AddFriend: unknown engineType: " + engineType);
-                        break;
-
-                }
-            });
-
-            socket.On("RemoveFriend", (ev) => {
-                Debug.Log("BridgeTransportSocketIO: HandleStart: On RemoveFriend: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
-                JObject message = (JObject)ev.Data[0];
-                string id = (string)message["id"];
-                string engineType = (string)message["engineType"];
-                switch (engineType) {
-
-                    case "ScriptingEngine":
-                        scriptingEngineID = "";
-                        scriptingEngineType = "";
-                        Debug.Log("BridgeTransportSocketIO: HandleStart: On RemoveFriend: ScriptingEngine: Starting ScriptingEngine SocketIO transport.");
-                        bridge.HandleTransportStopped();
-                        break;
-
-                    default:
-                        Debug.Log("BridgeTransportSocketIO: HandleStart: On RemoveFriend: unknown engineType: " + engineType);
-                        break;
-
-                }
-            });
-
-            socket.On("SendEventList", (ev) => {
-                Debug.Log("BridgeTransportSocketIO: HandleStart: On SendEventList: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
-                string evListString = (string)ev.Data[0];
-                SendBridgeToUnityEvents(evListString);
-            });
-
-            socket.On("SendBlob", (ev) => {
-                Debug.Log("BridgeTransportSocketIO: HandleStart: On SendBlob: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
-                int blobID = (int)ev.Data[0];
-                JToken blobToken = ev.Data[1];
-                Debug.Log("BridgeTransportSocketIO: HandleStart: blobToken.Type: " + blobToken.Type + " blobToken: " + blobToken);
-                byte[] blob = blobToken.ToObject<byte[]>();
-                Debug.Log("BridgeTransportSocketIO: HandleStart: blob: " + blob);
-                SendBlob(blobID, blob);
-            });
-
-            socket.Connect();
-
-        }
-
-
-        public static void SendBlob(int blobID, byte[] blob)
-        {
-            Debug.Log("BridgeTransportSocketIO: SendBlob: blobID: " + blobID + " length: " + blob.Length + " data: " + blob[0] + " " + blob[1] + " " + blob[2] + " " + blob[3]);
-            blobs[blobID] = blob;
-        }
-
-
-        public static byte[] GetBlob(int blobID)
-        {
-            Debug.Log("BridgeTransportSocketIO: GetBlob: blobID: " + blobID + " contains: " + blobs.ContainsKey(blobID));
-
-            if (!blobs.ContainsKey(blobID)) {
-                return null;
             }
+        });
 
-            byte[] blob = blobs[blobID];
-            blobs.Remove(blobID);
+        socket.On("RemoveFriend", (ev) => {
+            Debug.Log("BridgeTransportSocketIO: HandleStart: On RemoveFriend: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
+            JObject message = (JObject)ev.Data[0];
+            string id = (string)message["id"];
+            string engineType = (string)message["engineType"];
+            switch (engineType) {
 
-            Debug.Log("BridgeTransportSocketIO: GetBlob: blob length: " + blob.Length + " data: " + blob[0] + " " + blob[1] + " " + blob[2] + " " + blob[3]);
+                case "ScriptingEngine":
+                    scriptingEngineID = "";
+                    scriptingEngineType = "";
+                    Debug.Log("BridgeTransportSocketIO: HandleStart: On RemoveFriend: ScriptingEngine: Starting ScriptingEngine SocketIO transport.");
+                    bridge.HandleTransportStopped();
+                    break;
 
-            return blob;
-        }
+                default:
+                    Debug.Log("BridgeTransportSocketIO: HandleStart: On RemoveFriend: unknown engineType: " + engineType);
+                    break;
 
-
-        public override void HandleStart()
-        {
-        }
-
-
-        public override void HandleDestroy()
-        {
-            //Debug.Log("BridgeTransportSocketIO: HandleDestroy: this: " + this + " bridge: " + bridge);
-            if (socket != null) {
-                socket.Close();
-                socket = null;
             }
-        }
+        });
 
+        socket.On("SendEventList", (ev) => {
+            Debug.Log("BridgeTransportSocketIO: HandleStart: On SendEventList: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
+            string evListString = (string)ev.Data[0];
+            SendBridgeToUnityEvents(evListString);
+        });
 
-        public override void EvaluateJS(string js)
-        {
-            //Debug.Log("BridgeTransportSocketIO: EvaluateJS: js: " + js.Length + " " + js);
-            socket.Emit("EvaluateJS", js);
-        }
+        socket.On("SendBlob", (ev) => {
+            Debug.Log("BridgeTransportSocketIO: HandleStart: On SendBlob: ev: " + ev + " Name: " + ev.Name + " Data: " + ev.Data);
+            int blobID = (int)ev.Data[0];
+            JToken blobToken = ev.Data[1];
+            Debug.Log("BridgeTransportSocketIO: HandleStart: blobToken.Type: " + blobToken.Type + " blobToken: " + blobToken);
+            byte[] blob = blobToken.ToObject<byte[]>();
+            Debug.Log("BridgeTransportSocketIO: HandleStart: blob: " + blob);
+            SendBlob(blobID, blob);
+        });
 
-
-        public override bool HasSharedTexture()
-        {
-            return false;
-        }
-
-
-        public override bool HasSharedData()
-        {
-            return false;
-        }
-
-
-        public override Texture2D GetSharedTexture(int id)
-        {
-            Debug.LogError("BridgeTransportSocketIO: TODO: GetSharedTexture: id: " + id);
-            return null;
-        }
-
-
-        public override byte[] GetSharedData(int id)
-        {
-            Debug.LogError("BridgeTransportSocketIO: TODO: GetSharedData: id: " + id);
-            return null;
-        }
-
+        socket.Connect();
 
     }
 
 
+    public static void SendBlob(int blobID, byte[] blob)
+    {
+        Debug.Log("BridgeTransportSocketIO: SendBlob: blobID: " + blobID + " length: " + blob.Length + " data: " + blob[0] + " " + blob[1] + " " + blob[2] + " " + blob[3]);
+        blobs[blobID] = blob;
+    }
+
+
+    public static byte[] GetBlob(int blobID)
+    {
+        Debug.Log("BridgeTransportSocketIO: GetBlob: blobID: " + blobID + " contains: " + blobs.ContainsKey(blobID));
+
+        if (!blobs.ContainsKey(blobID)) {
+            return null;
+        }
+
+        byte[] blob = blobs[blobID];
+        blobs.Remove(blobID);
+
+        Debug.Log("BridgeTransportSocketIO: GetBlob: blob length: " + blob.Length + " data: " + blob[0] + " " + blob[1] + " " + blob[2] + " " + blob[3]);
+
+        return blob;
+    }
+
+
+    public override void HandleStart()
+    {
+    }
+
+
+    public override void HandleDestroy()
+    {
+        //Debug.Log("BridgeTransportSocketIO: HandleDestroy: this: " + this + " bridge: " + bridge);
+        if (socket != null) {
+            socket.Close();
+            socket = null;
+        }
+    }
+
+
+    public override void EvaluateJS(string js)
+    {
+        //Debug.Log("BridgeTransportSocketIO: EvaluateJS: js: " + js.Length + " " + js);
+        socket.Emit("EvaluateJS", js);
+    }
+
+
+    public override bool HasSharedTexture()
+    {
+        return false;
+    }
+
+
+    public override bool HasSharedData()
+    {
+        return false;
+    }
+
+
+    public override Texture2D GetSharedTexture(int id)
+    {
+        Debug.LogError("BridgeTransportSocketIO: TODO: GetSharedTexture: id: " + id);
+        return null;
+    }
+
+
+    public override byte[] GetSharedData(int id)
+    {
+        Debug.LogError("BridgeTransportSocketIO: TODO: GetSharedData: id: " + id);
+        return null;
+    }
+
 }
 
-
-#endif
 
 #endif

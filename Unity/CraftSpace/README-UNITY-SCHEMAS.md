@@ -8,7 +8,7 @@ CraftSpace employs a robust schema-to-code pipeline to ensure type safety and co
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
 │                 │      │                 │      │                 │
 │  Zod Schemas    │─────►│  JSON Schema    │─────►│  C# Classes     │
-│  (TypeScript)   │      │  (JSON)         │      │  (C#)           │
+│  (JSON Schema)           │
 │                 │      │                 │      │                 │
 └─────────────────┘      └─────────────────┘      └─────────────────┘
 ```

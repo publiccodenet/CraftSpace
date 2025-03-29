@@ -10,16 +10,11 @@ using System.Reflection;
 using UnityEngine;
 
 
-namespace Bridge {
-
-
-    //public class NamedAsset : ScriptableObject
-    [System.Serializable]
-    public struct NamedAsset
-    {
-        public string name;
-        public UnityEngine.Object asset;
-    }
-
-
+//public class NamedAsset : ScriptableObject
+[System.Serializable]
+public struct NamedAsset
+{
+    public string name;
+    public UnityEngine.Object asset;
 }
+

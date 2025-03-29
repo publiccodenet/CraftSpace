@@ -11,9 +11,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 
-namespace Bridge {
-
-
 public class KeyboardTracker : Tracker {
 
 
@@ -51,9 +48,6 @@ public class KeyboardTracker : Tracker {
             }
         }
     }
-
-
-}
 
 
 }

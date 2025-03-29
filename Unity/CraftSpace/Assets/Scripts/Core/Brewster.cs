@@ -1,12 +1,9 @@
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System;
-using CraftSpace.Models.Schema.Generated;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using CraftSpace.Utils;
-using Type = CraftSpace.Utils.LoggerWrapper.Type;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -35,9 +32,7 @@ public class Brewster : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            LoggerWrapper.Info("Brewster", "Awake", "Brewster content manager initialized", new Dictionary<string, object> {
-                { "basePath", baseResourcePath }
-            });
+            Debug.Log("[Brewster] Brewster content manager initialized. Base path: " + baseResourcePath);
         }
         else
         {
@@ -47,26 +42,20 @@ public class Brewster : MonoBehaviour
         
         if (loadOnStart)
         {
-            LoggerWrapper.Info("Brewster", "Awake", "Auto-loading content at startup", new Dictionary<string, object> {
-                { "basePath", baseResourcePath }
-            });
+            Debug.Log("[Brewster] Auto-loading content at startup. Base path: " + baseResourcePath);
             LoadAllContent();
         }
     }
     
     public void LoadAllContent()
     {
-        LoggerWrapper.LoadStart("Brewster", "LoadAllContent", "all collections", new Dictionary<string, object> {
-            { "basePath", baseResourcePath }
-        });
+        Debug.Log("[Brewster] Starting to load all collections. Base path: " + baseResourcePath);
         
         collections.Clear();
         
         // Load collections index
         List<string> collectionIds = LoadCollectionIds();
-        LoggerWrapper.Info("Brewster", "LoadAllContent", "Collections found in index", new Dictionary<string, object> {
-            { "count", collectionIds.Count }
-        });
+        Debug.Log($"[Brewster] Collections found in index: {collectionIds.Count}");
         
         // Load each collection
         foreach (var collectionId in collectionIds)
@@ -74,15 +63,12 @@ public class Brewster : MonoBehaviour
             LoadCollection(collectionId);
         }
         
-        LoggerWrapper.LoadComplete("Brewster", "LoadAllContent", "all collections", new Dictionary<string, object> {
-            { "collections", collections.Count },
-            { "totalItems", GetTotalItemCount() }
-        });
+        Debug.Log($"[Brewster] Completed loading all collections. Total collections: {collections.Count}, Total items: {GetTotalItemCount()}");
     }
     
     private List<string> LoadCollectionIds()
     {
-        LoggerWrapper.LoadStart("Brewster", "LoadCollectionIds", "collections index");
+        Debug.Log("[Brewster] Starting to load collections index");
         
         // Fixed path construction - don't include the .json extension for Resources.Load
         string indexPath = Path.Combine(baseResourcePath, "collections-index");
@@ -94,10 +80,7 @@ public class Brewster : MonoBehaviour
         
         if (indexAsset == null)
         {
-            LoggerWrapper.Error("Brewster", "LoadCollectionIds", "Failed to load collections index", new Dictionary<string, object> {
-                { "path", indexPath },
-                { "fullResourcePath", $"Assets/Resources/{indexPath}.json" } // Show the actual file path for debugging
-            }, null, gameObject);
+            Debug.LogError($"[Brewster] Failed to load collections index. Path: {indexPath}, Full resource path: Assets/Resources/{indexPath}.json");
             return new List<string>();
         }
         
@@ -111,20 +94,14 @@ public class Brewster : MonoBehaviour
             }
             
             if (collectionIds == null || collectionIds.Count == 0) {
-                LoggerWrapper.Error("Brewster", "LoadCollectionIds", "Deserialized collection index is empty", new Dictionary<string, object> {
-                    { "path", indexPath },
-                    { "jsonContent", indexAsset.text }
-                }, null, gameObject);
+                Debug.LogError($"[Brewster] Deserialized collection index is empty. Path: {indexPath}, JSON content: {indexAsset.text}");
                 return new List<string>();
             }
             
             return collectionIds;
         } catch (System.Exception ex) {
             // Old format fallback - try to deserialize as object with collections property using JObject instead
-            LoggerWrapper.Warning("Brewster", "LoadCollectionIds", "Failed to parse as string array, attempting legacy format", new Dictionary<string, object> {
-                { "path", indexPath },
-                { "exception", ex.Message }
-            }, gameObject);
+            Debug.LogWarning($"[Brewster] Failed to parse as string array, attempting legacy format. Path: {indexPath}, Exception: {ex.Message}");
             
             try {
                 JObject oldFormat = JObject.Parse(indexAsset.text);
@@ -138,23 +115,17 @@ public class Brewster : MonoBehaviour
                     return collectionIds;
                 }
             } catch (Exception fallbackEx) {
-                LoggerWrapper.Error("Brewster", "LoadCollectionIds", "Failed to parse legacy format", new Dictionary<string, object> {
-                    { "path", indexPath }
-                }, fallbackEx, gameObject);
+                Debug.LogError($"[Brewster] Failed to parse legacy format. Path: {indexPath}, Exception: {fallbackEx.Message}");
             }
             
-            LoggerWrapper.Error("Brewster", "LoadCollectionIds", "Failed to parse collection index in any format", new Dictionary<string, object> {
-                { "path", indexPath }
-            }, ex, gameObject);
+            Debug.LogError($"[Brewster] Failed to parse collection index in any format. Path: {indexPath}, Exception: {ex.Message}");
             return new List<string>();
         }
     }
     
     private void LoadCollection(string collectionId)
     {
-        LoggerWrapper.LoadStart("Brewster", "LoadCollection", "collection data", new Dictionary<string, object> {
-            { "collectionId", collectionId }
-        });
+        Debug.Log($"[Brewster] Starting to load collection data. Collection ID: {collectionId}");
         
         // Load collection data - FIXED: removed .json extension
         string collectionPath = Path.Combine(baseResourcePath, "collections", collectionId, "collection");
@@ -163,34 +134,21 @@ public class Brewster : MonoBehaviour
         
         if (collectionAsset == null)
         {
-            LoggerWrapper.Error("Brewster", "LoadCollection", "Collection data not found", new Dictionary<string, object> {
-                { "collectionId", collectionId },
-                { "path", collectionPath },
-                { "fullResourcePath", $"Assets/Resources/{collectionPath}.json" }
-            }, null, gameObject);
+            Debug.LogError($"[Brewster] Collection data not found. Collection ID: {collectionId}, Path: {collectionPath}, Full resource path: Assets/Resources/{collectionPath}.json");
             return;
         }
         
-        // Create the ScriptableObject instance
-        Collection collection = ScriptableObject.CreateInstance<Collection>();
-        
-        // Let the Collection parse its own JSON
-        collection.ParseFromJson(collectionAsset.text);
+        // Let the Collection parse its own JSON - create directly from JSON
+        Collection collection = Collection.FromJson(collectionAsset.text);
         
         // Ensure minimum required fields
         if (string.IsNullOrEmpty(collection.Id)) {
-            LoggerWrapper.Warning("Brewster", "LoadCollection", "Collection missing required 'Id' field", new Dictionary<string, object> {
-                { "collectionId", collectionId },
-                { "usingDirectoryName", true }
-            }, gameObject);
+            Debug.LogWarning($"[Brewster] Collection missing required 'Id' field. Collection ID: {collectionId}, Using directory name as fallback.");
             collection.Id = collectionId; // Use directory name as fallback
         }
         
         if (string.IsNullOrEmpty(collection.Name)) {
-            LoggerWrapper.Warning("Brewster", "LoadCollection", "Collection missing required 'Name' field", new Dictionary<string, object> {
-                { "collectionId", collectionId },
-                { "usingDirectoryName", true }
-            }, gameObject);
+            Debug.LogWarning($"[Brewster] Collection missing required 'Name' field. Collection ID: {collectionId}, Using directory name as fallback.");
             collection.Name = collectionId; // Use directory name as fallback for name too
         }
         
@@ -230,10 +188,7 @@ public class Brewster : MonoBehaviour
         // Load items index
         LoadItemsForCollection(collection, collectionId);
         
-        LoggerWrapper.CollectionLoaded("Brewster", "LoadCollection", collectionId, new Dictionary<string, object> {
-            { "name", collection.Name },
-            { "itemCount", collection.items.Count }
-        });
+        Debug.Log($"[Brewster] Loaded collection: {collection.Name} with {collection.items.Count} items");
         
         if (verbose)
         {
@@ -243,9 +198,7 @@ public class Brewster : MonoBehaviour
     
     private void LoadItemsForCollection(Collection collection, string collectionId)
     {
-        LoggerWrapper.LoadStart("Brewster", "LoadItemsForCollection", "items index", new Dictionary<string, object> {
-            { "collectionId", collectionId }
-        });
+        Debug.Log($"[Brewster] Starting to load items index. Collection ID: {collectionId}");
         
         // Load items index - FIXED: removed .json extension
         string indexPath = Path.Combine(baseResourcePath, "collections", collectionId, "items-index");
@@ -254,20 +207,14 @@ public class Brewster : MonoBehaviour
         
         if (indexAsset == null)
         {
-            LoggerWrapper.Warning("Brewster", "LoadItemsForCollection", "Items index not found", new Dictionary<string, object> {
-                { "collectionId", collectionId },
-                { "path", indexPath }
-            }, gameObject);
+            Debug.LogWarning($"[Brewster] Items index not found. Collection ID: {collectionId}, Path: {indexPath}");
             return;
         }
         
         // Parse the simple string array
         List<string> itemIds = JsonConvert.DeserializeObject<List<string>>(indexAsset.text);
         
-        LoggerWrapper.Info("Brewster", "LoadItemsForCollection", "Parsed items index", new Dictionary<string, object> {
-            { "collectionId", collectionId },
-            { "itemCount", itemIds.Count }
-        });
+        Debug.Log($"[Brewster] Parsed items index. Collection ID: {collectionId}, Item count: {itemIds.Count}");
         
         // Create folder for items if needed
         #if UNITY_EDITOR
@@ -285,20 +232,13 @@ public class Brewster : MonoBehaviour
             LoadItem(itemId, collection, collectionId);
         }
         
-        LoggerWrapper.Info("Brewster", "LoadItemsForCollection", "items", new Dictionary<string, object> {
-            { "collectionId", collectionId },
-            { "count", itemIds.Count }
-        });
+        Debug.Log($"[Brewster] Loaded items. Collection ID: {collectionId}, Count: {itemIds.Count}");
     }
     
     private void LoadItem(string itemId, Collection collection, string collectionId)
     {
         // Always log item loading during initial development, commented out later
-        LoggerWrapper.Info("Brewster", "LoadItem", "item data", new Dictionary<string, object> { 
-            { "collectionId", collectionId }, 
-            { "itemId", itemId }, 
-            { "path", Path.Combine(baseResourcePath, "collections", collectionId, "items", itemId, "item") } 
-        }, gameObject);
+        Debug.Log($"[Brewster] Loading item data. Collection ID: {collectionId}, Item ID: {itemId}, Path: {Path.Combine(baseResourcePath, "collections", collectionId, "items", itemId, "item")}");
         
         // Load item data - FIXED: removed .json extension
         string itemPath = Path.Combine(baseResourcePath, "collections", collectionId, "items", itemId, "item");
@@ -307,31 +247,24 @@ public class Brewster : MonoBehaviour
         
         if (itemAsset == null)
         {
-            LoggerWrapper.Error("Brewster", "LoadItem", $"{Type.ITEM}{Type.ERROR} Failed to load item data", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "path", itemPath }, { "resourcesRootPath", baseResourcePath } }, null, gameObject);
+            Debug.LogError($"[Brewster] Failed to load item data. Collection ID: {collectionId}, Item ID: {itemId}, Path: {itemPath}, Resources root path: {baseResourcePath}");
             return;
         }
         
         // Log raw JSON for debugging
-        LoggerWrapper.Info("Brewster", "LoadItem", "Item JSON loaded", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "jsonLength", itemAsset.text.Length }, { "jsonPreview", itemAsset.text.Length > 100 ? itemAsset.text.Substring(0, 100) + "..." : itemAsset.text } }, gameObject);
+        Debug.Log($"[Brewster] Item JSON loaded. Collection ID: {collectionId}, Item ID: {itemId}, JSON length: {itemAsset.text.Length}, JSON preview: {(itemAsset.text.Length > 100 ? itemAsset.text.Substring(0, 100) + "..." : itemAsset.text)}");
         
-        // Create a proper ScriptableObject instance
-        Item item = ScriptableObject.CreateInstance<Item>();
-        
-        // Let the Item parse its own JSON
-        item.ParseFromJson(itemAsset.text);
+        // Create directly from JSON
+        Item item = Item.FromJson(itemAsset.text);
         
         // Ensure minimum required fields
         if (string.IsNullOrEmpty(item.Id)) {
-            LoggerWrapper.Warning("Brewster", "LoadItem", "Item missing required 'Id' field", new Dictionary<string, object> {
-                { "collectionId", collectionId },
-                { "itemId", itemId },
-                { "usingDirectoryName", true }
-            }, gameObject);
+            Debug.LogWarning($"[Brewster] Item missing required 'Id' field. Collection ID: {collectionId}, Item ID: {itemId}, Using directory name as fallback.");
             item.Id = itemId; // Use directory name as fallback
         }
         
         if (string.IsNullOrEmpty(item.Title)) {
-            LoggerWrapper.Warning("Brewster", "LoadItem", "Item missing required 'Title' field", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "id", item.Id }, { "sourcePath", itemPath }, { "usingIdAsTitle", true } }, gameObject);
+            Debug.LogWarning($"[Brewster] Item missing required 'Title' field. Collection ID: {collectionId}, Item ID: {itemId}, ID: {item.Id}, Source path: {itemPath}, Using ID as title.");
             item.Title = itemId; // Use directory name as fallback for title too
         }
         
@@ -340,19 +273,19 @@ public class Brewster : MonoBehaviour
         #if UNITY_EDITOR
         if (createScriptableObjects)
         {
-            LoggerWrapper.Info("Brewster", "LoadItem", "Creating ScriptableObject in Editor", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "assetPath", $"Assets/GeneratedData/Collections/{collectionId}_Items/{itemId}.asset" } }, gameObject);
+            Debug.Log($"[Brewster] Creating ScriptableObject in Editor. Collection ID: {collectionId}, Item ID: {itemId}, Asset path: Assets/GeneratedData/Collections/{collectionId}_Items/{itemId}.asset");
             
             try {
                 item.parentCollection = collection;
-                item.collectionId = collectionId;
+                item.CollectionId = collectionId;
                 
                 // Create asset in editor
                 string assetPath = $"Assets/GeneratedData/Collections/{collectionId}_Items/{itemId}.asset";
                 AssetDatabase.CreateAsset(item, assetPath);
-                LoggerWrapper.Success("Brewster", "LoadItem", "Created ScriptableObject asset", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "assetPath", assetPath } }, gameObject);
+                Debug.Log($"[Brewster] Created ScriptableObject asset successfully. Collection ID: {collectionId}, Item ID: {itemId}, Asset path: {assetPath}");
             }
             catch (Exception ex) {
-                LoggerWrapper.Error("Brewster", "LoadItem", "Failed to create ScriptableObject", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "exception", ex.Message } }, ex, gameObject);
+                Debug.LogError($"[Brewster] Failed to create ScriptableObject. Collection ID: {collectionId}, Item ID: {itemId}, Exception: {ex.Message}");
                 return;
             }
         }
@@ -360,15 +293,15 @@ public class Brewster : MonoBehaviour
         {
         #endif
             // Runtime-only path
-            LoggerWrapper.Info("Brewster", "LoadItem", "Creating runtime CraftSpace.Models.Item", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId } }, gameObject);
+            Debug.Log($"[Brewster] Creating runtime Item. Collection ID: {collectionId}, Item ID: {itemId}");
             
             try {
                 item.parentCollection = collection;
-                item.collectionId = collectionId;
-                LoggerWrapper.Success("Brewster", "LoadItem", "Created runtime CraftSpace.Models.Item", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "dataTitle", item.Title } }, gameObject);
+                item.CollectionId = collectionId;
+                Debug.Log($"[Brewster] Created runtime Item successfully. Collection ID: {collectionId}, Item ID: {itemId}, Title: {item.Title}");
             }
             catch (Exception ex) {
-                LoggerWrapper.Error("Brewster", "LoadItem", "Failed to create runtime CraftSpace.Models.Item", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "exception", ex.Message } }, ex, gameObject);
+                Debug.LogError($"[Brewster] Failed to create runtime Item. Collection ID: {collectionId}, Item ID: {itemId}, Exception: {ex.Message}");
                 return;
             }
         #if UNITY_EDITOR
@@ -377,36 +310,36 @@ public class Brewster : MonoBehaviour
         
         // Add to collection with logging
         collection.items.Add(item);
-        LoggerWrapper.Info("Brewster", "LoadItem", "Added item to collection", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "collectionItemCount", collection.items.Count } }, gameObject);
+        Debug.Log($"[Brewster] Added item to collection. Collection ID: {collectionId}, Item ID: {itemId}, Collection item count: {collection.items.Count}");
         
         // Try to load item cover
         string coverPath = itemPath.Replace("/item", "/cover");
-        LoggerWrapper.Info("Brewster", "LoadItem", "Attempting to load cover", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "coverPath", coverPath } }, gameObject);
+        Debug.Log($"[Brewster] Attempting to load cover. Collection ID: {collectionId}, Item ID: {itemId}, Cover path: {coverPath}");
         
         item.cover = Resources.Load<Texture2D>(coverPath);
         
         if (item.cover == null)
         {
             // Load placeholder
-            LoggerWrapper.Info("Brewster", "LoadItem", "Cover not found, using placeholder", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "placeholderPath", $"{baseResourcePath}/placeholders/cover" } }, gameObject);
+            Debug.Log($"[Brewster] Cover not found, using placeholder. Collection ID: {collectionId}, Item ID: {itemId}, Placeholder path: {baseResourcePath}/placeholders/cover");
             item.cover = Resources.Load<Texture2D>($"{baseResourcePath}/placeholders/cover");
             
             if (item.cover == null) {
-                LoggerWrapper.Warning("Brewster", "LoadItem", "Placeholder cover not found", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "placeholderPath", $"{baseResourcePath}/placeholders/cover" } }, gameObject);
+                Debug.LogWarning($"[Brewster] Placeholder cover not found. Collection ID: {collectionId}, Item ID: {itemId}, Placeholder path: {baseResourcePath}/placeholders/cover");
             }
         }
         else
         {
             // Notify the model that its cover was loaded
-            LoggerWrapper.Success("Brewster", "LoadItem", "Loaded cover texture successfully", new Dictionary<string, object> { { "collectionId", collectionId }, { "itemId", itemId }, { "coverDimensions", $"{item.cover.width}x{item.cover.height}" } }, gameObject);
+            Debug.Log($"[Brewster] Loaded cover texture successfully. Collection ID: {collectionId}, Item ID: {itemId}, Cover dimensions: {item.cover.width}x{item.cover.height}");
             item.NotifyViewsOfUpdate();
         }
         
         // Log complete item data
-        LoggerWrapper.ItemLoaded("Brewster", "LoadItem", itemId, new Dictionary<string, object> { { "title", item.Title }, { "collectionId", collectionId }, { "creator", item.Creator }, { "hasCover", item.cover != null }, { "description", item.Description?.Length > 30 ? item.Description.Substring(0, 30) + "..." : item.Description } }, gameObject);
+        Debug.Log($"[Brewster] Item loaded. Item ID: {itemId}, Title: {item.Title}, Collection ID: {collectionId}, Creator: {item.Creator}, Has cover: {item.cover != null}, Description: {(item.Description?.Length > 30 ? item.Description.Substring(0, 30) + "..." : item.Description)}");
         
         // When loading an item, set the collectionId
-        item.collectionId = collectionId;
+        item.CollectionId = collectionId;
     }
     
     private int GetTotalItemCount()

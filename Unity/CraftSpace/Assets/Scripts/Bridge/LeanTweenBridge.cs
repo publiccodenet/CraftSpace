@@ -3,20 +3,18 @@
 // Copyright (C) 2018 by Don Hopkins, Ground Up Software.
 
 
-//#if USE_LEANTWEEN
-
+#if USE_LEANTWEEN
 
 ////////////////////////////////////////////////////////////////////////
 
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
-using UnityEngine.EventSystems;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+
 
 // move moveX moveY moveZ (object, destination, duration)
 //   setEase
@@ -123,9 +121,6 @@ LTDescr
   updateNow
 
 */
-
-namespace Bridge {
-
 
 public class LeanTweenBridge : BridgeObject {
 
@@ -726,14 +721,10 @@ public class LeanTweenBridge : BridgeObject {
         }
     }
 
-
-}
-
-
 }
 
 
 ////////////////////////////////////////////////////////////////////////
 
 
-//#endif
+#endif

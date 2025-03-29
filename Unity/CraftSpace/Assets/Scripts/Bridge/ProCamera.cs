@@ -12,9 +12,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public enum ProCameraTracking {
     None,
     Drag,
@@ -998,5 +995,4 @@ public class ProCamera : BridgeObject {
     }
 
 
-}
 }

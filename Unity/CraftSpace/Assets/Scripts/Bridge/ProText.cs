@@ -11,9 +11,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class ProText : BridgeObject {
 
 
@@ -173,9 +170,6 @@ public class ProText : BridgeObject {
             return bridge.mainCamera;
         }
     }
-
-
-}
 
 
 }

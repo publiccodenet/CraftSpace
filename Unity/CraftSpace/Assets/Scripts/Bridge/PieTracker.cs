@@ -14,9 +14,6 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class PieTracker : Tracker {
 
 
@@ -351,9 +348,6 @@ public class PieTracker : Tracker {
         }
 
     }
-
-
-}
 
 
 }

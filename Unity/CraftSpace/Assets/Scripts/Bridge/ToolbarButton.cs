@@ -13,9 +13,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class ToolbarButton : BridgeObject {
 
 
@@ -29,9 +26,6 @@ public class ToolbarButton : BridgeObject {
         Debug.Log("ToolbarButton: Click: message: " + message + " param: " + param + " label: " + label.text);
         SendEventName(message);
     }
-
-
-}
 
 
 }

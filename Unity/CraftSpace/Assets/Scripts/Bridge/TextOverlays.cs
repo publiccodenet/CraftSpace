@@ -11,9 +11,6 @@ using UnityEngine.UI;
 using TMPro;
 
 
-namespace Bridge {
-
-
 public class TextOverlays: Tracker {
 
 
@@ -66,8 +63,5 @@ public class TextOverlays: Tracker {
         SendEventName(eventName);
     }
     
-
-}
-
 
 }

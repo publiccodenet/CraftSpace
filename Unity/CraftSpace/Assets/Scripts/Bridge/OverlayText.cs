@@ -11,9 +11,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class OverlayText : BridgeObject {
 
 
@@ -101,8 +98,5 @@ public class OverlayText : BridgeObject {
 
     }
     
-
-}
-
 
 }

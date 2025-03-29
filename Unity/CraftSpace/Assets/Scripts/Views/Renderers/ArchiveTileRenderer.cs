@@ -1,18 +1,20 @@
 using UnityEngine;
-using CraftSpace.Models.Schema.Generated;
-using TMPro;
+using System;
 using System.Collections.Generic;
-using CraftSpace.Utils;
-using Type = CraftSpace.Utils.LoggerWrapper.Type;
+using TMPro;
 
 [RequireComponent(typeof(ItemView))]
-public class ArchiveTileRenderer : ItemViewRenderer
+public class ArchiveTileRenderer : BaseViewRenderer
 {
     // Standard tile dimensions used by Internet Archive
     public static readonly Vector2 STANDARD_TILE_SIZE = new Vector2(180, 180);
     
+    [Header("Archive Settings")]
+    [SerializeField] private Material _archiveMaterial;
+    [SerializeField] private float _tileSize = 1f;
+    [SerializeField] private float _tileSpacing = 0.1f;
+    
     [Header("Tile Settings")]
-    [SerializeField] private float _tileSize = 1.5f;
     [SerializeField] private float _titleOffset = 0.1f;
     [SerializeField] private float _titleHeight = 0.4f;
     [SerializeField] private int _maxTitleLength = 25;
@@ -27,6 +29,7 @@ public class ArchiveTileRenderer : ItemViewRenderer
     private MeshRenderer _tileRenderer;
     private TextMeshPro _titleText;
     private ItemView _itemView;
+    private MeshFilter _meshFilter;
     
     protected override void Awake()
     {
@@ -125,7 +128,15 @@ public class ArchiveTileRenderer : ItemViewRenderer
         }
     }
     
-    public override void UpdateWithItemModel(CraftSpace.Models.Schema.Generated.Item model)
+    public override void UpdateWithModel(Item model)
+    {
+        if (model != null)
+        {
+            UpdateWithItemModel(model);
+        }
+    }
+    
+    public void UpdateWithItemModel(Item model)
     {
         if (model == null)
             return;
@@ -133,16 +144,19 @@ public class ArchiveTileRenderer : ItemViewRenderer
         // Ensure we have the title at minimum
         if (string.IsNullOrEmpty(model.Title)) {
             model.Title = model.Id; // Use ID as title fallback
-            LoggerWrapper.Warning("ArchiveTileRenderer", "UpdateWithItemModel", "Item missing title", new Dictionary<string, object> {
-                { "itemId", model.Id },
-                { "usingIdAsTitle", true }
-            }, this.gameObject);
+            Debug.LogWarning($"[ArchiveTileRenderer] Item missing title. Item ID: {model.Id}, Using ID as title.");
         }
         
         // Set title text
         if (_titleText != null)
         {
-            _titleText.text = model.Title;  // Just set the title directly, let TMP handle it
+            // Apply the _maxTitleLength limit
+            string displayTitle = model.Title;
+            if (displayTitle.Length > _maxTitleLength)
+            {
+                displayTitle = displayTitle.Substring(0, _maxTitleLength - 3) + "...";
+            }
+            _titleText.text = displayTitle;
         }
         
         // First show placeholder color while loading
@@ -151,10 +165,7 @@ public class ArchiveTileRenderer : ItemViewRenderer
         // Check if model already has a texture
         if (model.cover != null)
         {
-            LoggerWrapper.Info("ArchiveTileRenderer", "UpdateWithItemModel", "Using cached cover image", new Dictionary<string, object> {
-                { "itemId", model.Id },
-                { "textureSize", $"{model.cover.width}x{model.cover.height}" }
-            });
+            Debug.Log($"[ArchiveTileRenderer] Using cached cover image. Item ID: {model.Id}, Texture size: {model.cover.width}x{model.cover.height}");
             
             // Use the existing texture
             _tileRenderer.material.shader = Shader.Find("Unlit/Texture");
@@ -183,16 +194,16 @@ public class ArchiveTileRenderer : ItemViewRenderer
     
     private string GetTileImageUrl(Item model)
     {
-        LoggerWrapper.Info("ArchiveTileRenderer", "GetTileImageUrl", "Getting resource path", new Dictionary<string, object> { { "itemId", model?.Id ?? "null" } }, this.gameObject);
+        Debug.Log($"[ArchiveTileRenderer] Getting resource path. Item ID: {model?.Id ?? "null"}");
         
         if (!string.IsNullOrEmpty(model.Id))
         {
             // Don't include file extension - Unity will find the right asset type
-            string resourcePath = $"Content/collections/{model.collectionId}/items/{model.Id}/cover";
+            string resourcePath = $"Content/collections/{model.CollectionId}/items/{model.Id}/cover";
             return resourcePath;
         }
         
-        LoggerWrapper.Warning("ArchiveTileRenderer", "GetTileImageUrl", "Cannot get resource path, no valid ID", new Dictionary<string, object> { { "itemId", model?.Id ?? "null" }, { "modelTitle", model?.Title } }, this.gameObject);
+        Debug.LogWarning($"[ArchiveTileRenderer] Cannot get resource path, no valid ID. Item ID: {model?.Id ?? "null"}, Model title: {model?.Title}");
         return null;
     }
     

@@ -10,9 +10,6 @@ using System.Reflection;
 using UnityEngine;
 
 
-namespace Bridge {
-
-
 public class TrackerProxy : MonoBehaviour {
 
 
@@ -65,9 +62,6 @@ public class TrackerProxy : MonoBehaviour {
         //Debug.Log("TrackerProxy: OnMouseOver: target: " + target);
         target.OnMouseOver();
     }
-
-
-}
 
 
 }

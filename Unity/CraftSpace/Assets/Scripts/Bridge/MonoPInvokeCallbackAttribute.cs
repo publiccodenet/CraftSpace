@@ -4,26 +4,16 @@
 //
 // Attribute that allows static functions to have callbacks (from C) generated AOT.
 
-
+using UnityEngine;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
-    public class MonoPInvokeCallbackAttribute : System.Attribute
-    {
-
-
-        public Type type;
-
-
-        public MonoPInvokeCallbackAttribute(Type t) {
-            type = t;
-        }
-
-
-    }
-
-
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class MonoPInvokeCallbackAttribute : Attribute
+{
+    public MonoPInvokeCallbackAttribute(Type type) {}
 }

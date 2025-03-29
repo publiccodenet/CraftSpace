@@ -11,9 +11,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class Tracker : BridgeObject {
 
 
@@ -155,7 +152,7 @@ public class Tracker : BridgeObject {
         isPointerOverUIObject = results.Count > 0;
 
         mouseRay =
-            Bridge.mainBridge.mainCamera.ScreenPointToRay(
+            Bridge.bridge.mainCamera.ScreenPointToRay(
                 mousePosition);
 
         mouseRaycastResult =
@@ -172,7 +169,7 @@ public class Tracker : BridgeObject {
 
         } else {
 
-            Vector3 cameraPosition = Bridge.mainBridge.mainCamera.transform.position;
+            Vector3 cameraPosition = Bridge.bridge.mainCamera.transform.position;
             Vector3 offset = cameraPosition - mouseRaycastHit.point;
             offset.y = 0.0f;
             float direction = 
@@ -726,8 +723,5 @@ public class Tracker : BridgeObject {
         SendEventName("CollisionExit");
     }
     
-
-}
-
 
 }

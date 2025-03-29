@@ -127,6 +127,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2760433362557930908, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: f91531a8a4c4c48e9a82a40c99fed1ba, type: 2}
+    - target: {fileID: 2760433362557930908, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
+      propertyPath: m_overflowMode
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2760433362557930908, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: -4340261258271581775, guid: f91531a8a4c4c48e9a82a40c99fed1ba, type: 2}
+    - target: {fileID: 2760433362557930908, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3238162359274482204, guid: a561cabf93c2d408da712ffa1d7cb643, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

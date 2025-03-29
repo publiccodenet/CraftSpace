@@ -14,7 +14,10 @@ console.log(chalk.cyan('🏁 GENERATING C# MODEL CLASSES FROM SCHEMAS'));
 
 // Directory configuration
 const schemaDir = PATHS.SCHEMAS_DIR;
-const outputDir = PATHS.CRAFTSPACE_GENERATED_SCHEMAS_DIR;
+const outputDir = path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  '../../../Assets/Scripts/Models/Schema/Generated'
+);
 
 console.log(`Schema directory: ${schemaDir}`);
 console.log(`Output directory: ${outputDir}`);

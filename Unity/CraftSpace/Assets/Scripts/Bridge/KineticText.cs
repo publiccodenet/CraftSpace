@@ -11,9 +11,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 
-namespace Bridge {
-
-
 public class KineticText : Tracker {
 
 
@@ -24,7 +21,7 @@ public class KineticText : Tracker {
     public TextMeshPro textMesh;
     public List<BoxCollider> boxColliders = new List<BoxCollider>();
     public ConfigurableJoint joint;
-    public PhysicMaterial physicMaterial;
+    public PhysicsMaterial physicMaterial;
 
 
     ////////////////////////////////////////////////////////////////////////
@@ -219,9 +216,6 @@ public class KineticText : Tracker {
         }
 
     }
-    
-
-}
 
 
 }

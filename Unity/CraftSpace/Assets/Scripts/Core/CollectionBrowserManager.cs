@@ -1,5 +1,5 @@
 using UnityEngine;
-using CraftSpace.Models;
+using System;
 using System.Collections.Generic;
 
 public class CollectionBrowserManager : MonoBehaviour
@@ -42,7 +42,7 @@ public class CollectionBrowserManager : MonoBehaviour
     {
         if (_collectionsContainer == null || _collectionViewPrefab == null)
             return;
-            
+        
         // Clear any existing layouts
         foreach (var layout in _collectionLayouts)
         {
@@ -96,7 +96,19 @@ public class CollectionBrowserManager : MonoBehaviour
         // Focus camera on first collection if available
         if (_collectionLayouts.Count > 0 && _cameraController != null)
         {
-            _cameraController.FocusOnCollection(_collectionLayouts[0]);
+            // Get the collection from the layout
+            var layout = _collectionLayouts[0];
+            var collection = layout.GetComponent<CollectionView>()?.Model;
+            if (collection != null)
+            {
+                _cameraController.FocusOnCollection(collection);
+            }
+            else
+            {
+                // If no collection is available, still focus on something
+                Debug.LogWarning("No Collection model found in layout, using default focus");
+                _cameraController.FocusOnCollection(null);
+            }
         }
     }
     
@@ -107,7 +119,19 @@ public class CollectionBrowserManager : MonoBehaviour
             collectionIndex >= 0 && 
             collectionIndex < _collectionLayouts.Count)
         {
-            _cameraController.FocusOnCollection(_collectionLayouts[collectionIndex]);
+            // Get the collection from the layout
+            var layout = _collectionLayouts[collectionIndex];
+            var collection = layout.GetComponent<CollectionView>()?.Model;
+            if (collection != null)
+            {
+                _cameraController.FocusOnCollection(collection);
+            }
+            else
+            {
+                // If no collection is available, still focus on something
+                Debug.LogWarning("No Collection model found in layout, using default focus");
+                _cameraController.FocusOnCollection(null);
+            }
         }
     }
 } 

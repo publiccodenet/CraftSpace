@@ -1,72 +1,100 @@
 #!/usr/bin/env node
 /**
- * Debug JSON Schema issues
- * 
- * This script checks and validates the exported schemas to make sure
- * they have the correct structure for Unity's schema importer.
+ * Debug script to check schemas for errors
  */
 import fs from 'fs-extra';
 import path from 'path';
-import { PATHS } from '../src/lib/constants/index.ts';
+import glob from 'glob';
+import { EMOJI, PATHS } from '../src/lib/constants/index.ts';
 
-// Use path constant
+// Schemas directory
 const schemaDir = PATHS.SCHEMAS_DIR;
 
-console.log('🔍 DEBUGGING JSON SCHEMAS');
+console.log(`${EMOJI.DEBUG} CHECKING SCHEMAS FOR ERRORS`);
 console.log(`Schema directory: ${schemaDir}`);
 
-// Find all schema files
-const schemaFiles = fs.readdirSync(schemaDir)
-  .filter(file => file.endsWith('.json'));
+// Ensure the schemas directory exists
+if (!fs.existsSync(schemaDir)) {
+  console.log(`${EMOJI.WARNING} Schemas directory does not exist!`);
+  console.log(`Creating directory: ${schemaDir}`);
+  fs.ensureDirSync(schemaDir);
+}
 
-console.log(`Found ${schemaFiles.length} schema files to check`);
+// Find all JSON schema files
+const schemaFiles = glob.sync('*.json', { cwd: schemaDir });
 
-// Check each schema
-for (const file of schemaFiles) {
-  const schemaPath = path.join(schemaDir, file);
-  console.log(`\nChecking schema: ${file}...`);
+if (schemaFiles.length === 0) {
+  console.log(`${EMOJI.WARNING} No schema files found in ${schemaDir}`);
+  console.log(`${EMOJI.INFO} Run 'npm run schema:export' to generate schemas`);
+} else {
+  console.log(`Found ${schemaFiles.length} schema files to check`);
   
-  try {
-    const schema = fs.readJSONSync(schemaPath);
+  // Check each schema file
+  let hasErrors = false;
+  
+  for (const file of schemaFiles) {
+    const filePath = path.join(schemaDir, file);
+    console.log(`\nChecking schema: ${file}`);
     
-    // Check for required fields
-    const requiredFields = ['$schema', 'type', 'properties'];
-    const missingFields = requiredFields.filter(field => !schema[field]);
-    
-    if (missingFields.length > 0) {
-      console.log(`⚠️ Missing required fields: ${missingFields.join(', ')}`);
-    }
-    
-    // Check if properties exist and have the right format
-    if (!schema.properties || Object.keys(schema.properties).length === 0) {
-      console.log('❌ No properties defined in schema!');
-    } else {
-      console.log(`✅ Found ${Object.keys(schema.properties).length} properties`);
+    try {
+      const schema = fs.readJsonSync(filePath);
       
-      // Check each property
-      for (const [propName, propDef] of Object.entries(schema.properties)) {
-        console.log(`  - ${propName}: ${propDef.type}`);
-        
-        // Check for missing type
-        if (!propDef.type) {
-          console.log(`    ❌ Missing type for property ${propName}`);
-        }
-        
-        // Check for descriptions
-        if (!propDef.description) {
-          console.log(`    ⚠️ No description for property ${propName}`);
-        }
+      // Basic checks
+      if (!schema.properties) {
+        console.log(`${EMOJI.ERROR} Schema ${file} is missing properties object`);
+        hasErrors = true;
+        continue;
       }
+      
+      // Check for required fields
+      if (!schema.required || schema.required.length === 0) {
+        console.log(`${EMOJI.WARNING} Schema ${file} has no required fields`);
+      }
+      
+      // Report property count
+      const propCount = Object.keys(schema.properties).length;
+      console.log(`${EMOJI.INFO} Schema has ${propCount} properties`);
+      
+      // Check all properties have a type
+      const propsWithoutType = Object.entries(schema.properties)
+        .filter(([_, prop]) => !prop.type)
+        .map(([name]) => name);
+      
+      if (propsWithoutType.length > 0) {
+        console.log(`${EMOJI.WARNING} Properties missing type: ${propsWithoutType.join(', ')}`);
+      } else {
+        console.log(`${EMOJI.SUCCESS} All properties have type definitions`);
+      }
+    } catch (error) {
+      console.log(`${EMOJI.ERROR} Failed to parse schema ${file}: ${error.message}`);
+      hasErrors = true;
     }
-    
-    // Check for Unity-specific metadata
-    if (!schema.description) {
-      console.log('⚠️ Missing schema description');
-    }
-    
-  } catch (error) {
-    console.error(`❌ Error reading schema ${file}:`, error.message);
+  }
+  
+  if (hasErrors) {
+    console.log(`\n${EMOJI.ERROR} Schema validation completed with errors`);
+  } else {
+    console.log(`\n${EMOJI.SUCCESS} Schema validation completed successfully`);
   }
 }
 
-console.log('\nSCHEMA DEBUG COMPLETE!'); 
+// Check other schema locations
+console.log('\nChecking other schema locations:');
+const contentSchemasDir = PATHS.CONTENT_SCHEMAS_DIR;
+const unitySchemasDir = PATHS.CRAFTSPACE_CONTENT_SCHEMAS_DIR;
+
+if (!fs.existsSync(contentSchemasDir)) {
+  console.log(`${EMOJI.WARNING} Content schemas directory does not exist: ${contentSchemasDir}`);
+  console.log(`${EMOJI.INFO} Run 'npm run schema:copy-to-content' to copy schemas`);
+} else {
+  const contentSchemaCount = glob.sync('*.json', { cwd: contentSchemasDir }).length;
+  console.log(`${EMOJI.INFO} Content schemas directory has ${contentSchemaCount} schemas`);
+}
+
+if (!fs.existsSync(unitySchemasDir)) {
+  console.log(`${EMOJI.WARNING} Unity schemas directory does not exist: ${unitySchemasDir}`);
+  console.log(`${EMOJI.INFO} Run 'npm run schema:copy' to copy schemas to Unity`);
+} else {
+  const unitySchemasCount = glob.sync('*.json', { cwd: unitySchemasDir }).length;
+  console.log(`${EMOJI.INFO} Unity schemas directory has ${unitySchemasCount} schemas`);
+} 

@@ -20,8 +20,6 @@ public enum CuboidFace {
 };
 
 
-namespace Bridge {
-
 
 public class Cuboid : Tracker {
 
@@ -104,9 +102,6 @@ public class Cuboid : Tracker {
                 y,
                 1.0f);
     }
-
-
-}
 
 
 }

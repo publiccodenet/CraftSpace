@@ -1,12 +1,11 @@
 using UnityEngine;
-using CraftSpace.Models.Schema.Generated;
+using System;
 using System.Collections.Generic;
-using CraftSpace.Utils;
-using Type = CraftSpace.Utils.LoggerWrapper.Type;
 using TMPro;
-using CraftSpace.Views;
+using UnityEngine.Events;
 
-public class ItemView : MonoBehaviour
+[AddComponentMenu("Views/Item View")]
+public class ItemView : MonoBehaviour, IModelView<Item>
 {
     [Header("Model Reference")]
     [SerializeField] private Item _model;
@@ -46,39 +45,31 @@ public class ItemView : MonoBehaviour
     private float _lastDistanceCheck = 0f;
     private const float DISTANCE_CHECK_INTERVAL = 0.5f;
     
-    // Property to get/set the model
+    // Property to get/set the model (implementing IModelView)
     public Item Model 
-    { 
-        get { return _model; }
-        set 
-        { 
-            if (_model != value)
-            {
-                // Unregister from old model
-                if (_model != null)
-                {
-                    _model.UnregisterView(this);
-                }
-                
-                _model = value;
-                
-                // Register with new model
-                if (_model != null)
-                {
-                    _model.RegisterView(this);
-                }
-                
-                // Update the view with the new model data
-                UpdateView();
-            }
-        }
+    {
+        get => _model;
+        set => SetModel(value);
     }
+    
+    // For convenience, add an Item property that maps to Model
+    public Item Item => _model;
     
     // Event for notifying renderers of model updates
     public delegate void ModelUpdatedHandler();
     public event ModelUpdatedHandler ModelUpdated;
     
     public CollectionView ParentCollectionView { get; set; }
+    
+    private Dictionary<System.Type, BaseViewRenderer> _closeRenderers = new Dictionary<System.Type, BaseViewRenderer>();
+    
+    [SerializeField] private UnityEvent<Item> _onItemChanged = new UnityEvent<Item>();
+    
+    // Reference to the loading material
+    public Material LoadingMaterial => _loadingMaterial;
+    
+    // Unity event for item changes
+    public UnityEvent<Item> OnItemChanged => _onItemChanged;
     
     private void Awake()
     {
@@ -110,48 +101,7 @@ public class ItemView : MonoBehaviour
     {
         float distance = Vector3.Distance(transform.position, _mainCamera.transform.position);
         
-        // Activate appropriate renderers based on distance
-        if (distance <= _closeDistance)
-        {
-            // Close up - detailed view
-            ShowRenderer<TextMetadataRenderer>(true);
-            ShowRenderer<SingleImageRenderer>(true);
-            ShowRenderer<PixelIconRenderer>(false);
-            
-            // Show highlight for closest items
-            if (distance <= _closeDistance * 0.5f && _model != null && (_model.IsFavorite ?? false))
-            {
-                ShowRenderer<HighlightParticleRenderer>(true);
-            }
-            else
-            {
-                ShowRenderer<HighlightParticleRenderer>(false);
-            }
-        }
-        else if (distance <= _mediumDistance)
-        {
-            // Medium distance - just image
-            ShowRenderer<TextMetadataRenderer>(false);
-            ShowRenderer<SingleImageRenderer>(true);
-            ShowRenderer<PixelIconRenderer>(false);
-            ShowRenderer<HighlightParticleRenderer>(false);
-        }
-        else if (distance <= _farDistance)
-        {
-            // Far distance - pixel icon
-            ShowRenderer<TextMetadataRenderer>(false);
-            ShowRenderer<SingleImageRenderer>(false);
-            ShowRenderer<PixelIconRenderer>(true);
-            ShowRenderer<HighlightParticleRenderer>(false);
-        }
-        else
-        {
-            // Very far away - disable all renderers or use simplest representation
-            ShowRenderer<TextMetadataRenderer>(false);
-            ShowRenderer<SingleImageRenderer>(false);
-            ShowRenderer<PixelIconRenderer>(false);
-            ShowRenderer<HighlightParticleRenderer>(false);
-        }
+        ShowRenderer<SingleImageRenderer>(true);
     }
     
     private void OnDestroy()
@@ -166,71 +116,109 @@ public class ItemView : MonoBehaviour
         DeactivateAllRenderers();
     }
     
-    // Called by model when it's updated
-    public virtual void HandleModelUpdated()
+    // Implement the IModelView interface method
+    public void HandleModelUpdated()
     {
+        // Call the original update view method
         UpdateView();
     }
     
-    // Update all active renderers
-    protected virtual void UpdateView()
+    // Update view based on the current model
+    public void UpdateView()
     {
-        LoggerWrapper.ModelUpdated("ItemView", "UpdateView", "Item", new Dictionary<string, object> {
-            { "itemId", _model?.Id ?? "null" },
-            { "title", _model?.Title ?? "null" },
-            { "activeRenderers", _activeRenderers.Count },
-            { "viewName", gameObject.name }
-        }, this.gameObject);
-        
-        // Base class just updates name for debugging
-        if (_model != null)
+        if (Item == null)
         {
-            gameObject.name = $"Item: {_model.Title}";
+            // No model, hide all renderers
+            DeactivateAllRenderers();
+            return;
+        }
+        
+        // Update distance-based renderers
+        UpdateBasedOnDistance();
+        
+        // Update all renderers with the model
+        UpdateRenderers();
+        
+        // Notify subscribers that the model has been updated
+        ModelUpdated?.Invoke();
+    }
+    
+    // Update all renderers with the current model
+    private void UpdateRenderers()
+    {
+        if (_model == null) return;
+        
+        foreach (var renderer in _renderers.Values)
+        {
+            if (renderer != null && renderer.IsActive)
+            {
+                renderer.UpdateWithModel(_model);
+            }
+        }
+    }
+    
+    // Show renderers based on distance from camera
+    private void UpdateBasedOnDistance()
+    {
+        if (_mainCamera == null)
+            _mainCamera = Camera.main;
+        
+        if (_mainCamera != null && Item != null)
+        {
+            float distance = Vector3.Distance(_mainCamera.transform.position, transform.position);
             
-            // Update all renderers with new model data
+            // Update renderers based on distance from camera
             foreach (var renderer in _renderers.Values)
             {
-                if (renderer != null)
+                if (renderer == null) continue;
+                
+                // Check if this is a close-range renderer
+                bool isCloseRenderer = _closeRenderers.ContainsKey(renderer.GetType());
+                
+                if (isCloseRenderer)
                 {
-                    renderer.UpdateWithModel(_model);
+                    if (distance <= _closeDistance)
+                    {
+                        renderer.Activate();
+                        if (!_activeRenderers.Contains(renderer))
+                        {
+                            _activeRenderers.Add(renderer);
+                        }
+                    }
+                    else
+                    {
+                        renderer.Deactivate();
+                        _activeRenderers.Remove(renderer);
+                    }
                 }
             }
             
-            // Notify event subscribers
-            ModelUpdated?.Invoke();
-            
-            LoggerWrapper.Success("ItemView", "UpdateView", $"{Type.VIEW}{Type.SUCCESS} View updated successfully", new Dictionary<string, object> {
-                { "activeRenderers", _activeRenderers.Count },
-                { "viewPosition", transform.position.ToString("F2") },
-                { "isVisible", IsVisible() }
-            }, this.gameObject);
-            
-            // Load image after model is set
-            LoadItemImage();
-            
-            // Configure the item label
-            if (_itemLabel != null && Model != null)
+            // Show highlight for closest items
+            if (distance <= _closeDistance * 0.5f && Item != null && Item.IsFavorite)
             {
-                _itemLabel.SetText(Model.Title);
+                var highlightRenderer = GetOrAddRenderer<HighlightParticleRenderer>();
+                if (highlightRenderer != null)
+                {
+                    highlightRenderer.Activate();
+                    highlightRenderer.UpdateWithModel(Item);
+                }
             }
-        }
-        else
-        {
-            gameObject.name = "Item: [No Model]";
-            LoggerWrapper.Warning("ItemView", "UpdateView", $"{Type.MODEL}{Type.ERROR} Cannot update view, model is null", new Dictionary<string, object> {
-                { "objectName", gameObject.name },
-                { "objectPath", GetGameObjectPath() }
-            }, this.gameObject);
+            else
+            {
+                var highlightRenderer = GetOrAddRenderer<HighlightParticleRenderer>();
+                if (highlightRenderer != null)
+                {
+                    highlightRenderer.Deactivate();
+                }
+            }
         }
     }
     
     // Initialize default renderers
     private void InitializeDefaultRenderers()
     {
-        // Add renderers but don't activate them yet - distance check will do that
-        GetOrAddRenderer<TextMetadataRenderer>();
+        // Add primary renderers but don't activate them yet
         GetOrAddRenderer<SingleImageRenderer>();
-        GetOrAddRenderer<PixelIconRenderer>();
         GetOrAddRenderer<HighlightParticleRenderer>();
         
         // Initial distance check
@@ -240,57 +228,48 @@ public class ItemView : MonoBehaviour
     // Get or add a renderer component
     public T GetOrAddRenderer<T>() where T : BaseViewRenderer
     {
-        System.Type rendererType = typeof(T);
+        System.Type type = typeof(T);
         
-        if (_renderers.TryGetValue(rendererType, out BaseViewRenderer existingRenderer))
+        // First check if we already have this renderer
+        if (_renderers.ContainsKey(type))
         {
-            return (T)existingRenderer;
+            return (T)_renderers[type];
         }
         
-        // Add the renderer component if it doesn't exist
-        T newRenderer = GetComponent<T>();
-        if (newRenderer == null)
+        // If not, try to get it from children
+        T renderer = GetComponentInChildren<T>(true);
+        
+        // If not found, add it
+        if (renderer == null)
         {
-            newRenderer = gameObject.AddComponent<T>();
+            GameObject rendererObj = new GameObject(type.Name);
+            rendererObj.transform.SetParent(transform, false);
+            renderer = rendererObj.AddComponent<T>();
         }
         
-        _renderers[rendererType] = newRenderer;
-        return newRenderer;
+        // Register the renderer
+        _renderers[type] = renderer;
+        
+        return renderer;
     }
     
     // Show or hide a specific renderer
-    public void ShowRenderer<T>(bool show) where T : BaseViewRenderer
+    public T ShowRenderer<T>(bool show = true) where T : BaseViewRenderer
     {
-        T renderer = GetOrAddRenderer<T>();
-        
-        if (show)
+        var renderer = GetOrAddRenderer<T>();
+        if (renderer != null)
         {
-            if (!_activeRenderers.Contains(renderer))
+            if (show)
             {
-                LoggerWrapper.Info("ItemView", "ShowRenderer", $"{Type.RENDER}{Type.CREATE} Activating renderer", new Dictionary<string, object> {
-                    { "rendererType", typeof(T).Name },
-                    { "itemId", _model?.Id ?? "null" },
-                    { "distance", _mainCamera != null ? Vector3.Distance(transform.position, _mainCamera.transform.position).ToString("F2") : "unknown" }
-                }, this.gameObject);
-                _activeRenderers.Add(renderer);
                 renderer.Activate();
                 renderer.UpdateWithModel(_model);
             }
-        }
-        else
-        {
-            if (_activeRenderers.Contains(renderer))
+            else
             {
-                LoggerWrapper.Info("ItemView", "ShowRenderer", $"{Type.RENDER}{Type.DELETE} Deactivating renderer", new Dictionary<string, object> {
-                    { "rendererType", typeof(T).Name },
-                    { "itemId", _model?.Id ?? "null" },
-                    { "wasActive", renderer is BaseViewRenderer ? ((BaseViewRenderer)renderer).IsActive : false },
-                    { "reason", "Distance or visibility change" }
-                }, this.gameObject);
-                _activeRenderers.Remove(renderer);
                 renderer.Deactivate();
             }
         }
+        return renderer;
     }
     
     // Deactivate all renderers
@@ -308,17 +287,22 @@ public class ItemView : MonoBehaviour
 
     public void SetModel(Item model)
     {
-        Model = model;
-        
-        // Register with the model
-        if (Model != null)
+        if (model == null) 
         {
-            Model.RegisterView(this);
-            // Ensure we have the collectionId
-            if (Model.parentCollection != null && string.IsNullOrEmpty(Model.collectionId)) {
-                Model.collectionId = Model.parentCollection.Id;
-            }
+            _model = null;
+            DeactivateAllRenderers();
+            return;
         }
+        
+        // Store model reference
+        _model = model;
+        _model.RegisterView(this);
+        
+        // Log model assignment
+        Debug.Log($"[ItemView] Model set for item view. Item ID: {_model.Id}, Collection ID: {_model.CollectionId}");
+        
+        // Update view with the new model
+        UpdateView();
     }
 
     private bool IsVisible()
@@ -424,7 +408,7 @@ public class ItemView : MonoBehaviour
     // Add this method to handle UI setup for the item
     private void SetupItemUI()
     {
-        if (Model == null) return;
+        if (Item == null) return;
 
         // If we don't have a texture yet, create a standard book-shaped mesh
         if (GetComponent<MeshRenderer>()?.material?.mainTexture == null)
@@ -479,7 +463,7 @@ public class ItemView : MonoBehaviour
         // Set the label text
         if (_itemLabel != null)
         {
-            _itemLabel.SetText(Model.Title);
+            _itemLabel.SetText(Item.Title);
         }
     }
 
@@ -499,13 +483,13 @@ public class ItemView : MonoBehaviour
             return string.Empty;
             
         // Don't include file extension - Unity will find the right asset type
-        return $"Content/collections/{Model.collectionId}/items/{itemId}/cover";
+        return $"Content/collections/{Item.collectionId}/items/{itemId}/cover";
     }
 
     // Method to load an image
     public void LoadItemImage()
     {
-        if (Model == null || string.IsNullOrEmpty(Model.Id))
+        if (Item == null || string.IsNullOrEmpty(Item.Id))
             return;
 
         // Create initial mesh and renderer
@@ -534,7 +518,7 @@ public class ItemView : MonoBehaviour
         CreateOrUpdateCoverMesh(loadingWidth, loadingHeight);
 
         // Load texture from Resources
-        string resourcePath = GetItemThumbnailUrl(Model.Id);
+        string resourcePath = GetItemThumbnailUrl(Item.Id);
         Texture2D texture = Resources.Load<Texture2D>(resourcePath);
         if (texture != null)
         {
@@ -666,5 +650,57 @@ public class ItemView : MonoBehaviour
             CreateHighlightMesh();
         }
         _highlightMesh.SetActive(highlighted);
+    }
+
+    private void LogWithContext(string methodName, string message, Dictionary<string, object> context = null)
+    {
+        if (context == null) context = new Dictionary<string, object>();
+        
+        // Add common context data
+        context["itemId"] = _model?.Id ?? "null";
+        context["title"] = _model?.Title ?? "null";
+        
+        // Log with standard Unity debug
+        Debug.Log($"[ItemView] {methodName}: {message} - Item ID: {context["itemId"]}, Title: {context["title"]}");
+    }
+
+    private void ShowAllRenderers(bool show)
+    {
+        foreach (var renderer in _renderers.Values)
+        {
+            if (renderer != null)
+            {
+                if (show)
+                {
+                    renderer.Activate();
+                    renderer.UpdateWithModel(_model);
+                }
+                else
+                {
+                    renderer.Deactivate();
+                }
+            }
+        }
+    }
+
+    // Register with the item when enabled
+    protected virtual void OnEnable()
+    {
+        if (_model != null)
+        {
+            HandleModelUpdated();
+        }
+    }
+
+    // Initialize with an item
+    public void Initialize(Item item)
+    {
+        SetModel(item);
+    }
+
+    // Clear the item reference
+    public void Clear()
+    {
+        SetModel(null);
     }
 } 

@@ -1,5 +1,6 @@
 using UnityEngine;
-using CraftSpace.Models.Schema.Generated;
+using System;
+using System.Collections.Generic;
 
 /// <summary>
 /// Base abstract class for all view renderers
@@ -19,8 +20,8 @@ public abstract class BaseViewRenderer : MonoBehaviour
         // Initialize in disabled state
         _isActivated = false;
         _currentAlpha = 0f;
+        OnAlphaChanged(_currentAlpha);
         
-        // Self-activate if configured
         if (_activeOnStart)
         {
             Activate();
@@ -30,92 +31,103 @@ public abstract class BaseViewRenderer : MonoBehaviour
     // Update is called once per frame
     protected virtual void Update()
     {
-        // Handle fade transitions
+        // Handle alpha transition
         UpdateTransition();
     }
     
-    // Handle transition effects
+    // Manage smooth transitions
     protected virtual void UpdateTransition()
     {
         float targetAlpha = _isActivated ? 1f : 0f;
         
-        if (!Mathf.Approximately(_currentAlpha, targetAlpha))
+        if (_currentAlpha != targetAlpha)
         {
             _currentAlpha = Mathf.MoveTowards(_currentAlpha, targetAlpha, Time.deltaTime * _transitionSpeed);
             OnAlphaChanged(_currentAlpha);
         }
     }
     
-    // Override this to handle alpha changes
+    // Apply alpha changes to visuals
     protected virtual void OnAlphaChanged(float alpha)
     {
-        // Default implementation does nothing
+        // Base implementation does nothing, override in derived classes
     }
     
-    // Activate the renderer
+    // Show this renderer
     public virtual void Activate()
     {
         _isActivated = true;
+        gameObject.SetActive(true);
     }
     
-    // Deactivate the renderer
+    // Hide this renderer
     public virtual void Deactivate()
     {
         _isActivated = false;
+        gameObject.SetActive(false);
     }
     
-    // Immediately show or hide without transition
+    // Set visibility directly
     public virtual void SetVisibility(bool visible)
     {
-        _isActivated = visible;
-        _currentAlpha = visible ? 1f : 0f;
-        OnAlphaChanged(_currentAlpha);
+        if (visible)
+            Activate();
+        else
+            Deactivate();
     }
     
-    // Render the model data
-    public abstract void UpdateWithModel(object model);
-
-    public bool IsActive { get; protected set; }
+    // Update renderer with model data
+    public abstract void UpdateWithModel(Item model);
+    
+    public bool IsActive => _isActivated;
 }
 
 /// <summary>
-/// Base class for item renderers
+/// Base class for Item-specific renderers
 /// </summary>
 public abstract class ItemViewRenderer : BaseViewRenderer
 {
-    // Called to update the renderer with item data
-    public virtual void UpdateWithItemModel(CraftSpace.Models.Schema.Generated.Item model)
+    // Update with an Item model
+    public virtual void UpdateWithItemModel(Item model)
     {
-        UpdateWithModel(model);
+        // Override in derived classes
     }
     
-    // Override to implement item-specific rendering
-    public override void UpdateWithModel(object model)
+    // Convert generic model to Item model
+    public override void UpdateWithModel(Item model)
     {
-        if (model is Item itemData)
+        if (model is Item itemModel)
         {
-            UpdateWithItemModel(itemData);
+            UpdateWithItemModel(itemModel);
+        }
+        else
+        {
+            Debug.LogWarning($"Renderer {GetType().Name} received invalid model type: {model?.GetType().Name ?? "null"}");
         }
     }
 }
 
 /// <summary>
-/// Base class for collection renderers
+/// Base class for Collection-specific renderers
 /// </summary>
 public abstract class CollectionViewRenderer : BaseViewRenderer
 {
-    // Called to update the renderer with collection data
+    // Update with a Collection model
     public virtual void UpdateWithCollectionModel(Collection model)
     {
-        UpdateWithModel(model);
+        // Override in derived classes
     }
     
-    // Override to implement collection-specific rendering
-    public override void UpdateWithModel(object model)
+    // Convert generic model to Collection model
+    public override void UpdateWithModel(Item model)
     {
-        if (model is Collection collectionData)
+        if (model is Collection collectionModel)
         {
-            UpdateWithCollectionModel(collectionData);
+            UpdateWithCollectionModel(collectionModel);
+        }
+        else
+        {
+            Debug.LogWarning($"Renderer {GetType().Name} received invalid model type: {model?.GetType().Name ?? "null"}");
         }
     }
 } 

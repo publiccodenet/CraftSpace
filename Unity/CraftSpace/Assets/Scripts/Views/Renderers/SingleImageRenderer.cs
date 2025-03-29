@@ -1,5 +1,5 @@
 using UnityEngine;
-using CraftSpace.Models.Schema.Generated;
+using System.Collections.Generic;
 
 /// <summary>
 /// Renders an item as a single image/texture (book cover, etc)
@@ -18,6 +18,7 @@ public class SingleImageRenderer : ItemViewRenderer
     private MeshFilter _meshFilter;
     private ItemView _itemView;
     private Camera _mainCamera;
+    [SerializeField] private Material _defaultMaterial;
     
     protected override void Awake()
     {
@@ -26,6 +27,15 @@ public class SingleImageRenderer : ItemViewRenderer
         _mainCamera = Camera.main;
         
         CreateImageObject();
+        
+        if (_meshRenderer == null)
+            _meshRenderer = GetComponent<MeshRenderer>();
+        
+        if (_meshRenderer == null)
+        {
+            _meshRenderer = gameObject.AddComponent<MeshRenderer>();
+            gameObject.AddComponent<MeshFilter>();
+        }
     }
     
     private void CreateImageObject()
@@ -128,57 +138,121 @@ public class SingleImageRenderer : ItemViewRenderer
         }
     }
     
-    public override void UpdateWithItemModel(CraftSpace.Models.Schema.Generated.Item model)
+    public override void UpdateWithItemModel(Item item)
     {
-        if (model == null || _meshRenderer == null)
-            return;
-            
-        if (model.cover != null)
+        if (item == null) return;
+        
+        // Load the cover image if available
+        if (!string.IsNullOrEmpty(item.CoverImage))
         {
-            // Apply texture
-            _meshRenderer.material.mainTexture = model.cover;
-            
-            // Adjust aspect ratio if needed
-            if (_preserveAspectRatio)
+            // Load texture from Resources or AssetBundle
+            Texture2D texture = Resources.Load<Texture2D>(item.CoverImage);
+            if (texture != null)
             {
-                float texAspect = (float)model.cover.width / model.cover.height;
-                float meshAspect = _width / _height;
-                
-                if (Mathf.Abs(texAspect - meshAspect) > 0.01f)
-                {
-                    // Update mesh to match texture aspect ratio
-                    float halfWidth = _width * 0.5f;
-                    float halfHeight = (_width / texAspect) * 0.5f;
-                    
-                    Vector3[] vertices = new Vector3[4]
-                    {
-                        new Vector3(-halfWidth, -halfHeight, 0),
-                        new Vector3(halfWidth, -halfHeight, 0),
-                        new Vector3(-halfWidth, halfHeight, 0),
-                        new Vector3(halfWidth, halfHeight, 0)
-                    };
-                    
-                    _meshFilter.mesh.vertices = vertices;
-                    _meshFilter.mesh.RecalculateBounds();
-                }
+                ApplyTexture(texture);
             }
+            else if (_defaultMaterial != null)
+            {
+                _meshRenderer.material = _defaultMaterial;
+            }
+        }
+    }
+    
+    private void ApplyTexture(Texture2D texture)
+    {
+        if (texture == null || _meshRenderer == null) return;
+        
+        // Create material if needed
+        if (_meshRenderer.material == null)
+        {
+            _meshRenderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        }
+        
+        // Apply texture
+        _meshRenderer.material.mainTexture = texture;
+        
+        // Update the mesh based on texture dimensions
+        CreateOrUpdateMesh(texture);
+    }
+    
+    private void CreateOrUpdateMesh(Texture2D texture)
+    {
+        float aspectRatio = (float)texture.width / texture.height;
+        float width, height;
+        
+        // Calculate dimensions while preserving aspect ratio
+        if (aspectRatio >= 1.0f)
+        {
+            width = _width;
+            height = width / aspectRatio;
         }
         else
         {
-            // Apply default color
-            _meshRenderer.material.mainTexture = null;
-            
-            // Use a color based on title
-            if (!string.IsNullOrEmpty(model.Title))
-            {
-                char firstChar = !string.IsNullOrEmpty(model.Title) ? char.ToUpperInvariant(model.Title[0]) : 'A';
-                float hue = (firstChar - 'A') / 26f;
-                _meshRenderer.material.color = Color.HSVToRGB(hue, 0.7f, 0.8f);
-            }
-            else
-            {
-                _meshRenderer.material.color = Color.white;
-            }
+            height = _height;
+            width = height * aspectRatio;
         }
+        
+        // Create mesh
+        MeshFilter meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter.sharedMesh == null)
+        {
+            meshFilter.sharedMesh = CreateQuadMesh(width, height);
+        }
+        else
+        {
+            UpdateQuadMesh(meshFilter.sharedMesh, width, height);
+        }
+    }
+    
+    private Mesh CreateQuadMesh(float width, float height)
+    {
+        Mesh mesh = new Mesh();
+        
+        // Vertices
+        Vector3[] vertices = new Vector3[4]
+        {
+            new Vector3(-width/2, 0, -height/2),  // Bottom left
+            new Vector3(width/2, 0, -height/2),   // Bottom right
+            new Vector3(-width/2, 0, height/2),   // Top left
+            new Vector3(width/2, 0, height/2)     // Top right
+        };
+        
+        // UVs
+        Vector2[] uv = new Vector2[4]
+        {
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(0, 1),
+            new Vector2(1, 1)
+        };
+        
+        // Triangles
+        int[] triangles = new int[6]
+        {
+            0, 2, 1,
+            2, 3, 1
+        };
+        
+        mesh.vertices = vertices;
+        mesh.uv = uv;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+        
+        return mesh;
+    }
+    
+    private void UpdateQuadMesh(Mesh mesh, float width, float height)
+    {
+        Vector3[] vertices = new Vector3[4]
+        {
+            new Vector3(-width/2, 0, -height/2),  // Bottom left
+            new Vector3(width/2, 0, -height/2),   // Bottom right
+            new Vector3(-width/2, 0, height/2),   // Top left
+            new Vector3(width/2, 0, height/2)     // Top right
+        };
+        
+        mesh.vertices = vertices;
+        mesh.RecalculateBounds();
+        mesh.RecalculateNormals();
     }
 } 

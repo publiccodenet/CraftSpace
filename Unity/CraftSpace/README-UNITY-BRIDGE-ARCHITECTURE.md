@@ -38,53 +38,53 @@ The Bridge architecture consists of several interconnected components:
 ### Class Hierarchy
 
 ```
-- Means root object (with name of superclass in parens).
-+ Means subclass of parent in outline.
-* Means sub-object of parent in outline (with name of superclass in parens).
+    - Means root object (with name of superclass in parens).
+    + Means subclass of parent in outline.
+    * Means sub-object of parent in outline (with name of superclass in parens).
 ```
 
 ```
-- Accessor (none)
+    - Accessor (none)
 
 - Bridge (BridgeObject)
   - Central manager for bridge communication
 
-- BridgeTransport (MonoBehaviour)
-  + BridgeTransportCEF
-    * UnityJSWindow (EditorWindow)
-    * WebProvider (none)
-  + BridgeTransportSocketIO
-  + BridgeTransportWebGL
+    - BridgeTransport (MonoBehaviour)
+        + BridgeTransportCEF
+            * UnityJSWindow (EditorWindow)
+            * WebProvider (none)
+        + BridgeTransportSocketIO
+        + BridgeTransportWebGL
   + BridgeTransportWebServer
-  + BridgeTransportWebView
+        + BridgeTransportWebView
     * BridgePlugin (MonoBehaviour)
 
-- BridgeExtensions (none)
-- BridgeJsonConverter (JsonConverter)
+    - BridgeExtensions (none)
+    - BridgeJsonConverter (JsonConverter)
 
-- BridgeObject (MonoBehaviour)
+    - BridgeObject (MonoBehaviour)
   - Base class for objects that can communicate via the bridge
-  + Tracker
-    * TrackerProxy (MonoBehaviour)
-    + PieTracker
-    + Cuboid
-      * Tile (MonoBehaviour)
-    + ParticleSystemHelper
+        + Tracker
+            * TrackerProxy (MonoBehaviour)
+            + PieTracker
+            + Cuboid
+                * Tile (MonoBehaviour)
+            + ParticleSystemHelper
     + KeyboardTracker
     + TextureViewer
     + KineticText
     + ProCamera
-  + LeanTweenBridge
-  + TextOverlays
-  + ToolbarButton
+        + LeanTweenBridge
+        + TextOverlays
+        + ToolbarButton
   + ProText
   + OverlayText
   + UnityBridge
 
-- ProxyGroup (MonoBehaviour)
+    - ProxyGroup (MonoBehaviour)
 
 - NamedAssetManager (MonoBehaviour)
-  * NamedAsset (ScriptableObject)
+        * NamedAsset (ScriptableObject)
 
 - MonoPInvokeCallbackAttribute (System.Attribute)
 ```
@@ -254,79 +254,79 @@ Unity types are converted to/from JSON using various formats:
 ### Vector2
 
 ```javascript
-{ // 2d vector
-    x: 0,
-    y: 0
-}
+        { // 2d vector
+            x: 0,
+            y: 0
+        }
 ```
 
 ### Vector3
 
 ```javascript
-{ // 3d vector
-    x: 0,
-    y: 0,
-    z: 0
-}
+        { // 3d vector
+            x: 0,
+            y: 0,
+            z: 0
+        }
 ```
 
 ### Vector4
 
 ```javascript
-{ // 4d vector
-    x: 0,
-    y: 0,
-    z: 0,
-    w: 0
-}
+        { // 4d vector
+            x: 0,
+            y: 0,
+            z: 0,
+            w: 0
+        }
 ```
 
 ### Quaternion
 
 ```javascript
-{ // 4d quaternion
-    x: 0,
-    y: 0,
-    z: 0,
-    w: 0
-}
+        { // 4d quaternion
+            x: 0,
+            y: 0,
+            z: 0,
+            w: 0
+        }
 
 // Alternative: Euler angles in degrees
 {
-    roll: 0,
-    pitch: 0,
-    yaw: 0
-}
+            roll: 0,
+            pitch: 0,
+            yaw: 0
+        }
 ```
 
 ### Color
 
 ```javascript
-"#00000000" // html color string
+        "#00000000" // html color string
 
-{ // rgb color (alpha defaults to 1)
-    r: 0,
-    g: 0,
-    b: 0
-}
-
+        { // rgb color (alpha defaults to 1)
+            r: 0,
+            g: 0,
+            b: 0
+        }
+        
 { // rgba color
-    r: 0,
-    g: 0,
-    b: 0,
-    a: 1
-}
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 1
+        }
 ```
-
+        
 ### Matrix4x4
 
 ```javascript
-[ // 16 element matrix array
-    1, 0, 0, 0, 
-    0, 1, 0, 0, 
-    0, 0, 1, 0, 
-    0, 0, 0, 1
-]
+        [ // 16 element matrix array
+            1, 0, 0, 0, 
+            0, 1, 0, 0, 
+            0, 0, 1, 0, 
+            0, 0, 0, 1
+        ]
 ```
 
 ### Particle System Types
@@ -601,3 +601,4 @@ Example event sequence for testing the bridge:
 4. **Cleanup**: Properly dispose bridge objects and resources when no longer needed
 5. **Debugging**: Enable console logging to diagnose communication issues
 
+  

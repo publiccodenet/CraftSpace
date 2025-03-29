@@ -10,9 +10,6 @@ using System.Reflection;
 using UnityEngine;
 
 
-namespace Bridge {
-
-
 public class NamedAssetManager : MonoBehaviour {
 
 
@@ -68,9 +65,6 @@ public class NamedAssetManager : MonoBehaviour {
 
         //Debug.Log("NamedAssetManager: UpdateNamedAssets: namedAssetArray length: " + namedAssetArray.Length + " namedAssets count: " + namedAssets.Count, this);
     }
-
-
-}
 
 
 }
