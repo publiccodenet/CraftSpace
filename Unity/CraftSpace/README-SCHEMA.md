@@ -187,6 +187,32 @@ public class ItemLoader : SchemaLoader
    - Keep Unity-specific code in the extending classes
    - Use proper serialization attributes
 
+## Internet Archive Metadata Handling
+
+We use a specific approach to handle Internet Archive (IA) metadata that optimizes for both Unity integration and IA compatibility:
+
+1. **Field Categorization**:
+   - **Essential IA Fields**: Core fields like `identifier`, `title`, `description`, `creator`, etc. are modeled as top-level schema properties
+   - **Additional Properties**: All other IA metadata fields are preserved in an `additionalProperties` field
+
+2. **Field Normalization**:
+   - **String Fields**: Fields like `title` and `description` are normalized to always be strings (arrays are joined with newlines)
+   - **Array Fields**: Fields like `creator`, `subject`, and `collection` are normalized to always be arrays
+   - **Null Handling**: All optional fields have safe defaults (empty strings, empty arrays)
+
+3. **Type Converters**:
+   - `StringOrNullToString`: Converts null/undefined to empty string
+   - `StringOrStringArrayToString`: Converts arrays to newline-separated strings
+   - `NullOrStringToStringArray`: Ensures values are always string arrays
+   - `StringToDateTime`: Converts ISO-8601 strings to DateTime objects in C#
+
+4. **Import/Export Strategy**:
+   - **Import**: Normalize fields on import for predictable Unity usage
+   - **Export**: Use original format information to convert back to IA's expected format
+   - **Filtering**: Collection references are filtered, removing system collections
+
+This approach provides clean, typed data in Unity while preserving all metadata for compatibility with Internet Archive's systems.
+
 ## Workflow Tips
 
 1. **Updating Schemas**:
@@ -220,4 +246,73 @@ public class ItemLoader : SchemaLoader
 3. **Integration**:
    - Real-time schema updates
    - Better Unity editor tools
-   - Automated testing support 
+   - Automated testing support
+
+### 3. Schema Example
+
+```typescript
+// Example schema with annotations
+const ItemSchema = withAnnotations(
+  z.object({
+    // Essential IA field with annotations
+    id: withAnnotations(
+      z.string().describe('Unique Internet Archive identifier'),
+      unity.field({
+        header: 'Basic Info',
+        tooltip: 'The unique identifier for this item'
+      }),
+      unity.serializeField()
+    ),
+    
+    title: withAnnotations(
+      z.string().describe('Title of this item'),
+      unity.field({
+        tooltip: 'The main title displayed for this item'
+      }),
+      unity.serializeField()
+    ),
+    
+    // Mixed type handling with converter
+    description: withAnnotations(
+      z.union([z.string(), z.array(z.string())]).optional()
+        .describe('Description of the item'),
+      unity.field({
+        tooltip: 'Description of the item',
+        multiline: true
+      }),
+      unity.serializeField(),
+      StringOrStringArray // Type converter
+    ),
+    
+    // Date fields with specialized converter
+    date: withAnnotations(
+      z.string().optional().describe('Publication date'),
+      unity.field({
+        tooltip: 'When this item was published'
+      }),
+      unity.serializeField(),
+      DateTimeConverter
+    ),
+    
+    // All other fields pass through here
+    additionalProperties: z.record(z.any()).optional()
+      .describe('Additional Internet Archive metadata fields')
+  }),
+  
+  // Class-level Unity annotations
+  unity.type({
+    title: 'Internet Archive Item',
+    description: 'Represents an Internet Archive item with metadata',
+    menuPath: 'Content'
+  }),
+  
+  // Class-level C# annotations
+  csharp.class({
+    baseClass: 'ScriptableObject',
+    interfaces: ['ISerializationCallbackReceiver'],
+    attributes: [
+      { name: 'Serializable' }
+    ]
+  })
+);
+``` 

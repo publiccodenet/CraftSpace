@@ -3,34 +3,8 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-[Serializable]
-public class Item : ScriptableObject
+public class Item : ItemSchema
 {
-    [SerializeField] public string Id { get; set; }
-    [SerializeField] public string Title { get; set; }
-    [SerializeField] public string Description { get; set; }
-    [SerializeField] public List<string> Subjects { get; set; }
-    [SerializeField] public bool IsFavorite { get; set; }
-    [SerializeField] public string ThumbnailUrl { get; set; }
-    [SerializeField] public string ModelUrl { get; set; }
-    [SerializeField] public string CollectionId { get; set; }
-    [SerializeField] public string Creator { get; set; }
-    [SerializeField] public int Downloads { get; set; }
-    
-    // Alias for ThumbnailUrl to maintain compatibility
-    public string CoverImage 
-    { 
-        get => ThumbnailUrl; 
-        set => ThumbnailUrl = value; 
-    }
-    
-    // Alias for lowercase collectionId (for JSON compatibility)
-    public string collectionId 
-    { 
-        get => CollectionId; 
-        set => CollectionId = value; 
-    }
-    
     // Unity-specific fields
     [NonSerialized] public Texture2D cover;
     [NonSerialized] public Collection parentCollection;
@@ -86,6 +60,9 @@ public class Item : ScriptableObject
     // Alias for API compatibility
     public static Item FromJson(string json)
     {
-        return FromJsonString(json);
+        Debug.Log($"[Item] FromJson: {json}");
+        var item = FromJsonString(json);
+        Debug.Log($"[Item] FromJson: {item}");
+        return item;
     }
 } 

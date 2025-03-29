@@ -36,9 +36,9 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     [SerializeField] private float _highlightMarginLeft = 0f;
     [SerializeField] private float _highlightMarginRight = 0f;
     
-    // Tracked renderers
-    private Dictionary<System.Type, BaseViewRenderer> _renderers = new Dictionary<System.Type, BaseViewRenderer>();
-    private List<BaseViewRenderer> _activeRenderers = new List<BaseViewRenderer>();
+    // Tracked renderers - update to use the base non-generic type
+    private Dictionary<System.Type, MonoBehaviour> _renderers = new Dictionary<System.Type, MonoBehaviour>();
+    private List<MonoBehaviour> _activeRenderers = new List<MonoBehaviour>();
     
     // Distance tracking
     private Camera _mainCamera;
@@ -61,7 +61,7 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     
     public CollectionView ParentCollectionView { get; set; }
     
-    private Dictionary<System.Type, BaseViewRenderer> _closeRenderers = new Dictionary<System.Type, BaseViewRenderer>();
+    private Dictionary<System.Type, MonoBehaviour> _closeRenderers = new Dictionary<System.Type, MonoBehaviour>();
     
     [SerializeField] private UnityEvent<Item> _onItemChanged = new UnityEvent<Item>();
     
@@ -101,6 +101,7 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     {
         float distance = Vector3.Distance(transform.position, _mainCamera.transform.position);
         
+        // Always use SingleImageRenderer, regardless of distance
         ShowRenderer<SingleImageRenderer>(true);
     }
     
@@ -150,9 +151,10 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         
         foreach (var renderer in _renderers.Values)
         {
-            if (renderer != null && renderer.IsActive)
+            var baseRenderer = renderer as BaseViewRenderer<Item>;
+            if (baseRenderer != null && baseRenderer.IsActive)
             {
-                renderer.UpdateWithModel(_model);
+                baseRenderer.UpdateWithModel(_model);
             }
         }
     }
@@ -165,51 +167,18 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         
         if (_mainCamera != null && Item != null)
         {
-            float distance = Vector3.Distance(_mainCamera.transform.position, transform.position);
-            
-            // Update renderers based on distance from camera
-            foreach (var renderer in _renderers.Values)
+            // Always show the SingleImageRenderer
+            var imageRenderer = GetOrAddRenderer<SingleImageRenderer>();
+            if (imageRenderer != null)
             {
-                if (renderer == null) continue;
+                imageRenderer.Activate();
+                if (!_activeRenderers.Contains(imageRenderer))
+                {
+                    _activeRenderers.Add(imageRenderer);
+                }
                 
-                // Check if this is a close-range renderer
-                bool isCloseRenderer = _closeRenderers.ContainsKey(renderer.GetType());
-                
-                if (isCloseRenderer)
-                {
-                    if (distance <= _closeDistance)
-                    {
-                        renderer.Activate();
-                        if (!_activeRenderers.Contains(renderer))
-                        {
-                            _activeRenderers.Add(renderer);
-                        }
-                    }
-                    else
-                    {
-                        renderer.Deactivate();
-                        _activeRenderers.Remove(renderer);
-                    }
-                }
-            }
-            
-            // Show highlight for closest items
-            if (distance <= _closeDistance * 0.5f && Item != null && Item.IsFavorite)
-            {
-                var highlightRenderer = GetOrAddRenderer<HighlightParticleRenderer>();
-                if (highlightRenderer != null)
-                {
-                    highlightRenderer.Activate();
-                    highlightRenderer.UpdateWithModel(Item);
-                }
-            }
-            else
-            {
-                var highlightRenderer = GetOrAddRenderer<HighlightParticleRenderer>();
-                if (highlightRenderer != null)
-                {
-                    highlightRenderer.Deactivate();
-                }
+                // Update the renderer with the current model
+                imageRenderer.UpdateWithModel(Item);
             }
         }
     }
@@ -217,16 +186,15 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     // Initialize default renderers
     private void InitializeDefaultRenderers()
     {
-        // Add primary renderers but don't activate them yet
+        // Add only SingleImageRenderer but don't activate it yet
         GetOrAddRenderer<SingleImageRenderer>();
-        GetOrAddRenderer<HighlightParticleRenderer>();
         
         // Initial distance check
         UpdateRenderersBasedOnDistance();
     }
     
     // Get or add a renderer component
-    public T GetOrAddRenderer<T>() where T : BaseViewRenderer
+    public T GetOrAddRenderer<T>() where T : MonoBehaviour
     {
         System.Type type = typeof(T);
         
@@ -254,19 +222,23 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     }
     
     // Show or hide a specific renderer
-    public T ShowRenderer<T>(bool show = true) where T : BaseViewRenderer
+    public T ShowRenderer<T>(bool show = true) where T : MonoBehaviour
     {
         var renderer = GetOrAddRenderer<T>();
         if (renderer != null)
         {
-            if (show)
+            var baseRenderer = renderer as BaseViewRenderer<Item>;
+            if (baseRenderer != null)
             {
-                renderer.Activate();
-                renderer.UpdateWithModel(_model);
-            }
-            else
-            {
-                renderer.Deactivate();
+                if (show)
+                {
+                    baseRenderer.Activate();
+                    baseRenderer.UpdateWithModel(_model);
+                }
+                else
+                {
+                    baseRenderer.Deactivate();
+                }
             }
         }
         return renderer;
@@ -277,9 +249,10 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     {
         foreach (var renderer in _activeRenderers)
         {
-            if (renderer != null)
+            var baseRenderer = renderer as BaseViewRenderer<Item>;
+            if (baseRenderer != null)
             {
-                renderer.Deactivate();
+                baseRenderer.Deactivate();
             }
         }
         _activeRenderers.Clear();
@@ -668,16 +641,17 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     {
         foreach (var renderer in _renderers.Values)
         {
-            if (renderer != null)
+            var baseRenderer = renderer as BaseViewRenderer<Item>;
+            if (baseRenderer != null)
             {
                 if (show)
                 {
-                    renderer.Activate();
-                    renderer.UpdateWithModel(_model);
+                    baseRenderer.Activate();
+                    baseRenderer.UpdateWithModel(_model);
                 }
                 else
                 {
-                    renderer.Deactivate();
+                    baseRenderer.Deactivate();
                 }
             }
         }

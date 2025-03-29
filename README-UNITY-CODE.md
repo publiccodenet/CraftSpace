@@ -8,6 +8,59 @@
 - **ViewFactory** - Creates and manages views for collections and items
 - **ItemSelectionManager** - Handles selection of items
 
+## Development Environment Setup
+
+Before starting development on the Unity portion of CraftSpace, set up your IDE with the following extensions for a more productive workflow:
+
+### Visual Studio & Visual Studio Code
+
+1. **Visual Studio Tools for Unity** (essential)
+   - Enables debugging, code completion, and Unity project navigation
+   - Properly handles .meta files and Unity-specific file operations
+   - Maintains the relationship between assets and their metadata
+
+2. **Unity Debug** (for VS Code)
+   - Allows attaching the VS Code debugger to the Unity editor
+   - Supports breakpoints, watch variables, and step debugging
+
+3. **C# Extensions**
+   - Enhanced syntax highlighting for C# files
+   - Code organization features (regions, methods grouping)
+
+4. **Unity Code Snippets**
+   - Provides templates for common Unity patterns
+   - Speeds up creation of MonoBehaviours, ScriptableObjects, etc.
+
+### Cursor
+
+1. **Unity Integration**
+   - Configure Cursor to exclude .meta files from the file explorer:
+     - Open Settings → Features → Explorer → Files: Exclude
+     - Add `*.meta` to the patterns list
+   - Cursor will still maintain these files when moving/renaming assets
+
+2. **Recommended Settings**
+   - Enable "Auto Save" to ensure changes are saved when Unity reimports assets
+   - Configure bracket pair colorization for better C# readability
+   - Set up a reasonable tab size (4 spaces) to match Unity's default formatting
+
+3. **File Association**
+   - Ensure .cs files open with Cursor by default
+   - Associate Unity scene and prefab files with Unity Editor
+
+### Git Configuration
+
+1. **Git LFS Setup**
+   - Configure Git LFS for Unity asset files (.asset, .fbx, etc.)
+   - Avoid LFS for code files to maintain good diff visibility
+
+2. **.gitignore Configuration**
+   - Use Unity's recommended .gitignore settings
+   - Ensure meta files are included in version control
+   - Exclude user-specific Unity files (UserSettings folder, etc.)
+
+By properly configuring your development environment, you can avoid common pitfalls with Unity development, like broken references due to improper handling of meta files or synchronization issues between your IDE and Unity.
+
 ## Required Prefabs
 
 ### 1. CollectionView Prefab

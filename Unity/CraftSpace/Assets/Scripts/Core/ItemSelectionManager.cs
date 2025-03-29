@@ -19,8 +19,9 @@ public class ItemSelectionManager : MonoBehaviour
     private Camera _mainCamera;
     private ItemView _currentHoveredItem;
     private ItemView _currentSelectedItem;
-    private HighlightParticleRenderer _currentHoverHighlight;
-    private HighlightParticleRenderer _currentSelectionHighlight;
+    
+    // Track original materials for restoring later
+    private Dictionary<GameObject, Material[]> _originalMaterials = new Dictionary<GameObject, Material[]>();
     
     private void Start()
     {
@@ -122,50 +123,76 @@ public class ItemSelectionManager : MonoBehaviour
     
     private void ApplyHoverHighlight(ItemView item)
     {
-        // Get or add HighlightParticleRenderer
-        _currentHoverHighlight = GetOrAddHighlightRenderer(item.gameObject);
-        _currentHoverHighlight.SetColor(_hoverHighlightColor);
-        _currentHoverHighlight.Activate();
+        // Simple hover highlight - just use debug log for now
+        Debug.Log($"Hovering over {item.name}");
+        
+        // For a real implementation, we would change material color or add a highlight effect
+        // ApplyHighlightColor(item.gameObject, _hoverHighlightColor);
     }
     
     private void RemoveHoverHighlight()
     {
-        if (_currentHoverHighlight != null)
+        // Only remove hover highlight if it's not the selected item
+        if (_currentHoveredItem != null && _currentHoveredItem != _currentSelectedItem)
         {
-            // Only deactivate if it's not the selection highlight
-            if (_currentHoverHighlight != _currentSelectionHighlight)
-            {
-                _currentHoverHighlight.Deactivate();
-            }
-            _currentHoverHighlight = null;
+            // RestoreOriginalMaterials(_currentHoveredItem.gameObject);
         }
     }
     
     private void ApplySelectionHighlight(ItemView item)
     {
-        // Get or add HighlightParticleRenderer
-        _currentSelectionHighlight = GetOrAddHighlightRenderer(item.gameObject);
-        _currentSelectionHighlight.SetColor(_selectedHighlightColor);
-        _currentSelectionHighlight.Activate();
+        // Simple selection highlight - just use debug log for now
+        Debug.Log($"Selected {item.name}");
+        
+        // For a real implementation, we would change material color or add a highlight effect
+        // ApplyHighlightColor(item.gameObject, _selectedHighlightColor);
     }
     
     private void RemoveSelectionHighlight()
     {
-        if (_currentSelectionHighlight != null)
+        if (_currentSelectedItem != null)
         {
-            _currentSelectionHighlight.Deactivate();
-            _currentSelectionHighlight = null;
+            // RestoreOriginalMaterials(_currentSelectedItem.gameObject);
         }
     }
     
-    private HighlightParticleRenderer GetOrAddHighlightRenderer(GameObject obj)
+    // Utility methods for future implementation
+    
+    private void ApplyHighlightColor(GameObject obj, Color color)
     {
-        HighlightParticleRenderer renderer = obj.GetComponent<HighlightParticleRenderer>();
-        if (renderer == null)
+        // Store original materials if we haven't already
+        if (!_originalMaterials.ContainsKey(obj))
         {
-            renderer = obj.AddComponent<HighlightParticleRenderer>();
+            MeshRenderer renderer = obj.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                _originalMaterials[obj] = renderer.materials;
+                
+                // Create new highlight materials
+                Material[] highlightMaterials = new Material[renderer.materials.Length];
+                for (int i = 0; i < renderer.materials.Length; i++)
+                {
+                    highlightMaterials[i] = new Material(renderer.materials[i]);
+                    highlightMaterials[i].color = color;
+                }
+                
+                // Apply highlight materials
+                renderer.materials = highlightMaterials;
+            }
         }
-        return renderer;
+    }
+    
+    private void RestoreOriginalMaterials(GameObject obj)
+    {
+        if (_originalMaterials.TryGetValue(obj, out Material[] originalMats))
+        {
+            MeshRenderer renderer = obj.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.materials = originalMats;
+            }
+            _originalMaterials.Remove(obj);
+        }
     }
     
     public ItemView GetSelectedItem()

@@ -3,19 +3,8 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-[Serializable]
-public class Collection : ScriptableObject
+public class Collection : CollectionSchema
 {
-    [SerializeField] public string Id { get; set; }
-    [SerializeField] public string Name { get; set; }
-    [SerializeField] public string Description { get; set; }
-    [SerializeField] public List<string> ItemIds { get; set; } = new List<string>();
-    [SerializeField] public string ThumbnailUrl { get; set; }
-    [SerializeField] public DateTime LastModified { get; set; }
-    [SerializeField] public string Curator { get; set; }
-    [SerializeField] public bool IsFeatured { get; set; }
-    [SerializeField] public Dictionary<string, string> Metadata { get; set; } = new Dictionary<string, string>();
-    
     // Runtime-only list of actual Item objects (not serialized)
     [NonSerialized] public List<Item> items = new List<Item>();
     
@@ -55,8 +44,6 @@ public class Collection : ScriptableObject
     // Default constructor
     public Collection()
     {
-        ItemIds = new List<string>();
-        Metadata = new Dictionary<string, string>();
         items = new List<Item>();
         _views = new List<CollectionView>();
     }
@@ -89,6 +76,9 @@ public class Collection : ScriptableObject
     // Alias for API compatibility
     public static Collection FromJson(string json)
     {
-        return FromJsonString(json);
+        Debug.Log($"[Collection] FromJson: {json}");
+        var collection = FromJsonString(json);
+        Debug.Log($"[Collection] FromJson: {collection}");
+        return collection;
     }
 } 

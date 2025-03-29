@@ -21,16 +21,16 @@ public class ContentBrowser : MonoBehaviour
     private List<GameObject> instantiatedCollections = new List<GameObject>();
     private List<GameObject> instantiatedItems = new List<GameObject>();
     
+    public Brewster brewster; // Public field to assign Brewster in the editor
+    
     void Start()
     {
-        if (Brewster.Instance != null)
+        if (brewster == null)
         {
-            PopulateCollections();
+            Debug.LogError("Brewster not found! Make sure it's initialized before this component.");
+            return;
         }
-        else
-        {
-            Debug.LogError("Brewster instance not found!");
-        }
+        PopulateCollections();
     }
     
     void PopulateCollections()
@@ -38,7 +38,7 @@ public class ContentBrowser : MonoBehaviour
         // Clear existing
         ClearCollections();
         
-        foreach (var collection in Brewster.Instance.collections)
+        foreach (var collection in brewster.collections)
         {
             GameObject collectionObj = Instantiate(collectionPrefab, collectionsContainer);
             

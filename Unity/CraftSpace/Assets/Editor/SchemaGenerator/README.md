@@ -193,3 +193,106 @@ if (item.HasField("some-field"))
 ## Contributing
 
 Feel free to extend or modify this tool for your needs. The codebase is intentionally small and focused to make modifications straightforward. 
+
+## Schema Design Approach
+
+Our schema design follows these key principles for handling Internet Archive metadata:
+
+### 1. Field Categorization
+
+- **Essential IA Fields**: Core Internet Archive fields like `identifier`, `title`, `description`, `creator`, `date`, etc. are modeled as top-level schema properties with rich annotations.
+- **Application-Specific Fields**: Fields critical to our Unity application get first-class schema support and rich Unity editor integration.
+- **Passthrough Fields**: All other Internet Archive metadata fields are handled through a dedicated passthrough field to maintain compatibility without cluttering the schema.
+
+### 2. Annotation System
+
+We use a flexible annotation system that supports:
+
+- **Field-Level Annotations**: Applied to individual schema properties
+  - C# attributes for serialization control
+  - Unity-specific attributes for editor integration
+  - Type conversion information
+- **Class-Level Annotations**: Applied to the entire schema
+  - Base class specification
+  - Interface implementations
+  - ScriptableObject menu paths
+
+### 3. Schema Example
+
+```typescript
+// Example schema with annotations
+const ItemSchema = withAnnotations(
+  z.object({
+    // Essential IA field with annotations
+    identifier: withAnnotations(
+      z.string().describe('Unique Internet Archive identifier'),
+      unity.field({
+        header: 'Basic Info',
+        tooltip: 'The unique identifier for this item'
+      }),
+      unity.serializeField()
+    ),
+    
+    title: withAnnotations(
+      z.string().describe('Title of this item'),
+      unity.field({
+        tooltip: 'The main title displayed for this item'
+      }),
+      unity.serializeField()
+    ),
+    
+    // Mixed type handling with converter
+    description: withAnnotations(
+      z.union([z.string(), z.array(z.string())]).optional()
+        .describe('Description of the item'),
+      unity.field({
+        tooltip: 'Description of the item',
+        multiline: true
+      }),
+      unity.serializeField(),
+      StringOrStringArray // Type converter
+    ),
+    
+    // Date fields with specialized converter
+    date: withAnnotations(
+      z.string().optional().describe('Publication date'),
+      unity.field({
+        tooltip: 'When this item was published'
+      }),
+      unity.serializeField(),
+      DateTimeConverter
+    ),
+    
+    // All other fields pass through here
+    additionalProperties: z.record(z.any()).optional()
+      .describe('Additional Internet Archive metadata fields')
+  }),
+  
+  // Class-level Unity annotations
+  unity.type({
+    title: 'Internet Archive Item',
+    description: 'Represents an Internet Archive item with metadata',
+    menuPath: 'Content'
+  }),
+  
+  // Class-level C# annotations
+  csharp.class({
+    baseClass: 'ScriptableObject',
+    interfaces: ['ISerializationCallbackReceiver'],
+    attributes: [
+      { name: 'Serializable' }
+    ]
+  })
+);
+```
+
+### 4. Data Flow Architecture
+
+Our data pipeline ensures metadata consistency between Internet Archive and our application:
+
+1. **Import**: Internet Archive metadata is imported, with essential fields mapped to schema properties and remaining fields preserved in the passthrough field.
+2. **Runtime Access**: All fields (essential and passthrough) are accessible through the same API.
+3. **Export**: When exporting, an application-specific data exporter can filter and transform fields as needed.
+4. **Filtering**: Exporters determine which fields to include, exclude, or transform based on the target platform.
+
+This approach gives us the best of both worlds: rich editor integration for important fields and complete preservation of Internet Archive metadata. 

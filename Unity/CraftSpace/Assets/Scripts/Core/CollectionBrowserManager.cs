@@ -1,9 +1,13 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
+// Run this script after Brewster
+[DefaultExecutionOrder(0)]
 public class CollectionBrowserManager : MonoBehaviour
 {
+    
     [Header("References")]
     [SerializeField] private Transform _collectionsContainer;
     [SerializeField] private GameObject _itemViewPrefab;
@@ -14,27 +18,58 @@ public class CollectionBrowserManager : MonoBehaviour
     [SerializeField] private float _collectionSpacing = 5f;
     
     private List<CollectionGridLayout> _collectionLayouts = new List<CollectionGridLayout>();
-    private Brewster _brewster;
+    public Brewster brewster; // Public field to assign Brewster in the editor
+    private bool _initialized = false;
+    private bool _isInitializing = false;
     
     private void Start()
     {
-        _brewster = GetComponent<Brewster>();
-        if (_brewster == null)
+        if (brewster == null)
         {
-            Debug.LogError("Brewster component not found!");
+            Debug.LogError("[CollectionBrowserManager] Brewster reference is not assigned in the editor!");
+            return;
+        }
+        InitializeComponent();
+    }
+    
+    private void InitializeComponent()
+    {
+        // Validate critical component references
+        if (_collectionsContainer == null)
+        {
+            Debug.LogError("[CollectionBrowserManager] Collections container reference is missing!");
             return;
         }
         
-        // Subscribe to Brewster's loading completion
-        // Since Brewster might not have a built-in event, we can check in Update
+        if (_collectionViewPrefab == null)
+        {
+            Debug.LogError("[CollectionBrowserManager] Collection view prefab reference is missing!");
+            return;
+        }
+        
+        if (_cameraController == null)
+        {
+            Debug.LogWarning("[CollectionBrowserManager] Camera controller reference is missing. Camera focusing features will be disabled.");
+        }
+        
+        _initialized = true;
+        Debug.Log("[CollectionBrowserManager] Successfully connected to Brewster.");
     }
     
     private void Update()
     {
-        // Only run once when collections are loaded
-        if (_brewster.collections.Count > 0 && _collectionLayouts.Count == 0)
+        // Only run once when collections are loaded and everything is properly initialized
+        if (_initialized && brewster != null && brewster.collections.Count > 0 && _collectionLayouts.Count == 0
+            && _collectionsContainer != null && _collectionViewPrefab != null)
         {
-            CreateCollectionLayouts();
+            try
+            {
+                CreateCollectionLayouts();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[CollectionBrowserManager] Error creating collection layouts: {ex.Message}\n{ex.StackTrace}");
+            }
         }
     }
     
@@ -57,11 +92,18 @@ public class CollectionBrowserManager : MonoBehaviour
         float totalWidth = 0;
         List<Vector2> gridSizes = new List<Vector2>();
         
-        foreach (var collection in _brewster.collections)
+        foreach (var collection in brewster.collections)
         {
             // Create temporary layout to calculate size
             GameObject tempLayout = Instantiate(_collectionViewPrefab);
             CollectionGridLayout gridLayout = tempLayout.GetComponent<CollectionGridLayout>();
+            if (gridLayout == null)
+            {
+                Debug.LogError("[CollectionBrowserManager] Failed to get CollectionGridLayout component from prefab.");
+                Destroy(tempLayout);
+                continue;
+            }
+            
             gridLayout.SetCollection(collection);
             
             Vector2 gridSize = gridLayout.GetGridSize();
@@ -74,7 +116,7 @@ public class CollectionBrowserManager : MonoBehaviour
         }
         
         // Add spacing between collections
-        totalWidth += (_brewster.collections.Count - 1) * _collectionSpacing;
+        totalWidth += (brewster.collections.Count - 1) * _collectionSpacing;
         
         // Position layouts
         float currentX = -totalWidth / 2;
@@ -98,7 +140,9 @@ public class CollectionBrowserManager : MonoBehaviour
         {
             // Get the collection from the layout
             var layout = _collectionLayouts[0];
-            var collection = layout.GetComponent<CollectionView>()?.Model;
+            var collectionView = layout.GetComponent<CollectionView>();
+            var collection = collectionView != null ? collectionView.Model : null;
+            
             if (collection != null)
             {
                 _cameraController.FocusOnCollection(collection);
@@ -106,32 +150,43 @@ public class CollectionBrowserManager : MonoBehaviour
             else
             {
                 // If no collection is available, still focus on something
-                Debug.LogWarning("No Collection model found in layout, using default focus");
+                Debug.LogWarning("[CollectionBrowserManager] No Collection model found in layout, using default focus");
                 _cameraController.FocusOnCollection(null);
             }
         }
+        
+        Debug.Log($"[CollectionBrowserManager] Created {_collectionLayouts.Count} collection layouts");
     }
     
     // Method for selecting a collection (e.g., called from UI)
     public void FocusOnCollection(int collectionIndex)
     {
-        if (_cameraController != null && 
-            collectionIndex >= 0 && 
-            collectionIndex < _collectionLayouts.Count)
+        if (_cameraController == null)
         {
-            // Get the collection from the layout
-            var layout = _collectionLayouts[collectionIndex];
-            var collection = layout.GetComponent<CollectionView>()?.Model;
-            if (collection != null)
-            {
-                _cameraController.FocusOnCollection(collection);
-            }
-            else
-            {
-                // If no collection is available, still focus on something
-                Debug.LogWarning("No Collection model found in layout, using default focus");
-                _cameraController.FocusOnCollection(null);
-            }
+            Debug.LogWarning("[CollectionBrowserManager] Cannot focus on collection - Camera controller is null");
+            return;
+        }
+        
+        if (collectionIndex < 0 || collectionIndex >= _collectionLayouts.Count)
+        {
+            Debug.LogWarning($"[CollectionBrowserManager] Cannot focus on collection - Invalid index: {collectionIndex}");
+            return;
+        }
+        
+        // Get the collection from the layout
+        var layout = _collectionLayouts[collectionIndex];
+        var collectionView = layout.GetComponent<CollectionView>();
+        var collection = collectionView != null ? collectionView.Model : null;
+        
+        if (collection != null)
+        {
+            _cameraController.FocusOnCollection(collection);
+        }
+        else
+        {
+            // If no collection is available, still focus on something
+            Debug.LogWarning("[CollectionBrowserManager] No Collection model found in layout, using default focus");
+            _cameraController.FocusOnCollection(null);
         }
     }
 } 

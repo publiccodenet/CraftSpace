@@ -1,20 +1,14 @@
 {
   "type": "object",
+  "title": "Item",
   "properties": {
     "id": {
       "type": "string",
-      "minLength": 1,
-      "description": "Unique identifier for the item"
-    },
-    "collectionId": {
-      "type": "string",
-      "minLength": 1,
-      "description": "ID of the collection this item belongs to"
+      "description": "Unique Internet Archive identifier."
     },
     "title": {
       "type": "string",
-      "minLength": 1,
-      "description": "Title of the item"
+      "description": "Title of this item."
     },
     "description": {
       "anyOf": [
@@ -28,15 +22,7 @@
           }
         }
       ],
-      "description": "Description of the item (can be a string or array of strings)"
-    },
-    "content": {
-      "type": "string",
-      "description": "Main content of the item"
-    },
-    "coverImage": {
-      "type": "string",
-      "description": "Path to cover image"
+      "description": "Description of the item."
     },
     "creator": {
       "anyOf": [
@@ -50,20 +36,9 @@
           }
         }
       ],
-      "description": "Creator/author of the item (can be a string or array of strings)"
+      "description": "Creator(s) of this item."
     },
-    "type": {
-      "type": "string",
-      "description": "Type of item"
-    },
-    "tags": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "List of tags for the item"
-    },
-    "language": {
+    "subject": {
       "anyOf": [
         {
           "type": "string"
@@ -75,46 +50,45 @@
           }
         }
       ],
-      "description": "Language(s) of the item"
+      "description": "Subject tags for this item."
     },
-    "created": {
+    "collection": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ],
+      "description": "Collections this item belongs to."
+    },
+    "mediatype": {
       "type": "string",
-      "description": "ISO date of creation"
+      "description": "Type of media (texts, movies, audio, etc)."
     },
-    "modified": {
+    "coverImage": {
       "type": "string",
-      "description": "ISO date of modification"
+      "description": "URL or path to the cover image."
     },
-    "publicdate": {
-      "type": "string",
-      "description": "ISO date when the item was made public"
-    },
-    "year": {
-      "type": "number",
-      "description": "Year of publication or creation"
-    },
-    "files": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "List of associated files"
-    },
-    "licenseurl": {
-      "type": "string",
-      "description": "URL to the license of the item"
-    },
-    "metadata": {
+    "extraFields": {
       "type": "object",
-      "properties": {},
       "additionalProperties": true,
-      "description": "Additional metadata"
+      "description": "Additional Internet Archive metadata fields."
     }
   },
   "required": [
     "id",
-    "collectionId",
-    "title"
+    "title",
+    "description",
+    "creator",
+    "subject",
+    "collection",
+    "mediatype",
+    "coverImage"
   ],
   "additionalProperties": false,
   "$schema": "http://json-schema.org/draft-07/schema#",

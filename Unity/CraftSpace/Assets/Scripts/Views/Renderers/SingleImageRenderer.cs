@@ -12,6 +12,7 @@ public class SingleImageRenderer : ItemViewRenderer
     [SerializeField] private float _height = 1.5f;
     [SerializeField] private bool _preserveAspectRatio = true;
     [SerializeField] private float _billboardDistance = 20f;
+    [SerializeField] private float _defaultAspectRatio = 2f/3f; // Standard book cover ratio (width/height)
     
     private GameObject _imageObject;
     private MeshRenderer _meshRenderer;
@@ -19,6 +20,13 @@ public class SingleImageRenderer : ItemViewRenderer
     private ItemView _itemView;
     private Camera _mainCamera;
     [SerializeField] private Material _defaultMaterial;
+    
+    // Public property to access and modify the default aspect ratio
+    public float DefaultAspectRatio 
+    {
+        get { return _defaultAspectRatio; }
+        set { _defaultAspectRatio = value; }
+    }
     
     protected override void Awake()
     {
@@ -49,7 +57,7 @@ public class SingleImageRenderer : ItemViewRenderer
         _meshFilter = _imageObject.AddComponent<MeshFilter>();
         _meshRenderer = _imageObject.AddComponent<MeshRenderer>();
         
-        // Create simple quad mesh
+        // Create simple quad mesh with default aspect ratio
         Mesh mesh = new Mesh();
         float halfWidth = _width * 0.5f;
         float halfHeight = _height * 0.5f;
@@ -138,9 +146,12 @@ public class SingleImageRenderer : ItemViewRenderer
         }
     }
     
-    public override void UpdateWithItemModel(Item item)
+    public override void UpdateWithModel(Item item)
     {
         if (item == null) return;
+        
+        // Create placeholder mesh first (using default aspect ratio)
+        CreatePlaceholderMesh();
         
         // Load the cover image if available
         if (!string.IsNullOrEmpty(item.CoverImage))
@@ -155,6 +166,46 @@ public class SingleImageRenderer : ItemViewRenderer
             {
                 _meshRenderer.material = _defaultMaterial;
             }
+        }
+    }
+    
+    // Create a mesh using the default aspect ratio as a placeholder
+    private void CreatePlaceholderMesh()
+    {
+        float width, height;
+        
+        // Use default aspect ratio for placeholder
+        if (_defaultAspectRatio < 1.0f)
+        {
+            // Tall format (portrait)
+            height = _height;
+            width = height * _defaultAspectRatio;
+        }
+        else
+        {
+            // Wide format (landscape)
+            width = _width;
+            height = width / _defaultAspectRatio;
+        }
+        
+        // Create/update mesh
+        MeshFilter meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter == null)
+            meshFilter = gameObject.AddComponent<MeshFilter>();
+            
+        if (meshFilter.sharedMesh == null)
+        {
+            meshFilter.sharedMesh = CreateQuadMesh(width, height);
+        }
+        else
+        {
+            UpdateQuadMesh(meshFilter.sharedMesh, width, height);
+        }
+        
+        // Apply default material
+        if (_defaultMaterial != null && _meshRenderer != null)
+        {
+            _meshRenderer.material = _defaultMaterial;
         }
     }
     
@@ -194,6 +245,9 @@ public class SingleImageRenderer : ItemViewRenderer
         
         // Create mesh
         MeshFilter meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter == null)
+            meshFilter = gameObject.AddComponent<MeshFilter>();
+            
         if (meshFilter.sharedMesh == null)
         {
             meshFilter.sharedMesh = CreateQuadMesh(width, height);
@@ -208,14 +262,35 @@ public class SingleImageRenderer : ItemViewRenderer
     {
         Mesh mesh = new Mesh();
         
-        // Vertices
-        Vector3[] vertices = new Vector3[4]
+        // Adjust vertices to work in both UI (RectTransform) and World space
+        bool isUIMode = GetComponent<RectTransform>() != null;
+        
+        if (isUIMode)
         {
-            new Vector3(-width/2, 0, -height/2),  // Bottom left
-            new Vector3(width/2, 0, -height/2),   // Bottom right
-            new Vector3(-width/2, 0, height/2),   // Top left
-            new Vector3(width/2, 0, height/2)     // Top right
-        };
+            // Create flat vertices for UI mode (XY plane)
+            Vector3[] vertices = new Vector3[4]
+            {
+                new Vector3(-width/2, -height/2, 0),  // Bottom left
+                new Vector3(width/2, -height/2, 0),   // Bottom right
+                new Vector3(-width/2, height/2, 0),   // Top left
+                new Vector3(width/2, height/2, 0)     // Top right
+            };
+            
+            mesh.vertices = vertices;
+        }
+        else
+        {
+            // Create vertices for world space (XZ plane, Y up)
+            Vector3[] vertices = new Vector3[4]
+            {
+                new Vector3(-width/2, 0, -height/2),  // Bottom left
+                new Vector3(width/2, 0, -height/2),   // Bottom right
+                new Vector3(-width/2, 0, height/2),   // Top left
+                new Vector3(width/2, 0, height/2)     // Top right
+            };
+            
+            mesh.vertices = vertices;
+        }
         
         // UVs
         Vector2[] uv = new Vector2[4]
@@ -233,7 +308,6 @@ public class SingleImageRenderer : ItemViewRenderer
             2, 3, 1
         };
         
-        mesh.vertices = vertices;
         mesh.uv = uv;
         mesh.triangles = triangles;
         mesh.RecalculateNormals();
@@ -243,13 +317,28 @@ public class SingleImageRenderer : ItemViewRenderer
     
     private void UpdateQuadMesh(Mesh mesh, float width, float height)
     {
-        Vector3[] vertices = new Vector3[4]
+        // Get existing vertices
+        Vector3[] vertices = mesh.vertices;
+        
+        // Adjust vertices to work in both UI (RectTransform) and World space
+        bool isUIMode = GetComponent<RectTransform>() != null;
+        
+        if (isUIMode)
         {
-            new Vector3(-width/2, 0, -height/2),  // Bottom left
-            new Vector3(width/2, 0, -height/2),   // Bottom right
-            new Vector3(-width/2, 0, height/2),   // Top left
-            new Vector3(width/2, 0, height/2)     // Top right
-        };
+            // Update for UI mode (XY plane)
+            vertices[0] = new Vector3(-width/2, -height/2, 0);  // Bottom left
+            vertices[1] = new Vector3(width/2, -height/2, 0);   // Bottom right
+            vertices[2] = new Vector3(-width/2, height/2, 0);   // Top left
+            vertices[3] = new Vector3(width/2, height/2, 0);    // Top right
+        }
+        else
+        {
+            // Update for world space (XZ plane, Y up)
+            vertices[0] = new Vector3(-width/2, 0, -height/2);  // Bottom left
+            vertices[1] = new Vector3(width/2, 0, -height/2);   // Bottom right
+            vertices[2] = new Vector3(-width/2, 0, height/2);   // Top left
+            vertices[3] = new Vector3(width/2, 0, height/2);    // Top right
+        }
         
         mesh.vertices = vertices;
         mesh.RecalculateBounds();

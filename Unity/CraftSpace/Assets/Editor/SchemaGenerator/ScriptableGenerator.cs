@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using CraftSpace;
 
 namespace CraftSpace.Editor.SchemaGenerator
 {
@@ -46,6 +47,7 @@ namespace CraftSpace.Editor.SchemaGenerator
             _code.AppendLine("using Newtonsoft.Json;");
             _code.AppendLine("using Newtonsoft.Json.Linq;");
             _code.AppendLine("using UnityEngine;");
+            _code.AppendLine("using CraftSpace;");
             _code.AppendLine();
             
             // Add nullable enable
@@ -56,8 +58,11 @@ namespace CraftSpace.Editor.SchemaGenerator
             var typeAttrs = _schema.GetUnityTypeAttributes();
             var className = typeAttrs?.Title ?? "JsonScriptableObject";
             
+            // Use the schema title as the class name
+            string actualClassName = _schema.Title ?? className;
+            
             // Generate the main ScriptableObject class
-            GenerateScriptableObject(_schema, className);
+            GenerateScriptableObject(_schema, actualClassName);
             
             return _code.ToString();
         }
@@ -108,9 +113,8 @@ namespace CraftSpace.Editor.SchemaGenerator
             // Generate properties
             GenerateProperties(schema.Properties);
 
-            // Generate JSON import/export methods
-            GenerateJsonMethods(className);
-
+            // We don't need to generate JSON methods as they're already in the base class
+            
             _code.AppendLine($"{_indent}}}");
         }
 
@@ -148,10 +152,29 @@ namespace CraftSpace.Editor.SchemaGenerator
 
         private void GenerateProperties(Dictionary<string, SchemaType> properties)
         {
+            // Track all generated nested class names to avoid duplicates
+            var nestedClassNames = new HashSet<string>();
+            
+            // First identify all nested classes
+            foreach (var kvp in properties)
+            {
+                if (kvp.Value.Type == "object")
+                {
+                    nestedClassNames.Add(ToTitleCase(kvp.Key));
+                }
+            }
+            
             foreach (var kvp in properties)
             {
                 string name = kvp.Key;
                 SchemaType prop = kvp.Value;
+                
+                // Skip if this property would conflict with a nested class name
+                if (nestedClassNames.Contains(ToTitleCase(name)))
+                {
+                    Debug.Log($"Skipping property {name} to avoid conflict with nested class");
+                    continue;
+                }
                 
                 string propertyName = ToTitleCase(name);
                 string backingFieldName = $"_{name}";
@@ -181,6 +204,13 @@ namespace CraftSpace.Editor.SchemaGenerator
             
             // Add SerializeField for Unity inspector
             string nullableMarker = isNullable ? "?" : "";
+            
+            // Fix object/Object ambiguity by using System.Object for object types
+            if (typeName == "Object" || typeName == "object")
+            {
+                typeName = "System.Object";
+            }
+            
             _code.AppendLine($"{_indent}    [SerializeField] private {typeName}{nullableMarker} {backingFieldName}{defaultValue};");
             
             // Add type converter if specified
@@ -201,36 +231,6 @@ namespace CraftSpace.Editor.SchemaGenerator
             _code.AppendLine();
         }
 
-        private void GenerateJsonMethods(string className)
-        {
-            // Import from JToken
-            _code.AppendLine($"{_indent}public void ImportFromJToken(JToken token)");
-            _code.AppendLine($"{_indent}{{");
-            _code.AppendLine($"{_indent}    JsonConvert.PopulateObject(token.ToString(), this);");
-            _code.AppendLine($"{_indent}}}");
-            _code.AppendLine();
-
-            // Export to JToken
-            _code.AppendLine($"{_indent}public JToken ExportToJToken()");
-            _code.AppendLine($"{_indent}{{");
-            _code.AppendLine($"{_indent}    return JToken.FromObject(this);");
-            _code.AppendLine($"{_indent}}}");
-            _code.AppendLine();
-
-            // Import from JSON string
-            _code.AppendLine($"{_indent}public void ImportFromJson(string json)");
-            _code.AppendLine($"{_indent}{{");
-            _code.AppendLine($"{_indent}    JsonConvert.PopulateObject(json, this);");
-            _code.AppendLine($"{_indent}}}");
-            _code.AppendLine();
-
-            // Export to JSON string
-            _code.AppendLine($"{_indent}public string ExportToJson()");
-            _code.AppendLine($"{_indent}{{");
-            _code.AppendLine($"{_indent}    return JsonConvert.SerializeObject(this);");
-            _code.AppendLine($"{_indent}}}");
-        }
-
         private string ConvertToPascalCase(string name) =>
             string.Concat(name.Split('_', '-').Select(s => char.ToUpper(s[0]) + s.Substring(1)));
 
@@ -247,20 +247,35 @@ namespace CraftSpace.Editor.SchemaGenerator
         
         private string GetTypeNameForProperty(SchemaType prop)
         {
+            // Check for type converter first, which takes precedence
+            var typeConverter = prop.GetTypeConverter();
+            if (typeConverter != null && !string.IsNullOrEmpty(typeConverter.CSharpType))
+            {
+                return typeConverter.CSharpType;
+            }
+            
+            // Otherwise use standard type mapping
             switch (prop.Type?.ToLower())
             {
-                case "string": return "string";
-                case "number": return "float";
-                case "integer": return "int";
-                case "boolean": return "bool";
+                case "string":
+                    return "string";
+                case "number":
+                    return "float";
+                case "integer":
+                    return "int";
+                case "boolean":
+                    return "bool";
                 case "array":
-                    // Handle arrays
-                    if (prop.Items?.Type == "string") 
-                        return "List<string>";
-                    else 
-                        return "List<object>";
-                case "object": return "Dictionary<string, object>";
-                default: return "object";
+                    var itemType = "object";
+                    if (prop.Items != null)
+                    {
+                        itemType = GetTypeNameForProperty(prop.Items);
+                    }
+                    return $"List<{itemType}>";
+                case "object":
+                    return ConvertToPascalCase(prop.Title ?? "Object");
+                default:
+                    return "object";
             }
         }
         
@@ -280,6 +295,13 @@ namespace CraftSpace.Editor.SchemaGenerator
 
         private void GenerateProperty(string name, SchemaType prop, int indentLevel)
         {
+            // Skip if this property name matches a nested class name that would cause conflict
+            if (name.Equals("extraFields", StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.Log($"Skipping property {name} to avoid conflict with nested ExtraFields class");
+                return;
+            }
+            
             string indent = new string(' ', indentLevel * 4);
             
             // Add description if available
@@ -294,6 +316,12 @@ namespace CraftSpace.Editor.SchemaGenerator
             _code.AppendLine($"{indent}[JsonProperty(\"{name}\")]");
             
             string typeName = GetTypeNameForProperty(prop);
+            
+            // Fix object/Object ambiguity by using System.Object for object types
+            if (typeName == "Object" || typeName == "object")
+            {
+                typeName = "System.Object";
+            }
             
             // Check if this property is in the required array
             bool isRequired = _schema.Required != null && _schema.Required.Contains(name);
