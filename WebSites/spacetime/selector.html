@@ -41,10 +41,24 @@
 
         const channel = client.channel("selectors")
 
+        var isMobile = navigator.userAgent.toLowerCase().match(/mobile/i),
+            isTablet = navigator.userAgent.toLowerCase().match(/tablet/i),
+            isAndroid = navigator.userAgent.toLowerCase().match(/android/i),
+            isiPhone = navigator.userAgent.toLowerCase().match(/iphone/i),
+            isiPad = navigator.userAgent.toLowerCase().match(/ipad/i);
+
+        let user = isAndroid ? 'Android' : isiPhone ? 'iPhone' : isAndroid ? 'Android' : isTablet ? 'Tablet' : isMobile ? 'Mobile' : 'Computer'
+
+        let userStatus = {
+          user,
+          online_at: new Date().toISOString()
+        };
+
         let subscribed = false;
         channel.subscribe((status) => {
           console.log('subscribe', status)
           if (status === 'SUBSCRIBED') {
+            channel.track(userStatus);
             const el = document.getElementById("label");
             el.style.opacity = '';
             subscribed = true;
