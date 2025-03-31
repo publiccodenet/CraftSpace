@@ -31,11 +31,12 @@
         overflow: hidden;
       }
       .qrcode {
-        position: absolute;
+        position: relative;
         top: 0;
         left: 0;
         width: 100px;
         height: 100px;
+        padding: 10px;
       }
     </style>
   </head>
@@ -44,13 +45,13 @@
       // Create a single supabase client for interacting with your database
       const client = supabase.createClient('https://gwodhwyvuftyrvbymmvc.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3b2Rod3l2dWZ0eXJ2YnltbXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDkyMDMsImV4cCI6MjA1NzkyNTIwM30.APVpyOupY84gQ7c0vBZkY-GqoJRPhb4oD4Lcj9CEzlc')
 
-      const channel = client.channel("navigators")
+      const navigatorChannel = client.channel("navigators")
 
       let subscribed = false;
       function sendEvent(event, payload) {
         if (! subscribed) return;
         console.log('sendEvent', name, payload)
-        channel.send({
+        navigatorChannel.send({
           type: 'broadcast',
           event,
           payload,
@@ -66,8 +67,17 @@
         console.log('handleZoom', zoom)
       }
 
-      // Subscribe to the Channel
-      channel
+      function handleSelectPos(payload) {
+        console.log('handleSelectPos', payload)
+      }
+
+      // handlers to send events into Unity
+      function handleSelectZoom(payload) {
+        console.log('handleSelectZoom', payload)
+      }
+
+      // Subscribe to the navigatorChannel
+      navigatorChannel
         .subscribe((status) => {
           console.log('subscribe', status)
           if (status === 'SUBSCRIBED') {
@@ -83,6 +93,26 @@
           'broadcast',
           { event: 'zoom' },
           (data) => handleZoom(data.payload.zoom)
+        )
+
+      const selectorChannel = client.channel("selectors")
+      // Subscribe to the selectorChannel
+      selectorChannel
+        .subscribe((status) => {
+          console.log('subscribe', status)
+          if (status === 'SUBSCRIBED') {
+            subscribed = true;
+          }
+        })
+        .on(
+          'broadcast',
+          { event: 'pos' },
+          (data) => handleSelectPos(data.payload)
+        )
+        .on(
+          'broadcast',
+          { event: 'zoom' },
+          (data) => handleSelectZoom(data.payload.zoom)
         )
     </script>
     <canvas id="unity-canvas" width=960 height=600 tabindex="-1" style="width: 100%; height: 100%; position: fixed; top: 0; left: 0; background: #1F1F20"></canvas>
@@ -117,8 +147,9 @@
       });
     </script>
     <script>
-      // add nagigator qr code
+      // add navigator and selector qr codes
       document.body.appendChild( getQrcodeLink( window.location + 'navigator.html') );
+      document.body.appendChild( getQrcodeLink( window.location + 'selector.html') );
     </script>
   </body>
 </html>
