@@ -226,20 +226,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _cameraRig: {fileID: 3205023071337114697}
   _camera: {fileID: 1026284022375847901}
-  _panSpeed: 10
-  _minX: -20
-  _maxX: 20
-  _minZ: -20
-  _maxZ: 20
+  _panSpeed: 3
+  _minX: -12
+  _maxX: 12
+  _minZ: -12
+  _maxZ: 12
   _invertDrag: 0
   _zoomSpeed: 1
-  _minZoom: 0.25
+  _minZoom: 0.1
   _maxZoom: 100
   _keyboardZoomSpeed: 5
-  _baseVelocityThreshold: 0.1
-  _velocitySmoothingFactor: 0.8
-  _frictionFactor: 0.98
-  _bounceFactor: 0.8
+  _baseVelocityThreshold: 0.2
+  _velocitySmoothingFactor: 0.1
+  _frictionFactor: 0.999
+  _bounceFactor: 0.9
   _itemInfoPanel: {fileID: 5512689547227979829}
   _itemLayer:
     serializedVersion: 2
