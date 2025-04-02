@@ -1,28 +1,25 @@
 {
   "type": "object",
-  "title": "Collection",
   "properties": {
     "id": {
       "type": "string",
-      "description": "Unique Internet Archive identifier for this collection."
+      "minLength": 1,
+      "description": "Unique identifier for the collection"
     },
     "title": {
       "type": "string",
-      "description": "Title of this collection."
+      "minLength": 1,
+      "description": "Primary display title for the collection",
+      "x_meta": {
+        "UnitySchemaConverter": "StringOrNullToStringConverter"
+      }
     },
     "description": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      ],
-      "description": "Description of the collection."
+      "type": "string",
+      "description": "Optional description for the collection",
+      "x_meta": {
+        "UnitySchemaConverter": "StringOrNullToStringConverter"
+      }
     },
     "creator": {
       "anyOf": [
@@ -36,7 +33,10 @@
           }
         }
       ],
-      "description": "Creator(s) of this collection."
+      "description": "Creator(s) of this collection.",
+      "x_meta": {
+        "UnitySchemaConverter": "StringArrayOrNullToStringArrayConverter"
+      }
     },
     "subject": {
       "anyOf": [
@@ -50,33 +50,50 @@
           }
         }
       ],
-      "description": "Subject tags for this collection."
+      "description": "Subject tags for this collection.",
+      "x_meta": {
+        "UnitySchemaConverter": "StringArrayOrNullToStringArrayConverter"
+      }
     },
     "mediatype": {
       "type": "string",
       "default": "collection",
-      "description": "Type of media (always \"collection\" for collections)."
+      "description": "Type of media (always \"collection\" for collections).",
+      "x_meta": {
+        "UnitySchemaConverter": "StringOrNullToStringConverter"
+      }
     },
     "coverImage": {
       "type": "string",
-      "description": "URL or path to the cover image."
+      "description": "URL or path to the cover image.",
+      "x_meta": {
+        "UnitySchemaConverter": "StringOrNullToStringConverter"
+      }
     },
-    "extraFields": {
-      "type": "object",
-      "additionalProperties": true,
-      "description": "Additional Internet Archive metadata fields."
+    "query": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ],
+      "description": "The query used to populate this collection (e.g., from an external API)",
+      "x_meta": {
+        "UnitySchemaConverter": "StringOrArrayOrNullToStringConverter"
+      }
     }
   },
   "required": [
     "id",
-    "title",
-    "description",
-    "creator",
-    "subject",
-    "mediatype",
-    "coverImage"
+    "title"
   ],
   "additionalProperties": false,
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Collection",
   "description": "Schema for Collection"
 }

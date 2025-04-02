@@ -1,10 +1,11 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
-/// Arranges collection items in a grid layout with configurable dimensions and spacing.
-/// Handles both automatic layout based on CollectionView and manual item management.
+/// Arranges collection items in a 3D grid layout with configurable dimensions and spacing.
+/// Works directly with standard 3D transforms - no UI/RectTransform dependency.
 /// </summary>
 [RequireComponent(typeof(CollectionView))]
 public class CollectionGridLayout : MonoBehaviour
@@ -15,8 +16,11 @@ public class CollectionGridLayout : MonoBehaviour
     [Tooltip("Size of each cell in the grid")]
     [SerializeField] private float _cellSize = 1f;
     
-    [Tooltip("Spacing between cells")]
-    [SerializeField] private float _spacing = 0.1f;
+    [Tooltip("Horizontal spacing between cells")]
+    [SerializeField] private float _spacingHorizontal = 0.1f;
+    
+    [Tooltip("Vertical spacing between cells")]
+    [SerializeField] private float _spacingVertical = 0.1f;
     
     [Tooltip("Number of columns in the grid")]
     [SerializeField] private int _columns = 4;
@@ -32,7 +36,7 @@ public class CollectionGridLayout : MonoBehaviour
 
     #region Private Fields
 
-    private List<RectTransform> _items = new List<RectTransform>();
+    private List<Transform> _itemTransforms = new List<Transform>();
     private Collection _collection;
     private CollectionView _collectionView;
     private bool _initialized = false;
@@ -104,54 +108,49 @@ public class CollectionGridLayout : MonoBehaviour
     /// </summary>
     public void ApplyLayout()
     {
-        // Get all item containers from the CollectionView
-        if (_collectionView == null)
+        try 
         {
-            _collectionView = GetComponent<CollectionView>();
+            // Get all item containers from the CollectionView
             if (_collectionView == null)
             {
-                Debug.LogError($"[CollectionGridLayout] Cannot apply layout - missing CollectionView component on {gameObject.name}");
+                _collectionView = GetComponent<CollectionView>();
+                if (_collectionView == null)
+                {
+                    Debug.LogError($"[CollectionGridLayout] Cannot apply layout - missing CollectionView component on {gameObject.name}");
+                    return;
+                }
+            }
+            
+            // Clear existing items
+            _itemTransforms.Clear();
+            
+            // Get all containers
+            var containers = _collectionView.GetItemContainers();
+            if (containers == null || containers.Count == 0)
+            {
+                Debug.Log($"[CollectionGridLayout] No item containers found in CollectionView on {gameObject.name}");
                 return;
             }
-        }
-        
-        // Clear existing items
-        _items.Clear();
-        
-        // Get all containers
-        var containers = _collectionView.GetItemContainers();
-        if (containers == null || containers.Count == 0)
-        {
-            Debug.Log($"[CollectionGridLayout] No item containers found in CollectionView on {gameObject.name}");
-            return;
-        }
-        
-        // Add their transforms to our layout items
-        foreach (var container in containers)
-        {
-            if (container != null && container.transform as RectTransform != null)
+            
+            // Add their transforms to our layout items
+            foreach (var container in containers)
             {
-                _items.Add(container.transform as RectTransform);
+                if (container != null)
+                {
+                    _itemTransforms.Add(container.transform);
+                }
             }
-            else if (container != null)
-            {
-                // If it's not a RectTransform, we'll use its regular transform
-                // This makes the class more flexible to work with both UI and world-space layouts
-                var regularTransform = container.transform;
-                var rectTransform = new GameObject($"{container.name}_LayoutProxy").AddComponent<RectTransform>();
-                rectTransform.SetParent(transform, false);
-                rectTransform.position = regularTransform.position;
-                
-                // Link the proxy to the original transform
-                var proxy = rectTransform.gameObject.AddComponent<LayoutProxy>();
-                proxy.SetTarget(regularTransform);
-                
-                _items.Add(rectTransform);
-            }
+            
+            // Calculate optimal columns based on item count
+            CalculateOptimalColumns();
+            
+            // Update the layout
+            UpdateLayout();
         }
-        
-        // Update the layout
-        UpdateLayout();
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CollectionGridLayout] Error in ApplyLayout: {ex.Message}\n{ex.StackTrace}");
+        }
     }
     
     /// <summary>
@@ -168,21 +167,21 @@ public class CollectionGridLayout : MonoBehaviour
             
         int rows = Mathf.CeilToInt((float)itemCount / _columns);
         
-        float width = _columns * _cellSize + (_columns - 1) * _spacing;
-        float height = rows * _cellSize + (rows - 1) * _spacing;
+        float width = _columns * _cellSize + (_columns - 1) * _spacingHorizontal;
+        float height = rows * _cellSize + (rows - 1) * _spacingVertical;
         
         return new Vector2(width, height);
     }
     
     /// <summary>
-    /// Adds a single item to the grid and updates layout if autoUpdateLayout is true
+    /// Adds a single transform to the grid and updates layout if autoUpdateLayout is true
     /// </summary>
-    /// <param name="item">The RectTransform to add</param>
-    public void AddItem(RectTransform item)
+    /// <param name="transform">The Transform to add</param>
+    public void AddItem(Transform transform)
     {
-        if (item == null) return;
+        if (transform == null) return;
         
-        _items.Add(item);
+        _itemTransforms.Add(transform);
         
         if (_autoUpdateLayout)
         {
@@ -191,14 +190,14 @@ public class CollectionGridLayout : MonoBehaviour
     }
     
     /// <summary>
-    /// Removes a single item from the grid and updates layout if autoUpdateLayout is true
+    /// Removes a single transform from the grid and updates layout if autoUpdateLayout is true
     /// </summary>
-    /// <param name="item">The RectTransform to remove</param>
-    public void RemoveItem(RectTransform item)
+    /// <param name="transform">The Transform to remove</param>
+    public void RemoveItem(Transform transform)
     {
-        if (item == null) return;
+        if (transform == null) return;
         
-        _items.Remove(item);
+        _itemTransforms.Remove(transform);
         
         if (_autoUpdateLayout)
         {
@@ -211,7 +210,7 @@ public class CollectionGridLayout : MonoBehaviour
     /// </summary>
     public void Clear()
     {
-        _items.Clear();
+        _itemTransforms.Clear();
         
         if (_autoUpdateLayout)
         {
@@ -241,16 +240,14 @@ public class CollectionGridLayout : MonoBehaviour
     /// <returns>Vector3 position in world space</returns>
     public Vector3 GetPositionForGridPosition(Vector2Int gridPosition)
     {
-        float cellAndSpacing = _cellSize + _spacing;
-        
-        // Calculate base position
-        float xPos = gridPosition.x * cellAndSpacing;
-        float zPos = -gridPosition.y * cellAndSpacing; // Negative to grow downward in z
+        // Calculate base position - use different spacing for horizontal and vertical
+        float xPos = gridPosition.x * (_cellSize + _spacingHorizontal);
+        float zPos = -gridPosition.y * (_cellSize + _spacingVertical); // Negative to grow downward in z
         
         // Apply horizontal centering if enabled
         if (_centerHorizontally)
         {
-            float gridWidth = _columns * cellAndSpacing - _spacing; // Subtract trailing spacing
+            float gridWidth = _columns * (_cellSize + _spacingHorizontal) - _spacingHorizontal; // Subtract trailing spacing
             float offset = gridWidth * 0.5f - _cellSize * 0.5f;
             xPos -= offset;
         }
@@ -267,25 +264,29 @@ public class CollectionGridLayout : MonoBehaviour
     /// </summary>
     private void UpdateLayout()
     {
-        if (_items == null || _items.Count == 0) return;
-        
-        for (int i = 0; i < _items.Count; i++)
+        try
         {
-            var item = _items[i];
-            if (item == null) continue;
+            if (_itemTransforms == null || _itemTransforms.Count == 0) return;
             
-            Vector2Int gridPos = GetGridPosition(i);
-            Vector3 position = GetPositionForGridPosition(gridPos);
+            // Recalculate optimal columns before layout
+            CalculateOptimalColumns();
             
-            item.anchoredPosition = new Vector2(position.x, position.z);
-            item.sizeDelta = new Vector2(_cellSize, _cellSize);
-            
-            // Look for a LayoutProxy component to update the target transform
-            var proxy = item.GetComponent<LayoutProxy>();
-            if (proxy != null)
+            for (int i = 0; i < _itemTransforms.Count; i++)
             {
-                proxy.UpdateTargetPosition(position);
+                var item = _itemTransforms[i];
+                if (item == null) continue;
+                
+                Vector2Int gridPos = GetGridPosition(i);
+                Vector3 position = GetPositionForGridPosition(gridPos);
+                
+                // Apply position directly to the transform
+                // Use localPosition to position relative to the grid's parent
+                item.localPosition = position;
             }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CollectionGridLayout] Error in UpdateLayout: {ex.Message}");
         }
     }
     
@@ -295,20 +296,13 @@ public class CollectionGridLayout : MonoBehaviour
     private int GetItemCount()
     {
         // First check our direct items list
-        if (_items != null && _items.Count > 0)
-            return _items.Count;
+        if (_itemTransforms != null && _itemTransforms.Count > 0)
+            return _itemTransforms.Count;
             
         // Otherwise check the collection
         if (_collection != null) 
         {
-            if (_collection.items != null && _collection.items.Count > 0)
-            {
-                return _collection.items.Count;
-            }
-            else if (_collection.ItemIds != null && _collection.ItemIds.Count > 0)
-            {
-                return _collection.ItemIds.Count;
-            }
+            return _collection.Items.Count();
         }
         
         return 0;
@@ -325,27 +319,30 @@ public class CollectionGridLayout : MonoBehaviour
         }
     }
 
-    #endregion
-}
-
-/// <summary>
-/// Helper component to link a RectTransform used for layout to a regular Transform 
-/// for positioning non-UI objects in a grid layout
-/// </summary>
-public class LayoutProxy : MonoBehaviour
-{
-    private Transform _target;
-    
-    public void SetTarget(Transform target)
+    /// <summary>
+    /// Calculates the optimal number of columns based on item count
+    /// </summary>
+    private void CalculateOptimalColumns()
     {
-        _target = target;
-    }
-    
-    public void UpdateTargetPosition(Vector3 position)
-    {
-        if (_target != null)
+        int itemCount = GetItemCount();
+        
+        // Handle special cases to avoid crashes
+        if (itemCount <= 0)
         {
-            _target.position = position;
+            _columns = 1; // Default to 1 column for empty collections
+            return;
         }
+        
+        if (itemCount == 1)
+        {
+            _columns = 1; // Single item needs just 1 column
+            return;
+        }
+        
+        // Calculate columns as ceiling of square root of item count
+        // This creates a grid that's roughly square
+        _columns = Mathf.CeilToInt(Mathf.Sqrt(itemCount));
     }
+
+    #endregion
 } 

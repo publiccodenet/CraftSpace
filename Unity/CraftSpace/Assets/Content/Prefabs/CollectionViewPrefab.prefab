@@ -48,7 +48,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _model: {fileID: 0}
   _itemContainer: {fileID: 464012571170886491}
-  _itemViewPrefab: {fileID: 4331697567644932370, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+  _itemViewsContainerPrefab: {fileID: 8545906332215059116, guid: 354510ea2cae34424a027bcd990180fc, type: 3}
+  _itemViewPrefabs: []
   _createItemViewsAutomatically: 1
 --- !u!114 &4539241664711781046
 MonoBehaviour:
@@ -62,18 +63,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6fc65b3323014e13b0e9c6be3b88bc9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _itemWidth: 1.5
-  _itemHeight: 1.5
-  _itemMarginTop: 0.3
-  _itemMarginBottom: 0.01
-  _itemMarginLeft: 0.01
-  _itemMarginRight: 0.01
-  _itemGapVertical: 0.6
-  _itemGapHorizontal: 0.2
-  _centerGrid: 1
-  _container: {fileID: 464012571170886491}
-  _itemViewPrefab: {fileID: 4331697567644932370, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
-  _collection: {fileID: 0}
+  itemViewContainerPrefab: {fileID: 8545906332215059116, guid: 354510ea2cae34424a027bcd990180fc, type: 3}
+  itemViewPrefab: {fileID: 4331697567644932370, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
+  _cellSize: 1
+  _spacing: 0.1
+  _columns: 4
+  _autoUpdateLayout: 1
+  _centerHorizontally: 1
 --- !u!1 &8955703354072507967
 GameObject:
   m_ObjectHideFlags: 0

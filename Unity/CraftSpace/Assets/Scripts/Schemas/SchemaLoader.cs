@@ -1,3 +1,15 @@
+//------------------------------------------------------------------------------
+// <file_path>Unity/CraftSpace/Assets/Scripts/Schemas/SchemaLoader.cs</file_path>
+// <namespace>CraftSpace</namespace>
+// <assembly>Assembly-CSharp</assembly>
+//
+// IMPORTANT: This is a MANUAL helper class for loading schema objects.
+// It is NOT generated and should be maintained manually.
+// Used as a base class for specialized loaders.
+//
+// Full absolute path: /Users/a2deh/GroundUp/SpaceCraft/CraftSpace/Unity/CraftSpace/Assets/Scripts/Schemas/SchemaLoader.cs
+//------------------------------------------------------------------------------
+
 using UnityEngine;
 using System;
 using System.Collections.Generic;
@@ -22,35 +34,36 @@ public class SchemaLoader : MonoBehaviour
             
         try
         {
-            // Use the appropriate cache and FromJsonString method based on type
+            // Use the appropriate cache and FromJson method based on type
             if (typeof(T) == typeof(Collection))
             {
                 if (!string.IsNullOrEmpty(id) && CollectionCache.TryGetValue(id, out Collection cached))
                     return cached as T;
                     
-                Collection collection = Collection.FromJsonString(json);
-                if (!string.IsNullOrEmpty(id) && collection != null)
+                Collection result = Collection.FromJson(json);
+                if (!string.IsNullOrEmpty(id) && result != null)
                 {
-                    CollectionCache[id] = collection;
-                    collection.name = $"Collection_{id}";
+                    CollectionCache[id] = result;
+                    result.name = $"Collection_{id}";
                 }
-                return collection as T;
+                return result as T;
             }
             else if (typeof(T) == typeof(Item))
             {
                 if (!string.IsNullOrEmpty(id) && ItemCache.TryGetValue(id, out Item cached))
                     return cached as T;
                     
-                Item item = Item.FromJsonString(json);
-                if (!string.IsNullOrEmpty(id) && item != null)
+                Item result = Item.FromJson(json);
+                if (!string.IsNullOrEmpty(id) && result != null)
                 {
-                    ItemCache[id] = item;
-                    item.name = $"Item_{id}";
+                    ItemCache[id] = result;
+                    result.name = $"Item_{id}";
                 }
-                return item as T;
+                return result as T;
             }
             
-            throw new ArgumentException($"Unsupported type: {typeof(T)}");
+            Debug.LogError($"SchemaLoader does not support type: {typeof(T).Name}");
+            return null;
         }
         catch (Exception ex)
         {

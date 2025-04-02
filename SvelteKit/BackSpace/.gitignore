@@ -101,3 +101,8 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Unity environment files
+.unity-env
+.unity-env.*
+unity-env.log

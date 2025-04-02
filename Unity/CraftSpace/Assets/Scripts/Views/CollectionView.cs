@@ -1,8 +1,9 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
-public class CollectionView : MonoBehaviour, IModelView<Collection>
+public class CollectionView : MonoBehaviour, IModelView<Collection>, ICollectionView
 {
     [Header("Model Reference")]
     [SerializeField] private Collection _model;
@@ -10,7 +11,6 @@ public class CollectionView : MonoBehaviour, IModelView<Collection>
     [Header("Child Item Views")]
     [SerializeField] private Transform _itemContainer;
     [SerializeField] private GameObject _itemViewsContainerPrefab;
-    [SerializeField] private List<GameObject> _itemViewPrefabs = new List<GameObject>();
     [SerializeField] private bool _createItemViewsAutomatically = false;
     
     // List of item view containers this collection view is managing
@@ -82,122 +82,152 @@ public class CollectionView : MonoBehaviour, IModelView<Collection>
     // Override in subclasses to provide specific visualization
     protected virtual void UpdateView()
     {
-        // Base class just updates name for debugging
-        if (_model != null)
+        try
         {
-            gameObject.name = $"Collection: {_model.Name}";
+            // Base class just updates name for debugging
+            if (_model != null)
+            {
+                gameObject.name = $"Collection: {_model.Title}";
+            }
+            else
+            {
+                gameObject.name = "Collection: [No Model]";
+            }
+            
+            ModelUpdated?.Invoke();
+            
+            Debug.Log($"[CollectionView] View updated. Collection ID: {_model?.Id ?? "null"}, Collection title: {_model?.Title ?? "null"}");
         }
-        else
+        catch (Exception ex)
         {
-            gameObject.name = "Collection: [No Model]";
+            Debug.LogError($"[CollectionView] Error in UpdateView: {ex.Message}");
         }
-        
-        ModelUpdated?.Invoke();
-        
-        Debug.Log($"[CollectionView] View updated. Collection ID: {_model?.Id ?? "null"}, Collection name: {_model?.Name ?? "null"}, Item count: {_model?.items?.Count ?? 0}");
     }
     
-    // Implement IModelView interface
+    // Implement IModelView interface for backward compatibility
     public void HandleModelUpdated()
     {
-        // Create item views if needed
-        if (_createItemViewsAutomatically && _model != null && _model.items.Count > 0)
+        try
         {
-            CreateItemViews();
+            // Create item views if needed, using Any() for efficiency
+            if (_createItemViewsAutomatically && _model != null && _model.Items.Any())
+            {
+                CreateItemViews();
+            }
+            
+            // Update view UI elements
+            UpdateViewElements();
         }
-        
-        // Update view UI elements
-        UpdateViewElements();
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CollectionView] Error in HandleModelUpdated: {ex.Message}");
+        }
+    }
+    
+    // Implement ICollectionView interface
+    public void OnCollectionUpdated(Collection collection)
+    {
+        try
+        {
+            // Verify this is our model
+            if (_model != collection)
+            {
+                Debug.LogWarning($"[CollectionView] Received update for different collection: {collection?.Title ?? "null"}");
+                return;
+            }
+            
+            // Use existing handler for backward compatibility
+            HandleModelUpdated();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CollectionView] Error in OnCollectionUpdated: {ex.Message}");
+        }
     }
     
     // Create item views for all items in the collection
     public void CreateItemViews()
     {
-        // Clear any existing item views
-        ClearItemViews();
-        
-        if (_model == null || _itemViewsContainerPrefab == null || _itemContainer == null)
-            return;
+        try
+        {
+            // Clear any existing item views
+            ClearItemViews();
             
-        foreach (var item in _model.items)
-        {
-            CreateItemViewContainer(item, Vector3.zero);
+            if (_model == null || _itemViewsContainerPrefab == null || _itemContainer == null)
+                return;
+                
+            foreach (var item in _model.Items)
+            {
+                CreateItemViewContainer(item, Vector3.zero);
+            }
+            
+            // Apply layout if there's a layout component
+            var layoutComponent = GetComponent<CollectionGridLayout>();
+            if (layoutComponent != null)
+            {
+                layoutComponent.ApplyLayout();
+            }
         }
-        
-        // Apply layout if there's a layout component
-        var layoutComponent = GetComponent<CollectionGridLayout>();
-        if (layoutComponent != null)
+        catch (Exception ex)
         {
-            layoutComponent.ApplyLayout();
+            Debug.LogError($"[CollectionView] Error in CreateItemViews: {ex.Message}");
         }
     }
     
     // Create a container with views for a specific item
     public ItemViewsContainer CreateItemViewContainer(Item itemModel, Vector3 position)
     {
-        if (itemModel == null || _itemViewsContainerPrefab == null)
-            return null;
+        try
+        {
+            if (itemModel == null || _itemViewsContainerPrefab == null)
+                return null;
+                
+            // Create container
+            GameObject containerObj = Instantiate(_itemViewsContainerPrefab, _itemContainer);
+            containerObj.name = $"ItemViews_{itemModel.Id}";
+            containerObj.transform.localPosition = position;
             
-        // Create container
-        GameObject containerObj = Instantiate(_itemViewsContainerPrefab, _itemContainer);
-        containerObj.name = $"ItemViews_{itemModel.Id}";
-        containerObj.transform.localPosition = position;
-        
-        // Get or add container component
-        ItemViewsContainer container = containerObj.GetComponent<ItemViewsContainer>();
-        if (container == null)
-        {
-            container = containerObj.AddComponent<ItemViewsContainer>();
-        }
-        
-        // Set the item model
-        container.Item = itemModel;
-        
-        // Create child views inside the container
-        foreach (var prefab in _itemViewPrefabs)
-        {
-            if (prefab != null)
+            // Get or add container component
+            ItemViewsContainer container = containerObj.GetComponent<ItemViewsContainer>();
+            if (container == null)
             {
-                AddItemViewToPrefab(container, prefab);
+                container = containerObj.AddComponent<ItemViewsContainer>();
             }
+            
+            // Set the item model - the container will create its own item view
+            container.Item = itemModel;
+            
+            // Keep track of the container
+            _itemContainers.Add(container);
+            
+            return container;
         }
-        
-        // Keep track of the container
-        _itemContainers.Add(container);
-        
-        return container;
-    }
-    
-    // Add a view to an existing container
-    private ItemView AddItemViewToPrefab(ItemViewsContainer container, GameObject prefab)
-    {
-        // Create the view inside the container
-        GameObject viewObj = Instantiate(prefab, container.transform);
-        
-        // Get or add ItemView component
-        ItemView view = viewObj.GetComponent<ItemView>();
-        if (view == null)
+        catch (Exception ex)
         {
-            view = viewObj.AddComponent<ItemView>();
+            Debug.LogError($"[CollectionView] Error in CreateItemViewContainer: {ex.Message}");
+            return null;
         }
-        
-        // The container will handle setting the item model
-        
-        return view;
     }
     
     // Clear all item containers
     public void ClearItemViews()
     {
-        foreach (var container in _itemContainers)
+        try
         {
-            if (container != null)
+            foreach (var container in _itemContainers)
             {
-                Destroy(container.gameObject);
+                if (container != null)
+                {
+                    Destroy(container.gameObject);
+                }
             }
+            
+            _itemContainers.Clear();
         }
-        
-        _itemContainers.Clear();
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CollectionView] Error in ClearItemViews: {ex.Message}");
+        }
     }
     
     // Get all item containers
@@ -209,16 +239,6 @@ public class CollectionView : MonoBehaviour, IModelView<Collection>
     // Protected method for UI updates to be overridden by subclasses
     protected virtual void UpdateViewElements()
     {
-        // For subclasses to implement UI updates
-        if (_model != null)
-        {
-            gameObject.name = $"Collection: {_model.Name}";
-            
-            Debug.Log($"[CollectionView] View updated. Collection ID: {_model.Id}, Collection name: {_model.Name}, Item count: {_model.items.Count}, Container count: {_itemContainers.Count}");
-        }
-        else
-        {
-            gameObject.name = "Collection: [No Model]";
-        }
+        // Override in subclasses to update UI elements
     }
 } 

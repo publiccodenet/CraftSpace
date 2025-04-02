@@ -1,3 +1,14 @@
+//------------------------------------------------------------------------------
+// <file_path>Unity/CraftSpace/Assets/Scripts/Schemas/ItemLoader.cs</file_path>
+// <namespace>CraftSpace</namespace>
+// <assembly>Assembly-CSharp</assembly>
+//
+// IMPORTANT: This is a MANUAL helper class for loading Item instances.
+// It is NOT generated and should be maintained manually.
+//
+// Full absolute path: /Users/a2deh/GroundUp/SpaceCraft/CraftSpace/Unity/CraftSpace/Assets/Scripts/Schemas/ItemLoader.cs
+//------------------------------------------------------------------------------
+
 using UnityEngine;
 using System;
 using System.IO;

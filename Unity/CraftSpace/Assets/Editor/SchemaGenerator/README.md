@@ -1,298 +1,282 @@
-# CraftSpace Schema Generator
+# Schema Generator
 
-A lightweight, Unity-focused JSON schema to C# generator that creates ScriptableObject classes with full Unity Editor integration and robust support for both JavaScript bridge communication and Internet Archive metadata.
+FILE PATH: Unity/CraftSpace/Assets/Editor/SchemaGenerator/README.md
 
-## Background
+## CRITICAL WARNINGS - PLEASE READ
 
-This tool was inspired by [NJsonSchema](https://github.com/RicoSuter/NJsonSchema), but was created as a simpler, Unity-specific alternative that excels at two critical use cases:
+**THIS FILE DOCUMENTS THE SCHEMA GENERATOR**
+* DO NOT EDIT GENERATED SCHEMA FILES!
+* ONLY EDIT THE GENERATOR AND THIS DOCUMENTATION
+* GENERATED FILES PATH: Unity/CraftSpace/Assets/Scripts/Schemas/Generated/
 
-1. **JavaScript Bridge Integration**:
-   - Real-time communication between Unity and JavaScript
-   - Dynamic field updates through the bridge
-   - Transparent access to all fields
-   - Consistent serialization behavior
+## ABSOLUTELY FORBIDDEN TECHNIQUES
 
-2. **Internet Archive Metadata Support**:
-   - Handling of evolving metadata schemas
-   - Support for inconsistent field types
-   - Preservation of unknown fields
-   - Backward compatibility
+1. **NEVER USE REFLECTION-BASED JSON.NET METHODS OR ATTRIBUTES**:
+   - ⛔ `JToken.ToObject<T>()` - **CRASHES** IN WEBGL/IL2CPP
+   - ⛔ `JToken.FromObject(obj)` - **CRASHES** IN WEBGL/IL2CPP
+   - ⛔ `JsonConvert.DeserializeObject<T>(json)` when T is a user-defined class/struct (risk of reflection/stripping) - **CRASH RISK**
+   - ⛔ `JsonConvert.SerializeObject(obj)` when obj is a user-defined class/struct - **CRASH RISK**
+   - ⛔ `[JsonProperty]` attribute - **FORBIDDEN** (reflection-based)
+   - ⛔ `[JsonConverter]` attribute - **FORBIDDEN** (reflection-based activation)
+   - ⛔ Any method or attribute that uses .NET reflection on types during runtime serialization/deserialization.
+   
+2. **ALWAYS USE DIRECT ACCESS METHODS INSTEAD**:
+   - ✅ Direct property assignment: `obj.Property = token.Value<Type>()` or explicit casts like `(int)token`.
+   - ✅ Manual iteration for lists/arrays.
+   - ✅ Direct type checking: `token.Type == JTokenType.X`.
+   - ✅ Direct manual construction of `JObject`/`JArray` for export.
+   
+3. **FOR CONVERTERS**:
+   - ✅ Define specific, IL2CPP-safe `JsonConverter` classes (like `StringOrNullToStringConverter`) that **DO NOT USE REFLECTION INTERNALLY**.
+   - ✅ Call these converters **DIRECTLY** in the generated code using specific methods (e.g., `new ConverterName().ReadJson(token)`), **NOT** via `[JsonConverter]` attribute or general `JsonConvert` methods.
+   - ⛔ Never use generic reflection-based converters.
+
+## IMPORTANT WORKFLOW FOR ALL SCHEMA-RELATED ISSUES:
+
+1. NEVER modify generated schema files directly (*.Schema.cs)
+2. ALWAYS fix the SchemaGenerator.cs first
+3. ONLY THEN regenerate all schemas using CraftSpace > Import All Schemas
+4. Use proper extension classes (Item.cs, Collection.cs) for custom code
+5. Keep extension classes THIN and use the base class for shared functionality
+
+## PROPER CODE ORGANIZATION:
+
+- Schema Generator (this directory) - EDIT THIS
+- SchemaGeneratedObject.cs - Base class for all schemas
+- Generated/*Schema.cs - AUTO-GENERATED, DO NOT EDIT!!!
+- Item.cs, Collection.cs - Thin extensions for custom code
 
 ## Features
 
-- Generates ScriptableObject classes from JSON schemas
-- Full Unity Inspector integration with:
-  - Headers
-  - Tooltips
-  - Range validation
-  - Spacing controls
-  - Multi-line text areas
-- Comprehensive dynamic field support:
-  - JavaScript-like field access
-  - Field change notifications
-  - Validation callbacks
-  - Bulk import/export
-  - Type-safe access methods
-- Robust metadata handling:
-  - Schema-defined fields with Unity integration
-  - Dynamic fields for unknown metadata
-  - Mixed type support
-  - Case-insensitive field access
-  - Field name normalization
-- Bridge-friendly features:
-  - Transparent field access
-  - Automatic serialization
-  - Change notifications
-  - Query support
-- Editor-only code generation (not included in builds)
+- Schema metadata driven type converters
+- Generates explicit C# properties (no reflection)
+- Direct JObject storage for extra fields
+- No dynamic access or type conversion
+- No namespaces or extra assemblies
+- Simple and maintainable code
+- IL2CPP-safe string normalization via custom converters
+
+## Annotation Workflow (The Description Hack)
+
+**IMPORTANT:** Due to limitations with `zod-to-json-schema` correctly preserving Zod's `.meta()` data, we employ a workaround using specially formatted descriptions in the Zod schemas.
+
+1.  **Define Metadata in Zod Description:** In your Zod schema definitions (`collection.ts`, `item.ts`), append metadata as a **JSON string on a new line** within the `.describe()` call for the relevant property.
+
+    ```typescript
+    // Example from item.ts
+    id: z.string()
+      .min(1)
+      .describe(`Unique identifier for the item
+{"UnitySchemaConverter":"StringOrNullToStringConverter"}`), // <-- Namespaced key used
+    
+    creator: z.union([z.string(), z.array(z.string())])
+      .describe(`Creator/author of the item (can be a string or array of strings)
+{"UnitySchemaConverter":"StringOrArrayOrNullToStringConverter"}`), // <-- Namespaced key used
+    ```
+    **Note for Zod Schema Consumers:** Tools consuming the raw Zod types directly (e.g., within the SvelteKit app) should be aware that only the *first line* of the description is the intended human-readable description. The subsequent line containing JSON is metadata for the export pipeline.
+
+2.  **Export Schemas:** Run `npm run schema:export` in the `SvelteKit/BackSpace` directory.
+
+3.  **Parse Description and Inject Metadata:** The `schema-export.js` script:
+    *   Uses `zod-to-json-schema` to get the initial JSON schema (including the multi-line descriptions).
+    *   Iterates through each property in the generated schema.
+    *   Looks for a newline (`\n`) in the `description` string.
+    *   If found, it attempts to `JSON.parse()` the text *after* the last newline.
+    *   If parsing succeeds, it injects the entire parsed JSON object into a new `x_meta` field in the property's schema and cleans the `description` field.
+    *   Outputs the processed JSON schema files (`Collection.json`, `Item.json`) **directly** to the SSOT location: `StreamingAssets/Content/schemas`.
+
+    ```json
+    // Example snippet from processed Item.json in StreamingAssets/Content/schemas
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for the item", 
+      "x_meta": {                           
+        "UnitySchemaConverter": "StringOrNullToStringConverter" // <-- Namespaced key present
+      }
+    }
+    ```
+
+4.  **Generate C# Code:** In Unity, use the `CraftSpace > Schema Generator` window or run `npm run unity:regenerate-schemas` from BackSpace. The `SchemaGenerator.cs` script reads the processed `*.json` schema files **directly** from `StreamingAssets/Content/schemas`.
+
+## String Handling Converters
+
+The generator recognizes the following converter names (defined in `SchemaConverters.cs` and referenced via the `UnitySchemaConverter` key in `x_meta`):
+
+1.  **Required String** (default):
+    - No `x_meta.UnitySchemaConverter` needed.
+
+2.  **`StringOrNullToStringConverter`**:
+    ```json
+    // Schema excerpt
+    "title": {
+      "type": "string",
+      "description": "...",
+      "x_meta": { "UnitySchemaConverter": "StringOrNullToStringConverter" }
+    }
+    ```
+    - C# Type: `string`
+    - Generates code calling `StringOrNullToStringConverter.ReadJson/WriteJson`.
+
+3.  **`StringOrArrayOrNullToStringConverter`**:
+    ```json
+    // Schema excerpt
+    "description": {
+      "type": "string", 
+      "description": "...",
+      "x_meta": { "UnitySchemaConverter": "StringOrArrayOrNullToStringConverter" }
+    }
+    ```
+    - C# Type: `string`
+    - Generates code calling `StringOrArrayOrNullToStringConverter.ReadJson/WriteJson`.
+
+4.  **`ArrayOrNullToStringArrayConverter`**:
+    ```json
+    // Schema excerpt
+    "tags": {
+      "type": "array", 
+      "items": { "type": "string" },
+      "description": "...",
+      "x_meta": { "UnitySchemaConverter": "ArrayOrNullToStringArrayConverter" }
+    }
+    ```
+    - C# Type: `string[]`
+    - Generates code calling `ArrayOrNullToStringArrayConverter.ReadJson/WriteJson`.
+
+## IL2CPP & WebGL Constraints
+
+The generator is designed around IL2CPP and WebGL constraints:
+
+1. **NEVER USE REFLECTION**: IL2CPP strips unused methods in WebGL builds, causing ALL reflection-based code to CRASH AT RUNTIME. Instead:
+   - ❌ NEVER use `ToObject<T>()` - The app WILL crash in WebGL (not just in the editor)
+   - ❌ NEVER use `FromObject(obj)` - The app WILL crash in WebGL
+   - ✅ Use explicit properties with direct assignment
+   - ✅ Use explicit conversion with type checking
+   - ✅ Use switch statements for property checking
+
+2. **No Dynamic**: `DynamicObject` and `ExpandoObject` don't work reliably in IL2CPP. We use:
+   - `JObject` for dynamic storage
+   - Explicit property access for known fields
+   - Direct `JObject` manipulation for extra fields
+
+3. **No Type Generation**: Runtime type generation doesn't work in IL2CPP. We:
+   - Generate all code at edit time
+   - Use explicit types only
+   - No runtime code compilation
+
+## JSON.NET Usage
+
+We use a minimal subset of JSON.NET features that work well in WebGL. The `SchemaGeneratedObject` base class and the explicit code generated by this tool work together to **replace** JSON.NET's reflection-based serialization/deserialization for user-defined types, ensuring IL2CPP/WebGL compatibility.
+
+1. **ALLOWED - JObject/JToken for access & parsing**:
+   - ✅ `JObject` for structured data (used by the base class).
+   - ✅ `JObject.Parse(json)` - Used by the base class to get the initial object.
+   - ✅ `JToken.ToString()` for string conversion.
+   - ✅ Direct type checking: `token.Type == JTokenType.X`.
+   - ✅ Direct casting: `(int)token`, `(float)token`.
+   - ✅ Direct accessors: `json["propertyName"]`.
+   - ✅ `JToken.Value<T>()` ONLY for primitive types (string, int, float, bool).
+
+2. **FORBIDDEN - Reflection Methods and Attributes at Runtime**:
+   - ❌ `JToken.ToObject<T>()` - **WILL CRASH IN WEBGL**
+   - ❌ `JToken.FromObject(obj)` - **WILL CRASH IN WEBGL** (except for primitives/basic types).
+   - ❌ `JsonConvert.DeserializeObject<T>(json)` - **AVOID** for user-defined types.
+   - ❌ `JsonConvert.SerializeObject(obj)` - **AVOID** for user-defined types.
+   - ❌ `[JsonProperty]` attribute - **FORBIDDEN**.
+   - ❌ `[JsonConverter]` attribute - **FORBIDDEN**.
+   - ❌ Any other attribute-based serialization/deserialization.
+
+3. **Custom Converters Only (Called Directly by Generated Code)**:
+   - ✅ Define specific, IL2CPP-safe `JsonConverter` classes.
+   - ✅ Implement static `ReadJson(JToken)` and `WriteJson(Value)` helper methods within converters.
+   - ✅ Generator outputs **direct calls** to these static methods based on `x_meta.UnitySchemaConverter`.
+   - ❌ Do not rely on attributes or `JsonConvert` methods to invoke converters at runtime.
 
 ## Usage
 
-### Basic Setup
-1. In Unity, go to `CraftSpace > Schema Generator`
-2. Enter or paste your JSON schema
-3. Set the target namespace (default: `CraftSpace.Generated`)
-4. Choose output location (default: `Assets/Scripts/Generated`)
-5. Click Generate
+1.  Define/update Zod schemas in `SvelteKit/BackSpace/src/lib/schemas` using `.meta()` for annotations.
+2.  Run `npm run schema:export` in `SvelteKit/BackSpace` directory.
+3.  Ensure exported `*.json` files are present in `Unity/CraftSpace/Assets/StreamingAssets/Content/schemas`.
+4.  Open the Unity generator window: `CraftSpace > Schema Generator`.
+5.  Click "Import All Schemas".
+6.  Generated classes appear in `Assets/Scripts/Schemas/Generated`.
 
-### JavaScript Bridge Integration
+## CI/CD Integration
 
-```javascript
-// JavaScript side
-// Access any field (schema-defined or dynamic)
-const title = queryObject.get("title");
-const metadata = queryObject.get("some-metadata-field");
+The schema generator can be run from the command line using Unity's batch mode:
 
-// Add new fields dynamically
-queryObject.set("new-field", "value");
+```bash
+# Windows
+Unity.exe -batchmode -quit -executeMethod SchemaGenerator.ImportAllSchemas -projectPath "path/to/project"
 
-// Update existing fields
-queryObject.set("title", "New Title");
+# macOS
+/Applications/Unity/Unity.app/Contents/MacOS/Unity -batchmode -quit -executeMethod SchemaGenerator.ImportAllSchemas -projectPath "path/to/project"
 
-// Handle field updates
-bridge.on("fieldChanged", (fieldName, newValue) => {
-    console.log(`Field ${fieldName} changed to:`, newValue);
-});
+# Linux
+unity -batchmode -quit -executeMethod SchemaGenerator.ImportAllSchemas -projectPath "path/to/project"
 ```
 
-```csharp
-// Unity side
-// Dynamic access to all fields
-dynamic item = archiveItem.AsDynamic();
-string title = item.title;
-JToken metadata = item.someMetadataField;
+Add to your CI/CD pipeline:
+1. Place schema files in `StreamingAssets/Content/schemas`
+2. Run Unity in batch mode with `ImportAllSchemas`
+3. Generated code will be in `Assets/Scripts/Schemas/Generated`
+4. Commit or use the generated files as needed
 
-// Type-safe access
-if (archiveItem.TryGetField<string>("title", out var safeTitle))
-{
-    // Use safeTitle
-}
+## Supported Types
 
-// Field change notifications
-archiveItem.OnDynamicFieldChanged.AddListener((args) => {
-    Debug.Log($"Field {args.FieldName} changed from {args.OldValue} to {args.NewValue}");
-});
+Basic types:
+- `string` -> `string` (normalization handled by converters specified in `x_meta`)
+- `number` -> `float`
+- `integer` -> `int`
+- `boolean` -> `bool`
+- `array` -> `List<T>` (if items schema is simple) or `string[]` (if `ArrayOrNullToStringArrayConverter` is used)
+- `object` -> Specific generated class or `JObject` for `extraFields`.
 
-// Validation
-archiveItem.SetValidationCallback((fieldName, value) => {
-    // Return true to allow the change, false to reject it
-    return true;
-});
+## Limitations
 
-// Bulk import
-var newData = JObject.Parse(jsonFromJavaScript);
-archiveItem.ImportDynamicFields(newData);
-```
+1. **No Runtime Type Generation**:
+   - All schemas must be processed at edit time
+   - No dynamic schema loading in builds
+   - No runtime property generation
 
-### Internet Archive Metadata Handling
+2. **Limited Type Support**:
+   - Only basic types and arrays
+   - Dates handled as strings
+   - No complex type conversion
 
-```json
-{
-  "title": "ArchiveItem",
-  "type": "object",
-  "description": "Represents an Internet Archive item",
-  "properties": {
-    "identifier": {
-      "type": "string",
-      "description": "Unique item identifier",
-      "required": true
-    },
-    "title": {
-      "type": "string",
-      "description": "Item title"
-    },
-    "description": {
-      "type": "any",
-      "description": "Item description (handles both string and string[])"
-    }
-  }
-}
-```
+3. **No Reflection Features**:
+   - No dynamic member access
+   - No type introspection
+   - No attribute-based behavior
 
-```csharp
-// Handle mixed types
-var description = item.description as JToken;
-if (description.Type == JTokenType.Array)
-{
-    var descriptions = description.ToObject<string[]>();
-}
-else
-{
-    var singleDescription = description.ToString();
-}
+4. **JSON.NET Constraints**:
+   - Limited to JObject/JToken usage
+   - No LINQ to JSON
+   - No dynamic deserialization
+   - Only string normalization converters 
 
-// Access unknown metadata
-var unknownFields = item.UnknownFields;
-foreach (var field in unknownFields.Properties())
-{
-    // Handle arbitrary metadata fields
-}
+## Extra Fields Handling
 
-// Add new metadata fields
-item.SetDynamicField("new-metadata", someValue);
+Any properties present in the JSON data that are *not* explicitly defined in the corresponding `properties` section of the JSON Schema are considered "extra fields".
 
-// Check field existence
-if (item.HasField("some-field"))
-{
-    // Field exists (either schema-defined or dynamic)
-}
-```
+*   The base class `SchemaGeneratedObject` automatically stores these fields in a `protected JObject extraFields` dictionary.
+*   The `ImportExtraFields` method (called during `ImportFromJson`) iterates through the incoming JSON and adds any unrecognized properties to this dictionary.
+*   The `ExportExtraFields` method (called during `ExportToJson`) writes the contents of the `extraFields` dictionary back into the outgoing JSON.
+*   This preserves unknown or deprecated fields during a read-modify-write cycle.
+*   **Inspector Visibility:** Currently, the `extraFields` JObject is **not** easily viewable or editable in the standard Unity Inspector. See the TODO section for potential future enhancements.
 
-## Design Philosophy
+## TODO / Future Enhancements
 
-1. **JavaScript-First Bridge Integration**:
-   - Transparent field access
-   - Dynamic field support
-   - Consistent behavior with JavaScript objects
-   - Real-time updates
-
-2. **Robust Metadata Handling**:
-   - Schema evolution support
-   - Unknown field preservation
-   - Mixed type handling
-   - Backward compatibility
-
-3. **Unity Integration**:
-   - Editor support for schema-defined fields
-   - Serialization of all fields
-   - Change notifications
-   - Type safety when needed
-
-4. **Developer Experience**:
-   - Clear separation of concerns
-   - Intuitive API
-   - Comprehensive documentation
-   - Flexible extension points
-
-## Installation
-
-1. Ensure you have Newtonsoft.Json in your Unity project
-2. Copy the SchemaGenerator folder to your project's Editor folder
-3. Restart Unity if needed
-
-## Contributing
-
-Feel free to extend or modify this tool for your needs. The codebase is intentionally small and focused to make modifications straightforward. 
-
-## Schema Design Approach
-
-Our schema design follows these key principles for handling Internet Archive metadata:
-
-### 1. Field Categorization
-
-- **Essential IA Fields**: Core Internet Archive fields like `identifier`, `title`, `description`, `creator`, `date`, etc. are modeled as top-level schema properties with rich annotations.
-- **Application-Specific Fields**: Fields critical to our Unity application get first-class schema support and rich Unity editor integration.
-- **Passthrough Fields**: All other Internet Archive metadata fields are handled through a dedicated passthrough field to maintain compatibility without cluttering the schema.
-
-### 2. Annotation System
-
-We use a flexible annotation system that supports:
-
-- **Field-Level Annotations**: Applied to individual schema properties
-  - C# attributes for serialization control
-  - Unity-specific attributes for editor integration
-  - Type conversion information
-- **Class-Level Annotations**: Applied to the entire schema
-  - Base class specification
-  - Interface implementations
-  - ScriptableObject menu paths
-
-### 3. Schema Example
-
-```typescript
-// Example schema with annotations
-const ItemSchema = withAnnotations(
-  z.object({
-    // Essential IA field with annotations
-    identifier: withAnnotations(
-      z.string().describe('Unique Internet Archive identifier'),
-      unity.field({
-        header: 'Basic Info',
-        tooltip: 'The unique identifier for this item'
-      }),
-      unity.serializeField()
-    ),
-    
-    title: withAnnotations(
-      z.string().describe('Title of this item'),
-      unity.field({
-        tooltip: 'The main title displayed for this item'
-      }),
-      unity.serializeField()
-    ),
-    
-    // Mixed type handling with converter
-    description: withAnnotations(
-      z.union([z.string(), z.array(z.string())]).optional()
-        .describe('Description of the item'),
-      unity.field({
-        tooltip: 'Description of the item',
-        multiline: true
-      }),
-      unity.serializeField(),
-      StringOrStringArray // Type converter
-    ),
-    
-    // Date fields with specialized converter
-    date: withAnnotations(
-      z.string().optional().describe('Publication date'),
-      unity.field({
-        tooltip: 'When this item was published'
-      }),
-      unity.serializeField(),
-      DateTimeConverter
-    ),
-    
-    // All other fields pass through here
-    additionalProperties: z.record(z.any()).optional()
-      .describe('Additional Internet Archive metadata fields')
-  }),
-  
-  // Class-level Unity annotations
-  unity.type({
-    title: 'Internet Archive Item',
-    description: 'Represents an Internet Archive item with metadata',
-    menuPath: 'Content'
-  }),
-  
-  // Class-level C# annotations
-  csharp.class({
-    baseClass: 'ScriptableObject',
-    interfaces: ['ISerializationCallbackReceiver'],
-    attributes: [
-      { name: 'Serializable' }
-    ]
-  })
-);
-```
-
-### 4. Data Flow Architecture
-
-Our data pipeline ensures metadata consistency between Internet Archive and our application:
-
-1. **Import**: Internet Archive metadata is imported, with essential fields mapped to schema properties and remaining fields preserved in the passthrough field.
-2. **Runtime Access**: All fields (essential and passthrough) are accessible through the same API.
-3. **Export**: When exporting, an application-specific data exporter can filter and transform fields as needed.
-4. **Filtering**: Exporters determine which fields to include, exclude, or transform based on the target platform.
-
-This approach gives us the best of both worlds: rich editor integration for important fields and complete preservation of Internet Archive metadata. 
+*   **Schema-Aware Custom Editor for JSON Data:** Create a generalized custom Unity Editor system for `MonoBehaviour` and `ScriptableObject` components.
+    *   **Target:** Any component holding `Newtonsoft.Json.Linq` types (`JObject`, `JToken`, `JArray`). Identification could use custom attributes (e.g., `[InspectAsJson(SchemaName = "optional_schema")]`) or interfaces.
+    *   **Functionality:** When inspecting a component with such fields:
+        *   Read an associated JSON schema file if specified (via attribute or convention).
+        *   Use schema metadata (`x_editor` [example name], `description`, `type`) to dynamically generate a user-friendly Inspector UI for the JSON data, mimicking standard Unity decorators and controls (Headers, Tooltips, Sliders, Color Pickers, etc.).
+        *   Implement custom controls (sliders, color pickers) based on schema metadata (e.g., `x_editor: { "UnityEditorHint": "slider", "min": 0, "max": 10 }`).
+        *   Re-implement the visual behavior of standard Unity decorators (`[Header]`, `[Space]`, `[Tooltip]`) based on schema metadata (e.g., `x_editor: { "UnityEditorHeader": "Display Settings", "UnityEditorTooltip": "..." }`).
+        *   Offer a fallback generic tree view for `JObject`/`JToken` fields that don't have an associated schema.
+    *   **Scope:** This applies not only to the `extraFields` in `SchemaGeneratedObject` but potentially to *any* component within the bridge system interacting with `JObject`/`JToken` data, offering a unified way to inspect and manage JSON-related state in the editor.
+*   **Schema Validation:** Implement optional validation during `ImportFromJson` against the original schema to warn about or reject data that doesn't conform.
+*   **Performance Profiling:** Analyze performance for very large JSON files or frequent deserialization/registry lookups.
+*   **Error Handling:** Add more granular error reporting or recovery options during parsing/import and registry operations.
+*   **Nested Schema Objects:** Currently assumes simple property types or arrays of simple types. Generating code for properties that are themselves complex schema objects (nested structures) would require recursive generation logic in the C# generator and potentially recursive handling in the custom editor. 

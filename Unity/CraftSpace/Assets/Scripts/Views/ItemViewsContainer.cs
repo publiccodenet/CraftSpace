@@ -3,33 +3,63 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// Container for managing multiple ItemView instances
+/// Container for managing multiple ItemView instances in 3D space.
+/// This handles creating item views for a given item model and manages their lifecycle.
 /// </summary>
 public class ItemViewsContainer : MonoBehaviour
 {
+    [Tooltip("Transform to parent item views under. If null, will use this transform.")]
     [SerializeField] private Transform contentContainer;
+    
+    [Tooltip("Prefab to use for creating item views. Must have an ItemView component.")]
     [SerializeField] private GameObject itemViewPrefab;
     
     private List<ItemView> itemViews = new List<ItemView>();
     private Item _item;
     
+    /// <summary>
+    /// The transform where item views will be parented
+    /// </summary>
     public Transform ContentContainer => contentContainer;
+    
+    /// <summary>
+    /// All item views managed by this container
+    /// </summary>
     public List<ItemView> ItemViews => itemViews;
     
-    // Add property for accessing the item
+    /// <summary>
+    /// The item model this container is displaying
+    /// </summary>
     public Item Item
     {
         get => _item;
         set
         {
             _item = value;
-            UpdateItemViews();
+            
+            // If we have an item but no item views, create one automatically
+            if (_item != null && (itemViews == null || itemViews.Count == 0))
+            {
+                // Create a view using the configured prefab
+                AddItemView(_item);
+            }
+            else
+            {
+                // Update any existing views with the new item
+                UpdateItemViews();
+            }
         }
     }
     
     private void Awake()
     {
-        // Collect any existing item views
+        // If no content container is assigned, use this transform
+        if (contentContainer == null)
+        {
+            contentContainer = transform;
+        }
+        
+        // Collect any existing item views that might already be children
         ItemView[] existingViews = GetComponentsInChildren<ItemView>();
         foreach (var view in existingViews)
         {
@@ -40,6 +70,9 @@ public class ItemViewsContainer : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// Updates all item views to display the current item
+    /// </summary>
     private void UpdateItemViews()
     {
         if (_item == null) return;
@@ -54,7 +87,7 @@ public class ItemViewsContainer : MonoBehaviour
     }
     
     /// <summary>
-    /// Initialize the container with items
+    /// Initialize the container with multiple items (not typically used)
     /// </summary>
     public void Initialize(List<Item> items)
     {
@@ -69,19 +102,44 @@ public class ItemViewsContainer : MonoBehaviour
     }
     
     /// <summary>
-    /// Create and add a new item view
+    /// Create and add a new item view using the configured prefab
     /// </summary>
     public ItemView AddItemView(Item item)
     {
-        if (item == null || itemViewPrefab == null) return null;
+        if (item == null)
+        {
+            Debug.LogError("[ItemViewsContainer] Cannot create view for null item");
+            return null;
+        }
         
+        if (itemViewPrefab == null)
+        {
+            Debug.LogError("[ItemViewsContainer] Missing itemViewPrefab in ItemViewsContainer");
+            return null;
+        }
+        
+        // Ensure we have a valid content container
+        if (contentContainer == null)
+        {
+            contentContainer = transform;
+        }
+        
+        // Instantiate the view prefab as a child of the content container
         GameObject viewObj = Instantiate(itemViewPrefab, contentContainer);
+        viewObj.name = $"ItemView_{item.Id}";
+        
+        // Get the ItemView component from the instantiated prefab
         ItemView itemView = viewObj.GetComponent<ItemView>();
         
         if (itemView != null)
         {
+            // Set the item model on the view
             itemView.SetModel(item);
             itemViews.Add(itemView);
+        }
+        else
+        {
+            Debug.LogError("[ItemViewsContainer] ItemViewPrefab doesn't have an ItemView component");
         }
         
         return itemView;

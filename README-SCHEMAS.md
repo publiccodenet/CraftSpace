@@ -1,3 +1,200 @@
+# Schema System Overview
+
+The schema system provides a robust, cross-platform data modeling solution ensuring type safety and consistency between TypeScript and Unity C# codebases.
+
+## Core Components
+
+### 1. Source of Truth (Zod Schemas)
+- Located in `SvelteKit/BackSpace/src/lib/schemas/*.ts`
+- Defines core data structures using Zod for TypeScript type safety
+- Uses a "description hack" to embed metadata (like type converters) in property descriptions
+- Handles variations in data formats (e.g., fields that can be strings or arrays)
+
+### 2. Schema Export Pipeline
+- `schema-export.js` converts Zod schemas to JSON Schema format
+- Processes descriptions to extract metadata into `x_meta` fields
+- Outputs processed JSON schemas to `Content/schemas` (SSOT)
+- Maintains strict rules for runtime safety, especially for WebGL/IL2CPP compatibility
+
+### 3. Unity Integration
+- JSON schemas are copied to Unity's `StreamingAssets/Content/schemas`
+- `SchemaGenerator.cs` generates C# classes from JSON schemas
+- Generated classes avoid reflection-based serialization for WebGL compatibility
+- Uses custom converters for type-safe string handling
+
+## Key Features
+- Type-safe data modeling across platforms
+- Runtime validation at all levels
+- WebGL/IL2CPP compatibility through careful code generation
+- Metadata-driven type conversion
+- Direct property access without reflection
+- Support for complex types and nested structures
+
+## Safety Rules
+- No reflection-based JSON.NET methods in runtime code
+  - **❌ AVOID**: `JsonConvert.DeserializeObject<T>()` 
+  - **✅ USE**: `JToken.Parse()` with explicit type handling
+- No attribute-based serialization
+- Direct property access and type checking
+- Custom converters for type-safe string handling
+- Strict validation at all pipeline stages
+- Test in WebGL builds before deploying
+
+## Directory Structure
+```
+BackSpace/
+└── src/
+    └── lib/
+        └── schemas/         # TypeScript schema definitions
+
+Content/
+└── schemas/                # Central JSON schema repository
+
+Unity/CraftSpace/Assets/
+├── Content/
+│   └── Schemas/            # Unity copy of JSON schemas
+├── Generated/
+│   └── Schemas/            # Generated C# classes
+└── Scripts/
+    └── Models/
+        └── Extensions/     # Unity extensions
+```
+
+## Schema Pipeline Flow
+1. **Schema Definition**: Core data models defined using Zod in TypeScript
+2. **Schema Export**: Zod schemas converted to standard JSON Schema format
+3. **Schema Copy**: JSON Schema files copied to Unity project
+4. **C# Generation**: SchemaImporter tool generates C# classes from JSON Schema
+5. **Unity Integration**: Generated classes used in Unity for type-safe serialization
+
+## Key Schema Models
+
+### Collection Schema
+- **id**: Unique identifier for the collection
+- **name**: Display name of the collection
+- **query**: Internet Archive query string
+- **description**: Detailed collection description
+- **totalItems**: Count of items in the collection
+- **lastUpdated**: Timestamp of last update
+
+### Item Schema
+- **id**: Unique identifier for the item
+- **title**: Display title of the item
+- **creator**: Original creator/author
+- **description**: Detailed item description
+- **mediaType**: Type of media (text, video, audio, etc.)
+- **date**: Publication or creation date
+- **files**: Associated files for this item
+
+## Best Practices
+1. **Incremental Schema Changes**: Make small, incremental changes
+2. **Documentation**: Document all schema changes in a changelog
+3. **Test Coverage**: Ensure validation tests for all platforms
+4. **Strict Validation**: Use stricter validation during development
+5. **Schema Visualization**: Use tools like JSON Schema Viewer for visualization
+6. **Follow Naming Conventions**: Be consistent with property naming
+7. **Keep Schemas DRY**: Extract common patterns into reusable schema components
+8. **Include Descriptions**: Add clear descriptions for each property
+9. **WebGL-Safe JSON Parsing**: 
+   - Avoid `JsonConvert.DeserializeObject<T>()` for WebGL builds
+   - Use JToken-based parsing for safer cross-platform compatibility
+   - Test WebGL builds early and often to catch reflection-related issues
+   - Implement explicit type checking rather than relying on automatic type conversion
+10. **Handle Internet Archive Metadata Gracefully**:
+    - Use flexible JToken parsing for Internet Archive's variable metadata
+    - Implement fallbacks for missing or malformed properties
+    - Log warnings instead of throwing errors when encountering unexpected metadata
+
+## Internet Archive Metadata Handling
+1. **Field Categorization**:
+   - Essential IA fields as top-level schema properties
+   - Additional properties preserved in the C# implementation's `extraFields`
+2. **Field Normalization**:
+   - String fields normalized to always be strings
+   - Array fields normalized to always be arrays
+   - Optional fields have safe defaults
+3. **Type Converters**:
+   - `StringOrNullToString`: Handles null/undefined
+   - `StringOrStringArrayToString`: Handles string/array variations
+   - `NullOrStringToStringArray`: Ensures string arrays
+   - `StringToDateTime`: Handles date/time conversions
+
+## Extra Fields Implementation
+
+The schema system provides a special mechanism for handling undefined properties in the Unity C# implementation:
+
+1. **C# Implementation Only**:
+   - `extraFields` only exists in the Unity C# side
+   - It is **NOT** exposed in Zod schemas or JSON schemas
+   - It's implemented as a JObject in the SchemaGeneratedObject base class
+
+2. **Automatic Field Management**:
+   - `ImportExtraFields()` captures any undefined fields from JSON
+   - `ExportToJson()` includes both known properties and extraFields
+   - This happens transparently without additional code
+
+3. **Implementation Details**:
+   - The SchemaGenerator ensures the `extraFields` property is handled correctly
+   - Generated schema classes include special case handling for `extraFields`
+   - The HasDefinedProperty method recognizes `extraFields` as a special case
+
+This approach ensures that custom metadata fields from Internet Archive or other sources are preserved without cluttering the schema definition.
+
+## Schema Update Workflow
+1. Update Zod schema in `SvelteKit/BackSpace/src/lib/schemas/`
+2. Run complete schema generation:
+   ```bash
+   cd SvelteKit/BackSpace
+   npm run schema:generate-all
+   ```
+3. Open Unity and use `Tools > Import JSON Schema`
+4. Update affected TypeScript code
+5. Test validation across platforms
+
+## Troubleshooting
+1. Verify schemas directory exists:
+   ```bash
+   mkdir -p SvelteKit/BackSpace/schemas Content/schemas
+   ```
+2. Run debug scripts:
+   ```bash
+   npm run path:debug
+   npm run schema:debug
+   ```
+3. For Unity issues:
+   - Delete generated C# files
+   - Restart Unity
+   - Re-run import process
+
+## Resources
+- [Zod Documentation](https://zod.dev/)
+- [JSON Schema](https://json-schema.org/)
+- [NJsonSchema](https://github.com/RicoSuter/NJsonSchema)
+- [JSON.NET](https://www.newtonsoft.com/json)
+- [Ajv Validator](https://ajv.js.org/)
+- [zod-to-json-schema](https://github.com/StefanTerdell/zod-to-json-schema)
+
+## Future Enhancements
+1. **Schema-Aware Custom Editor**:
+   - Generalized Unity Editor system for JSON data
+   - Dynamic Inspector UI based on schema metadata
+   - Custom controls based on schema hints
+2. **Schema Validation**:
+   - Optional validation during `ImportFromJson`
+   - Warning/rejection of non-conforming data
+3. **Performance Optimization**:
+   - Async loading support
+   - Improved caching strategies
+   - Batch loading operations
+4. **Developer Experience**:
+   - Better error messages
+   - Schema validation in editor
+   - Visual schema designer
+
+# Schema Documentation
+
+This document describes the schema system used in the CraftSpace project.
+
 # BackSpace Schema System
 
 This document outlines the schema-driven development approach used in BackSpace, focusing on how we maintain type safety and data consistency across multiple platforms.
@@ -58,22 +255,7 @@ After generating the schemas and copying them to Unity:
 
 #### 4. Extend with Unity Functionality
 
-Create extension files in Unity that add Unity-specific functionality:
-
-```csharp
-// Assets/Scripts/Models/Extensions/ItemExtensions.cs
-[Serializable]
-public partial class Item : ScriptableObject
-{
-    // Unity-specific functionality
-    [NonSerialized] public Texture2D cover;
-    
-    public void NotifyViewsOfUpdate()
-    {
-        // Implementation
-    }
-}
-```
+There are Unity integration focused subclasses of the dynamically generated classes CollectinSchema and ItemSchema called Collection and Item that have code for managing multiple views, cover images, and other unity integation tasks. Extend Unity functionality by modifying these classes (not subclassing or extending them).
 
 ### Directory Structure
 
@@ -96,13 +278,59 @@ Unity/CraftSpace/Assets/
         └── Extensions/     # Unity extensions
 ```
 
-### Schema File Locations
+### Schema File Locations (Pipeline Flow)
 
-- **JSON Schemas (BackSpace)**: `SvelteKit/BackSpace/schemas/*.json`
-- **JSON Schemas (Central)**: `Content/schemas/*.json`
-- **JSON Schemas (Unity)**: `Unity/CraftSpace/Assets/Content/Schemas/*.json`
-- **C# Classes**: `Unity/CraftSpace/Assets/Generated/Schemas/*.cs`
-- **Unity Extensions**: `Unity/CraftSpace/Assets/Scripts/Models/Extensions/*.cs`
+This outlines the key locations and their roles in the schema pipeline, following the flow from definition to runtime use.
+
+1.  **Zod Schemas (TypeScript - The Ultimate SSOT):**
+    *   `SvelteKit/BackSpace/src/lib/schemas/*.ts`
+    *   *Purpose:* Define the core data structures and embed metadata via the "description hack".
+
+2.  **Exported JSON Schemas (SSOT for Unity & Other Consumers):**
+    *   `Content/schemas/*.json` (Located at the project root)
+    *   *Purpose:* Central repository for processed JSON Schemas derived from Zod. These are the direct output of the `schema:export` script and serve as the source for downstream processes like copying to Unity.
+
+3.  **JSON Schemas (Unity Runtime Content):**
+    *   `Unity/CraftSpace/Assets/StreamingAssets/Content/schemas/*.json`
+    *   *Purpose:* A filtered mirror of the central `Content/schemas` directory, copied into the Unity project's `StreamingAssets` for runtime access and **used as the input for the C# Code Generator**. This copy step (managed outside the scripts detailed here for now) allows different targets (like Unity) to potentially use a subset of the available schemas.
+
+4.  **C# Code Generator (Tool):**
+    *   `Unity/CraftSpace/Assets/Editor/SchemaGenerator/SchemaGenerator.cs`
+    *   *Purpose:* Reads processed JSON schemas from `StreamingAssets/Content/schemas` and generates the C# Schema classes. **Crucially, it generates explicit, reflection-free code for serialization/deserialization, designed to work hand-in-hand with the `SchemaGeneratedObject` base class and direct converter calls.**
+
+5.  **Generated C# Schema Classes (Derived from JSON Schemas):**
+    *   `Unity/CraftSpace/Assets/Scripts/Schemas/Generated/*Schema.cs`
+    *   *Purpose:* Auto-generated C# representation of the schema data structure, inheriting from `SchemaGeneratedObject`. Contains the generated `ImportKnownProperties` and `ExportKnownProperties` methods. **DO NOT EDIT MANUALLY.**
+
+6.  **C# Base Class (Foundation):**
+    *   `Unity/CraftSpace/Assets/Scripts/Schemas/SchemaGeneratedObject.cs`
+    *   *Purpose:* Provides the runtime framework for reflection-free serialization/deserialization (`ImportFromJson`, `ImportKnownProperties`, etc.), manages extra fields, provides the `ScriptableObject` base, and centralizes common logic like setting the Unity object name (`TypeName-Id`).
+
+7.  **Manual C# Unity Integration Classes (e.g., `Collection`, `Item`):**
+    *   `Unity/CraftSpace/Assets/Scripts/Schemas/*.cs`
+    *   *Purpose:* Inherit from generated classes (`Item : ItemSchema`). These classes:
+        *   Store lists of IDs for related objects (e.g., `private List<string> _itemIds;` populated from index files).
+        *   Implement properties (e.g., `public IEnumerable<Item> Items { get; }`) whose getters perform on-demand lookups via the `ContentRegistry` (Brewster) using the stored IDs.
+        *   Contain methods to load *index files* (e.g., `LoadItemIndex()`) which populate the ID lists, called by the registry.
+        *   Add any other Unity-specific runtime logic or non-serialized fields (like `Texture2D cover`).
+
+8.  **Central Content Registry (`Brewster`):**
+    *   `Unity/CraftSpace/Assets/Scripts/Core/Brewster.cs`
+    *   *Purpose:* Manages the runtime loading and caching of all schema-derived `ScriptableObject` instances.
+        *   Maintains flat dictionaries (maps) per content type (e.g., `Dictionary<string, Collection> _loadedCollections`, `Dictionary<string, Item> _loadedItems`).
+        *   Provides public static singleton instance methods to retrieve objects by ID (e.g., `GetCollection(string id)`, `GetItem(string collectionId, string itemId)`).
+        *   Handles **on-demand loading**: If an object is requested but not in its dictionary, the registry:
+            1.  Constructs the path to the object's JSON file in `StreamingAssets`.
+            2.  Reads the JSON file.
+            3.  Calls the static `FromJson` factory method for the corresponding type.
+            4.  Adds the newly created `ScriptableObject` instance to the appropriate dictionary (cache).
+            5.  Triggers necessary post-load actions (like `LoadItemIndex` for collections, `LoadCoverImage` for items).
+            6.  Returns the instance.
+        *   Initializes by loading only the collection index (`collections-index.json`).
+
+9.  **C# Converters:**
+    *   `Unity/CraftSpace/Assets/Scripts/Bridge/BridgeJsonConverter.cs` (or similar).
+    *   *Purpose:* Implement specific, IL2CPP-safe value conversion logic called directly by generated code (No change here).
 
 ### Schema Naming Convention
 
@@ -111,6 +339,35 @@ Schemas follow this naming convention:
 1. JSON schema: `[Name].json` (e.g., `Collection.json`)
 2. Generated C# class: `[Name].cs` (e.g., `Collection.cs`)
 3. Unity extension: `[Name]Extensions.cs` (e.g., `CollectionExtensions.cs`)
+
+### Key NPM Scripts (Run from `SvelteKit/BackSpace`)
+
+These scripts automate parts of the schema definition, export, and Unity integration process:
+
+*   **`npm run schema:generate:json`**: 
+    *   Action: Reads Zod schemas, processes descriptions, and generates processed JSON Schema files (`*.json`) into the central `Content/schema/` directory.
+*   **`npm run schemas:export:unity`**: 
+    *   Action: Exports (copies) the processed JSON schema files from the central SSOT (`Content/schema/`) directory into the Unity project's `StreamingAssets/Content/schemas/` folder.
+*   **`npm run schemas:prepare:unity`**: 
+    *   Action: Orchestrates the full preparation of schemas needed by Unity *before* C# generation (runs `schema:generate:json` then `schemas:export:unity`).
+*   **`npm run schemas:export`**: 
+    *   Action: Top-level export command. For now, it defaults to preparing schemas for Unity (`schemas:prepare:unity`). Can be expanded later.
+*   **`npm run schemas:regenerate:unity`**: 
+    *   Action: Prepares the JSON schemas for Unity (`schemas:prepare:unity`) and then triggers the Unity C# code **regeneration** process (via `unity-automation.js` with the `regenerate-schemas` argument, assuming it executes `SchemaGenerator.GenerateSchemas_Commandline`). See Naming Conventions below.
+*   **`npm run pipeline:schemas:unity`**: 
+    *   Action: Convenience script to run the entire schema preparation and C# code regeneration pipeline for Unity (effectively calls `schemas:regenerate:unity`).
+
+#### Naming Conventions & Factoring
+
+The schema pipeline scripts follow these conventions:
+
+*   **`schemas:*` prefix:** Used for scripts primarily dealing with the schema definition, processing, or movement *from* the Single Source of Truth (SSOT) perspective, or end-to-end schema pipeline tasks.
+*   **`unity:*` prefix:** Used for scripts where the *final, critical action* takes place within the Unity environment (like C# regeneration or building the Unity project), *OR* for utility scripts focused solely on Unity interaction (like `unity:setup`).
+*   **Prepare vs. Regenerate:** 
+    *   `schemas:prepare:unity` includes all steps necessary to get the JSON files ready *for* Unity (Generation + Export/Copy).
+    *   `schemas:regenerate:unity` includes the preparation step *and* the final C# code regeneration step inside Unity.
+
+*Naming Rationale:* The script `schemas:regenerate:unity` is now grouped under `schemas:` because it represents the full end-to-end schema pipeline for Unity, even though the final step executes within the Unity environment. Utility scripts like `unity:setup` remain under the `unity:` prefix.
 
 ### Troubleshooting
 
@@ -152,92 +409,19 @@ Located in `Assets/Scripts/Schema`, this module:
 
 #### 1. Schema Classes
 
-```csharp
-// Simple direct inheritance from generated classes
-[Serializable]
-public class Collection : Models.SchemaGenerated.Collection
-{
-    // Unity-specific extensions here
-}
-
-[Serializable]
-public class Item : Models.SchemaGenerated.Item
-{
-    // Unity-specific fields and methods
-    [NonSerialized] public Texture2D cover;
-    [NonSerialized] public Collection parentCollection;
-    
-    // View system methods
-    public void NotifyViewsOfUpdate() { /* ... */ }
-    public event System.Action ModelUpdated;
-}
-```
+Schema classes directly inherit from generated code while adding Unity-specific functionality.
 
 #### 2. View System
 
-The module includes a Model-View pattern for binding schema objects to UI:
+The module includes a Model-View pattern for binding schema objects to UI components.
 
-```csharp
-// Base class for Item views
-public abstract class ItemView : MonoBehaviour
-{
-    [SerializeField] protected Item _item;
-    
-    // View handling with auto-registration
-    public Item Item { get; set; } // Auto registers/unregisters
-    
-    // Override this to update your UI
-    public abstract void HandleModelUpdated();
-}
+#### 3. Content Registry (Brewster)
 
-// Base class for Collection views
-public abstract class CollectionView : MonoBehaviour
-{
-    [SerializeField] protected Collection _collection;
-    
-    // View handling
-    public abstract void HandleModelUpdated();
-}
-```
-
-#### 3. ModelLoader Utility
-
-A utility class that simplifies loading schema objects from JSON:
-
-```csharp
-// Load directly from files
-Collection collection = ModelLoader.LoadCollectionFromFile(jsonPath);
-Item item = ModelLoader.LoadItemFromFile(jsonPath);
-
-// Load from JSON strings
-Collection collection = ModelLoader.LoadCollectionFromJson(jsonString);
-Item item = ModelLoader.LoadItemFromJson(jsonString);
-
-// Clear caches
-ModelLoader.ClearCaches();
-```
-
-### Usage Example
-
-```csharp
-// Load a collection and its items
-public void LoadCollection(string collectionId)
-{
-    // Load collection from JSON file
-    string jsonPath = Path.Combine(contentPath, "collections", collectionId, "collection.json");
-    Collection collection = ModelLoader.LoadCollectionFromFile(jsonPath);
-    
-    // Access properties directly
-    Debug.Log($"Loaded: {collection.Name} ({collection.Id})");
-    
-    // Load associated items
-    foreach (string itemDir in Directory.GetDirectories(itemsDir))
-    {
-        Item item = ModelLoader.LoadItemFromFile(Path.Combine(itemDir, "item.json"));
-        item.parentCollection = collection;
-    }
-}
-```
+The Brewster class acts as a central registry for all schema objects, managing:
+- Loading objects from JSON
+- Caching loaded objects
+- Tracking relationships between objects
+- Providing global access to all content
 
 ### Advantages
 
@@ -260,81 +444,13 @@ Assets/Scripts/Schema/
 
 [Zod](https://github.com/colinhacks/zod) serves as our primary schema definition tool, providing both TypeScript type generation and runtime validation.
 
-### Basic Schema Definition
+### Key Features
 
-```typescript
-// src/lib/schemas/collection.ts
-import { z } from 'zod';
-
-export const CollectionSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  query: z.string().optional(),
-  description: z.string().optional(),
-  created: z.string().datetime(),
-  lastUpdated: z.string().datetime(),
-  totalItems: z.number().int().nonnegative(),
-  includeInUnity: z.boolean().optional().default(false),
-  sort: z.string().optional(),
-  limit: z.number().int().nonnegative().optional(),
-  exportProfiles: z.array(z.string()).optional()
-});
-
-// Generate TypeScript type
-export type Collection = z.infer<typeof CollectionSchema>;
-
-// Create subschema for creation (subset of fields)
-export const CollectionCreateSchema = CollectionSchema.omit({
-  created: true,
-  lastUpdated: true,
-  totalItems: true
-}).extend({
-  // Add any creation-specific fields
-});
-
-export type CollectionCreate = z.infer<typeof CollectionCreateSchema>;
-```
-
-### Advanced Schema Patterns
-
-#### Nested Objects
-
-```typescript
-// Item with metadata schema
-export const ItemSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  // Nested metadata object
-  metadata: z.object({
-    author: z.string().optional(),
-    year: z.number().int().positive().optional(),
-    tags: z.array(z.string()).default([]),
-    ratings: z.record(z.number().min(0).max(5)).optional()
-  }).optional()
-});
-```
-
-#### Union Types and Discriminated Unions
-
-```typescript
-// Define a union type for different content types
-const TextContentSchema = z.object({
-  type: z.literal('text'),
-  content: z.string()
-});
-
-const ImageContentSchema = z.object({
-  type: z.literal('image'),
-  url: z.string().url(),
-  alt: z.string().optional()
-});
-
-// Discriminated union based on 'type' field
-export const ContentBlockSchema = z.discriminatedUnion('type', [
-  TextContentSchema,
-  ImageContentSchema
-]);
-```
+- **TypeScript-First**: Automatic type inference for TypeScript
+- **Runtime Validation**: Full validation at runtime
+- **Schema Composition**: Build complex schemas from simpler ones
+- **Documentation**: Schemas are self-documenting with descriptions
+- **Meta Properties**: Support for additional metadata
 
 ### Schema Organization
 
@@ -349,465 +465,41 @@ src/lib/schemas/
 
 ## TypeScript Integration
 
-### Type Inference
+### Type Safety 
 
-Zod automatically generates TypeScript types:
-
-```typescript
-import { CollectionSchema, type Collection } from '../lib/schemas/collection';
-
-// Type-safe usage
-const collection: Collection = {
-  id: 'scifi',
-  name: 'Science Fiction',
-  query: 'subject:science fiction',
-  created: new Date().toISOString(),
-  lastUpdated: new Date().toISOString(),
-  totalItems: 0
-};
-```
+Zod generates TypeScript types for compile-time safety.
 
 ### Validation
 
-```typescript
-import { CollectionSchema } from '../lib/schemas/collection';
-import { validateOrThrow } from '../lib/utils/validation';
+Zod schemas provide runtime validation of data structures.
 
-// Runtime validation
-function createCollection(data: unknown) {
-  // This throws if validation fails
-  const validCollection = validateOrThrow(CollectionSchema, data);
-  
-  // Now work with validated data
-  saveCollection(validCollection);
-}
-```
+### Form Integration
 
-### Form Validation Integration
-
-Zod schemas can be used directly with form libraries:
-
-```typescript
-import { useForm } from 'svelte-forms';
-import { toFormValidator } from '../lib/utils/form-validators';
-import { CollectionCreateSchema } from '../lib/schemas/collection';
-
-// In a Svelte component
-const form = useForm({
-  initialValues: {
-    id: '',
-    name: '',
-    description: ''
-  },
-  validate: toFormValidator(CollectionCreateSchema),
-  onSubmit: async (values) => {
-    // Values are already validated against the schema
-    await api.collections.create(values);
-  }
-});
-```
+Schemas can be integrated with form libraries for automatic validation.
 
 ## JSON Schema Export
 
-We export Zod schemas to JSON Schema format for cross-platform use:
-
-```typescript
-// scripts/schema-export.ts
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import fs from 'fs-extra';
-import path from 'path';
-import * as schemas from '../src/lib/schemas/index.js';
-
-async function exportSchemas() {
-  const outputDir = path.resolve('exports/schemas');
-  await fs.ensureDir(outputDir);
-  
-  for (const [name, schema] of Object.entries(schemas)) {
-    const jsonSchema = zodToJsonSchema(schema, { name });
-    await fs.writeJSON(
-      path.join(outputDir, `${name}.schema.json`),
-      jsonSchema,
-      { spaces: 2 }
-    );
-  }
-}
-
-exportSchemas().catch(console.error);
-```
-
-### Generated JSON Schema Example
-
-A Zod schema like `CollectionSchema` will generate a JSON Schema like:
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "name": {
-      "type": "string",
-      "minLength": 1
-    },
-    "query": {
-      "type": "string"
-    },
-    "description": {
-      "type": "string"
-    },
-    "created": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "lastUpdated": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "totalItems": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "includeInUnity": {
-      "type": "boolean",
-      "default": false
-    },
-    "sort": {
-      "type": "string"
-    },
-    "limit": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "exportProfiles": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    }
-  },
-  "required": ["id", "name", "created", "lastUpdated", "totalItems"],
-  "additionalProperties": false
-}
-```
+We export Zod schemas to JSON Schema format for cross-platform use.
 
 ## Unity C# Integration
 
-### C# Class Generation
-
-We use [NJsonSchema](https://github.com/RicoSuter/NJsonSchema) to generate C# classes from our JSON Schemas:
-
-```csharp
-// Unity Editor script to generate C# classes
-using UnityEditor;
-using UnityEngine;
-using NJsonSchema;
-using NJsonSchema.CodeGeneration.CSharp;
-using System.IO;
-using System.Threading.Tasks;
-
-public class SchemaImporter : EditorWindow
-{
-    [MenuItem("Tools/Import JSON Schema")]
-    static async void GenerateModels()
-    {
-        string schemaDirectory = Path.Combine(Application.dataPath, "Content/Schemas");
-        string outputDirectory = Path.Combine(Application.dataPath, "Generated/Schemas");
-        
-        if (!Directory.Exists(outputDirectory))
-            Directory.CreateDirectory(outputDirectory);
-            
-        foreach (string schemaFile in Directory.GetFiles(schemaDirectory, "*.json"))
-        {
-            await GenerateModelFromSchema(schemaFile, outputDirectory);
-        }
-        
-        AssetDatabase.Refresh();
-        Debug.Log("Model generation complete!");
-    }
-    
-    static async Task GenerateModelFromSchema(string schemaPath, string outputDir)
-    {
-        string schemaJson = File.ReadAllText(schemaPath);
-        var schema = await JsonSchema.FromJsonAsync(schemaJson);
-        
-        var generator = new CSharpGenerator(schema, new CSharpGeneratorSettings
-        {
-            Namespace = "CraftSpace.Models.SchemaGenerated",
-            ClassStyle = CSharpClassStyle.Poco,
-            JsonLibrary = CSharpJsonLibrary.NewtonsoftJson
-        });
-        
-        var code = generator.GenerateFile();
-        string fileName = Path.GetFileNameWithoutExtension(schemaPath);
-        File.WriteAllText(Path.Combine(outputDir, $"{fileName}.cs"), code);
-        
-        Debug.Log($"Generated {fileName}.cs");
-    }
-}
-```
-
-### Avoiding Namespace Conflicts
-
-To avoid conflicts between our generated classes and our manual model classes, we follow these principles:
-
-1. **Separate Namespaces**: 
-   - Hand-written model classes: `CraftSpace.Models`
-   - Generated schema classes: `CraftSpace.Models.SchemaGenerated`
-
-2. **Partial Classes**: All generated classes are marked as `partial`, allowing us to extend them in separate files.
-
-3. **Directory Organization**:
-   - Hand-written models: `Assets/Scripts/Models/`
-   - Generated schema classes: `Assets/Generated/Schemas/`
-
-### Generated C# Class Example
-
-For the `Collection` schema, the generated C# class would look like:
-
-```csharp
-using System;
-using System.Collections.Generic;
-using Newtonsoft.Json;
-
-namespace CraftSpace.Models.SchemaGenerated
-{
-    public partial class Collection
-    {
-        [JsonProperty("id", Required = Required.Always)]
-        public string Id { get; set; }
-
-        [JsonProperty("name", Required = Required.Always)]
-        public string Name { get; set; }
-
-        [JsonProperty("query", Required = Required.DisallowNull, NullValueHandling = NullValueHandling.Ignore)]
-        public string? Query { get; set; }
-
-        [JsonProperty("description", Required = Required.DisallowNull, NullValueHandling = NullValueHandling.Ignore)]
-        public string? Description { get; set; }
-
-        [JsonProperty("created", Required = Required.Always)]
-        public DateTimeOffset Created { get; set; }
-
-        [JsonProperty("lastUpdated", Required = Required.Always)]
-        public DateTimeOffset LastUpdated { get; set; }
-
-        [JsonProperty("totalItems", Required = Required.Always)]
-        public int TotalItems { get; set; }
-
-        [JsonProperty("includeInUnity", Required = Required.DisallowNull, NullValueHandling = NullValueHandling.Ignore)]
-        public bool? IncludeInUnity { get; set; } = false;
-
-        [JsonProperty("sort", Required = Required.DisallowNull, NullValueHandling = NullValueHandling.Ignore)]
-        public string Sort { get; set; }
-
-        [JsonProperty("limit", Required = Required.DisallowNull, NullValueHandling = NullValueHandling.Ignore)]
-        public int? Limit { get; set; }
-
-        [JsonProperty("exportProfiles", Required = Required.DisallowNull, NullValueHandling = NullValueHandling.Ignore)]
-        public List<string> ExportProfiles { get; set; }
-
-        public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this);
-        }
-
-        public static Collection? FromJson(string json)
-        {
-            if (string.IsNullOrEmpty(json)) return null;
-            return JsonConvert.DeserializeObject<Collection>(json);
-        }
-    }
-}
-```
-
-### Extending Generated Classes
-
-You can extend these generated partial classes with your own functionality:
-
-```csharp
-// Assets/Scripts/Models/Extensions/CollectionExtensions.cs
-using UnityEngine;
-
-namespace CraftSpace.Models.SchemaGenerated
-{
-    // Add Unity-specific functionality to the generated class
-    public partial class Collection : ScriptableObject
-    {
-        // Unity-specific fields
-        [System.NonSerialized] public Texture2D previewImage;
-        
-        // Additional methods
-        public void LoadPreview()
-        {
-            // Implementation
-        }
-        
-        // Other Unity-specific functionality
-    }
-}
-```
-
 ### JSON.NET Integration
 
-The generated C# classes work seamlessly with JSON.NET:
-
-```csharp
-using Newtonsoft.Json;
-using CraftSpace.Models;
-using UnityEngine;
-using System.Threading.Tasks;
-
-public class CollectionLoader : MonoBehaviour
-{
-    public async Task<Collection> LoadCollection(string collectionId)
-    {
-        string json = await FetchCollectionData(collectionId);
-        
-        // Deserialize with JSON.NET
-        Collection collection = JsonConvert.DeserializeObject<Collection>(json);
-        
-        // Use the strongly-typed object
-        Debug.Log($"Loaded collection: {collection.Name} with {collection.TotalItems} items");
-        
-        return collection;
-    }
-    
-    private async Task<string> FetchCollectionData(string collectionId)
-    {
-        // Implementation of data fetching
-        // ...
-    }
-}
-```
+The generated C# classes work seamlessly with JSON.NET.
 
 ### Unity-BackSpace Bridge Integration
 
-The schema system works with our P/Invoke bridge for WebGL communication:
-
-```csharp
-using CraftSpace.Models;
-using Newtonsoft.Json;
-
-public class BackSpaceBridge : MonoBehaviour
-{
-    [DllImport("__Internal")]
-    private static extern void _Bridge_SendToBackSpace(string messageType, string data);
-    
-    public void SendCollectionToBackSpace(Collection collection)
-    {
-        string json = JsonConvert.SerializeObject(collection);
-        _Bridge_SendToBackSpace("collection_update", json);
-    }
-    
-    // Receive data from BackSpace
-    public void ReceiveCollectionFromBackSpace(string json)
-    {
-        try {
-            Collection collection = JsonConvert.DeserializeObject<Collection>(json);
-            // Process the received collection
-            ProcessCollection(collection);
-        }
-        catch (JsonException ex) {
-            Debug.LogError($"Failed to deserialize collection: {ex.Message}");
-        }
-    }
-}
-```
+The schema system works with our P/Invoke bridge for WebGL communication.
 
 ## Web/Client Integration
 
 ### Browser-Side Validation
 
-For client-side validation, we use [Ajv](https://github.com/ajv-validator/ajv) with our exported JSON schemas:
-
-```javascript
-// client/src/validation.js
-import Ajv from 'ajv';
-import collectionSchema from '../schemas/CollectionSchema.schema.json';
-import itemSchema from '../schemas/ItemSchema.schema.json';
-
-const ajv = new Ajv();
-const validateCollection = ajv.compile(collectionSchema);
-const validateItem = ajv.compile(itemSchema);
-
-export function validateCollectionData(data) {
-  const valid = validateCollection(data);
-  return {
-    valid,
-    errors: validateCollection.errors
-  };
-}
-```
+For client-side validation, we can use [Ajv](https://github.com/ajv-validator/ajv) with our exported JSON schemas.
 
 ### SvelteKit API Validation
 
-Server-side API endpoints use Zod for validation:
-
-```typescript
-// src/routes/api/collections/+server.ts
-import { json } from '@sveltejs/kit';
-import { CollectionCreateSchema } from '$lib/schemas/collection';
-
-export async function POST({ request }) {
-  const data = await request.json();
-  
-  // Validate using the schema
-  const result = CollectionCreateSchema.safeParse(data);
-  
-  if (!result.success) {
-    return json({ error: result.error.format() }, { status: 400 });
-  }
-  
-  // Proceed with validated data
-  const collection = result.data;
-  // ... create collection logic
-  
-  return json({ success: true, id: collection.id });
-}
-```
-
-## Schema Versioning
-
-As schemas evolve, we maintain backward compatibility:
-
-1. **Add, don't remove**: Add optional fields rather than removing fields
-2. **Version in filename**: For breaking changes, version the schema (`collection_v2.schema.json`)
-3. **Migration utilities**: Provide migration utilities for schema changes
-
-### Versioning Strategy
-
-When a breaking change is needed:
-
-1. Create a new schema version (e.g., `CollectionSchemaV2`)
-2. Create migration utilities between versions
-3. Update the export process to generate both versions
-4. Gradually transition code to use the new version
-
-```typescript
-// src/lib/schemas/collection.ts
-export const CollectionSchemaV1 = z.object({
-  // Original schema definition
-});
-
-export const CollectionSchemaV2 = z.object({
-  // New schema with breaking changes
-});
-
-// Current active version
-export const CollectionSchema = CollectionSchemaV2;
-
-// Migration utility
-export function migrateV1ToV2(v1Collection): z.infer<typeof CollectionSchemaV2> {
-  // Transform from v1 to v2 format
-  return {
-    ...v1Collection,
-    // Add new required fields or transform existing ones
-  };
-}
-```
+Server-side API endpoints use Zod for validation.
 
 ## Schema Update Workflow
 
@@ -838,65 +530,6 @@ When updating a schema:
 6. **Integration**: Update any code that uses the schema
 7. **End-to-End Testing**: Test the full data pipeline
 
-## Best Practices
-
-1. **Incremental Schema Changes**: Make small, incremental changes
-2. **Documentation**: Document all schema changes in a changelog
-3. **Test Coverage**: Ensure validation tests for all platforms
-4. **Strict Validation**: Use stricter validation during development
-5. **Schema Visualization**: Use tools like [JSON Schema Viewer](https://github.com/networknt/json-schema-viewer) for visualization
-6. **Follow Naming Conventions**: Be consistent with property naming
-7. **Keep Schemas DRY**: Extract common patterns into reusable schema components
-8. **Include Descriptions**: Add clear descriptions for each property
-
-### Schema Design Patterns
-
-#### Reusable Sub-Schemas
-
-```typescript
-// Define reusable schema fragments
-const TimestampFields = z.object({
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime()
-});
-
-// Use them in multiple schemas
-const UserSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string()
-}).merge(TimestampFields);
-
-const PostSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string(),
-  content: z.string()
-}).merge(TimestampFields);
-```
-
-#### Enum Validation
-
-```typescript
-// Define allowed values as an enum
-export const CollectionTypeEnum = z.enum(['public', 'private', 'featured']);
-export type CollectionType = z.infer<typeof CollectionTypeEnum>;
-
-// Use in schema
-export const CollectionSchema = z.object({
-  // ...other properties
-  type: CollectionTypeEnum,
-  // ...more properties
-});
-```
-
-## Resources
-
-- [Zod Documentation](https://zod.dev/)
-- [JSON Schema](https://json-schema.org/)
-- [NJsonSchema](https://github.com/RicoSuter/NJsonSchema)
-- [JSON.NET](https://www.newtonsoft.com/json)
-- [Ajv Validator](https://ajv.js.org/)
-- [zod-to-json-schema](https://github.com/StefanTerdell/zod-to-json-schema)
-
 ## Schema Design Principles
 
 * All schemas are defined using Zod for TypeScript type safety
@@ -906,3 +539,117 @@ export const CollectionSchema = z.object({
 * Keep schemas focused on one responsibility/entity 
 * Include detailed descriptions for all properties to auto-generate documentation
 * Prefer composition over inheritance for schema reuse 
+
+# Schema Pipeline Overview
+
+This document outlines the end-to-end process for defining, exporting, and consuming data schemas within the CraftSpace project.
+
+## Pipeline Steps
+
+1. **Zod Schemas (TypeScript Source of Truth)**
+   - Located in `SvelteKit/BackSpace/src/lib/schemas/*.ts`
+   - Define core data structures and embedded metadata
+
+2. **Export Script**
+   - Converts Zod schemas to JSON Schema format
+   - Processes descriptions and extracts metadata into `x_meta` fields
+   - Outputs to central JSON schema repository
+
+3. **JSON Schemas (Storage)**
+   - Located in `Unity/CraftSpace/Assets/StreamingAssets/Content/schemas/`
+   - Standard JSON Schema files with embedded metadata
+
+4. **C# Code Generation**
+   - Reads JSON schemas and generates corresponding C# classes
+   - Creates type-safe, reflection-free code
+
+5. **C# Schema Base Class**
+   - `SchemaGeneratedObject` provides common functionality
+   - Handles serialization/deserialization without reflection
+
+6. **Unity Integration Classes**
+   - Extend generated schema classes with Unity-specific features
+   - Handle relationships between objects through ID-based references
+
+7. **Content Registry (Brewster)**
+   - Manages loading, caching, and relationships between objects
+   - Provides global access to schema objects
+
+## Runtime Architecture
+
+Schema objects are managed using an ID-based registry pattern that provides:
+
+- On-demand loading of objects
+- Memory optimization
+- Simple serialization/deserialization
+- Clean handling of object relationships 
+
+## Schema Implementation in Unity
+
+### Accessing Schema Objects
+
+The Brewster registry system provides a central point to access all schema objects:
+
+```csharp
+// Get a collection by its ID
+Collection collection = Brewster.Instance.GetCollection("collectionId");
+
+// Get an item by its ID (requires collection context)
+Item item = Brewster.Instance.GetItem("collectionId", "itemId");
+```
+
+### WebGL/IL2CPP Compatibility
+
+#### ⚠️ WARNING: Avoid Generic JsonConvert.DeserializeObject<T>
+
+JSON.NET's generic deserialization methods like `JsonConvert.DeserializeObject<T>()` use heavy reflection that can cause **hard crashes in WebGL builds**. These methods often work in the Unity Editor but fail catastrophically at runtime in WebGL:
+
+```csharp
+// 🛑 AVOID THIS - Crashes in WebGL!
+List<string> items = JsonConvert.DeserializeObject<List<string>>(jsonContent);
+```
+
+#### ✅ RECOMMENDED: Use JToken-Based Parsing
+
+Instead, use the non-generic `JToken.Parse()` approach followed by explicit type handling:
+
+```csharp
+// ✅ WebGL-safe approach
+JToken token = JToken.Parse(jsonContent);
+if (token is JArray array)
+{
+    List<string> items = new List<string>();
+    foreach (JToken item in array)
+    {
+        if (item.Type == JTokenType.String)
+        {
+            items.Add(item.Value<string>());
+        }
+    }
+}
+```
+
+#### Benefits of JToken Approach:
+
+1. **WebGL/IL2CPP Compatibility**: Minimal reflection, works reliably in WebGL builds
+2. **Dynamic Type Handling**: Better for handling variable data structures
+3. **Polymorphic Data**: Ideal for Internet Archive's diverse metadata formats
+4. **Error Resilience**: More graceful handling of malformed JSON
+5. **Direct JSON Model**: Stays closer to the raw JSON structure
+
+### Schema Classes Design
+
+The schema implementation follows a clear inheritance pattern:
+
+1. `SchemaGeneratedObject` - Base abstract class with common functionality
+2. `*Schema` classes - Generated code from JSON schemas (e.g., `CollectionSchema`, `ItemSchema`) 
+3. Extension classes - Manual classes that extend the generated code (e.g., `Collection`, `Item`)
+
+### Runtime Data Architecture
+
+Schema objects are managed using an ID-based registry pattern:
+
+- Objects are loaded on-demand when requested
+- Relationships between objects are managed via IDs rather than direct references
+- The Brewster registry maintains the object cache
+- This approach optimizes memory usage and supports serialization/deserialization 

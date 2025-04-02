@@ -67,9 +67,28 @@ Schemas can also include Unity-specific type attributes:
 - Create asset menu customization
 - Color coding
 
-### Additional Fields
-All schemas include an `extraFields` property (renamed from `additionalProperties`) that stores any additional Internet Archive metadata fields not explicitly defined in the schema. This approach:
+## Important Implementation Details
 
+### The `extraFields` Mechanism
+
+All schema classes automatically inherit an `extraFields` property from `SchemaGeneratedObject`. This special property:
+
+1. **Is NOT defined in JSON/Zod schemas**: It only exists in the C# implementation
+2. **Captures undefined properties**: Any property not explicitly defined in the schema is stored here
+3. **Preserves all metadata**: Ensures no information is lost during serialization/deserialization
+4. **Is transparent to users**: This is an implementation detail handled by the base class
+
+### How `extraFields` Works
+
+1. During `ImportFromJson()`:
+   - The base class calls your class's `ImportKnownProperties()` to populate defined properties
+   - Then it calls `ImportExtraFields()` to store any undefined properties in `extraFields`
+
+2. During `ExportToJson()`:
+   - Your class's `ExportKnownProperties()` populates a JObject with defined properties
+   - Then the base class adds all entries from `extraFields` back to the JObject
+
+This approach:
 - Preserves all original data
 - Handles evolving schemas and inconsistent field names
 - Ensures backward compatibility
@@ -95,4 +114,27 @@ All generated schema classes inherit from `SchemaGeneratedObject` (in the `Craft
 - System.Object is used for object types to avoid ambiguity with UnityEngine.Object
 
 ## Namespace Organization
-Generated classes use the namespace `CraftSpace.Schemas.Generated` and are inherited by our main classes in the `CraftSpace` namespace. 
+Generated classes use the namespace `CraftSpace.Schemas.Generated` and are inherited by our main classes in the `CraftSpace` namespace.
+
+## Usage Guidelines
+
+1. **NEVER modify generated files**: If changes are needed, modify the schema generator or source schemas
+2. **Use extension classes**: Add functionality in non-generated files like `Item.cs` and `Collection.cs`
+3. **Treat extraFields as internal**: Don't directly access `extraFields` in your code, it's an implementation detail
+
+## Regenerating Schemas
+
+If schema definitions change:
+
+1. Update Zod schemas in `SvelteKit/BackSpace/src/lib/schemas/*.ts`
+2. Run `npm run schemas:regenerate:unity` from the BackSpace directory
+3. Unity will automatically update the generated classes
+
+## Troubleshooting
+
+If you encounter errors in the generated code:
+
+1. Never modify the generated files directly
+2. Check and fix `SchemaGenerator.cs` first
+3. Then regenerate the schema classes
+4. If schema incompatibility issues persist, update the base class `SchemaGeneratedObject.cs` 

@@ -1,3 +1,14 @@
+//------------------------------------------------------------------------------
+// <file_path>Unity/CraftSpace/Assets/Editor/BuildTools.cs</file_path>
+// <namespace>CraftSpace.Editor</namespace>
+// <assembly>Assembly-CSharp-Editor</assembly>
+//
+// Build automation script for WebGL platform. This is NOT related to schema generation.
+// It is a separate build tool that happens to be in the Editor folder.
+//
+// Full absolute path: /Users/a2deh/GroundUp/SpaceCraft/CraftSpace/Unity/CraftSpace/Assets/Editor/BuildTools.cs
+//------------------------------------------------------------------------------
+
 using System.IO;
 using System.Linq;
 using System.Text;

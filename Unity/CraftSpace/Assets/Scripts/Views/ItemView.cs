@@ -1,11 +1,18 @@
-using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 using TMPro;
 using UnityEngine.Events;
+using UnityEngine.Networking;
 
+/// <summary>
+/// Displays a single Item model as a 3D object in the scene.
+/// Features lazy loading of textures, LOD based on distance, and memory-efficient texture management.
+/// Only loads cover images when the item is actually visible to the camera.
+/// </summary>
 [AddComponentMenu("Views/Item View")]
-public class ItemView : MonoBehaviour, IModelView<Item>
+public class ItemView : MonoBehaviour, IModelView<Item>, IItemView
 {
     [Header("Model Reference")]
     [SerializeField] private Item _model;
@@ -35,6 +42,11 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     [SerializeField] private float _highlightMarginBottom = 0f;
     [SerializeField] private float _highlightMarginLeft = 0f;
     [SerializeField] private float _highlightMarginRight = 0f;
+    
+    // Cached component references
+    private MeshFilter _meshFilter;
+    private MeshRenderer _meshRenderer;
+    private BoxCollider _boxCollider;
     
     // Tracked renderers - update to use the base non-generic type
     private Dictionary<System.Type, MonoBehaviour> _renderers = new Dictionary<System.Type, MonoBehaviour>();
@@ -71,9 +83,23 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     // Unity event for item changes
     public UnityEvent<Item> OnItemChanged => _onItemChanged;
     
+    // Add a new method to report visibility changes
+    private bool _wasVisibleLastFrame = false;
+    
     private void Awake()
     {
         _mainCamera = Camera.main;
+        
+        // Cache component references
+        _meshFilter = GetComponent<MeshFilter>();
+        if (_meshFilter == null)
+            _meshFilter = gameObject.AddComponent<MeshFilter>();
+            
+        _meshRenderer = GetComponent<MeshRenderer>();
+        if (_meshRenderer == null)
+            _meshRenderer = gameObject.AddComponent<MeshRenderer>();
+            
+        _boxCollider = GetComponent<BoxCollider>();
         
         if (_model != null)
         {
@@ -87,13 +113,17 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         }
     }
     
+    /// <summary>
+    /// Simplified Update method that doesn't do periodic polling
+    /// </summary>
     private void Update()
     {
-        // Check distance to camera periodically to update renderers
-        if (_mainCamera != null && Time.time > _lastDistanceCheck + DISTANCE_CHECK_INTERVAL)
+        // If texture is loaded but not applied to renderer, apply it
+        if (_model != null && _model.cover != null && 
+            _meshRenderer != null && _meshRenderer.material != null && 
+            _meshRenderer.material.mainTexture != _model.cover)
         {
-            _lastDistanceCheck = Time.time;
-            UpdateRenderersBasedOnDistance();
+            ApplyLoadedTexture(_model.cover);
         }
     }
     
@@ -111,6 +141,9 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         {
             // Unregister when view is destroyed
             _model.UnregisterView(this);
+            
+            // If this is the last view for this item, we should consider cleaning up the texture
+            // This is handled in the Item class's UnregisterView method
         }
         
         // Clean up renderers
@@ -124,24 +157,52 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         UpdateView();
     }
     
+    // Implement the IItemView interface method
+    public void OnItemUpdated(Item item)
+    {
+        try
+        {
+            // Verify this is our model
+            if (_model != item)
+            {
+                Debug.LogWarning($"[ItemView] Received update for different item: {item?.Title ?? "null"}");
+                return;
+            }
+            
+            // Use existing handler for backward compatibility
+            HandleModelUpdated();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[ItemView] Error in OnItemUpdated: {ex.Message}");
+        }
+    }
+    
     // Update view based on the current model
     public void UpdateView()
     {
-        if (Item == null)
+        try
         {
-            // No model, hide all renderers
-            DeactivateAllRenderers();
-            return;
+            if (Item == null)
+            {
+                // No model, hide all renderers
+                DeactivateAllRenderers();
+                return;
+            }
+            
+            // Update distance-based renderers
+            UpdateBasedOnDistance();
+            
+            // Update all renderers with the model
+            UpdateRenderers();
+            
+            // Notify subscribers that the model has been updated
+            ModelUpdated?.Invoke();
         }
-        
-        // Update distance-based renderers
-        UpdateBasedOnDistance();
-        
-        // Update all renderers with the model
-        UpdateRenderers();
-        
-        // Notify subscribers that the model has been updated
-        ModelUpdated?.Invoke();
+        catch (Exception ex)
+        {
+            Debug.LogError($"[ItemView] Error in UpdateView: {ex.Message}");
+        }
     }
     
     // Update all renderers with the current model
@@ -271,18 +332,106 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         _model = model;
         _model.RegisterView(this);
         
-        // Log model assignment
-        Debug.Log($"[ItemView] Model set for item view. Item ID: {_model.Id}, Collection ID: {_model.CollectionId}");
+        Debug.Log($"[ItemView/SET_MODEL] *** Setting model: {_model.Id} - {_model.Title} ***");
+        
+        // Apply loading material
+        if (_loadingMaterial != null)
+        {
+            _meshRenderer.material = _loadingMaterial;
+            
+            // Create standard book cover mesh for loading state
+            float loadingWidth = _itemWidth;
+            float loadingHeight = _itemWidth * 1.5f; // Book cover aspect ratio
+            if (loadingHeight > _itemHeight)
+            {
+                loadingHeight = _itemHeight;
+                loadingWidth = loadingHeight / 1.5f;
+            }
+            CreateOrUpdateCoverMesh(loadingWidth, loadingHeight);
+        }
+        else
+        {
+            // Create a fallback material if loading material is not set
+            Material fallbackMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            fallbackMaterial.color = new Color(0.8f, 0.8f, 0.8f); // Light gray
+            _meshRenderer.material = fallbackMaterial;
+            
+            // Create standard book cover mesh for loading state
+            float loadingWidth = _itemWidth;
+            float loadingHeight = _itemWidth * 1.5f; // Book cover aspect ratio
+            if (loadingHeight > _itemHeight)
+            {
+                loadingHeight = _itemHeight;
+                loadingWidth = loadingHeight / 1.5f;
+            }
+            CreateOrUpdateCoverMesh(loadingWidth, loadingHeight);
+        }
+        
+        // Set up label text immediately
+        if (_itemLabel != null)
+        {
+            _itemLabel.SetText(_model.Title);
+        }
+        
+        // IMMEDIATELY load cover image without any delay or distance checks
+        Debug.Log($"[ItemView/SET_MODEL] Immediately loading cover image for {_model.Id}");
+        LoadItemImage();
         
         // Update view with the new model
         UpdateView();
+        
+        // Trigger event for external listeners
+        _onItemChanged.Invoke(_model);
     }
 
+    // New method to force immediate loading without any delay or visibility check
+    private void ForceLoadCoverImage()
+    {
+        if (_model == null || string.IsNullOrEmpty(_model.Id)) return;
+
+        // Construct the direct file path
+        string coverPath = System.IO.Path.Combine(
+            Application.streamingAssetsPath,
+            "Content",
+            "collections",
+            _model.ParentCollectionId,
+            "items", 
+            _model.Id,
+            "cover.jpg"
+        );
+
+        // Check if file exists
+        if (!System.IO.File.Exists(coverPath)) return;
+
+        try
+        {
+            // Direct file loading - simple and reliable
+            byte[] imageData = System.IO.File.ReadAllBytes(coverPath);
+            
+            // Create texture from bytes
+            Texture2D texture = new Texture2D(2, 2);
+            if (texture.LoadImage(imageData))
+            {
+                // Cache the texture in the model
+                _model.cover = texture;
+                
+                // Apply the texture to this view
+                ApplyLoadedTexture(texture);
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[ItemView] Exception loading cover: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Determines if this item is currently visible to the camera.
+    /// For now, always returns true to ensure loading.
+    /// </summary>
     private bool IsVisible()
     {
-        if (_mainCamera == null) return false;
-        Vector3 screenPoint = _mainCamera.WorldToViewportPoint(transform.position);
-        return screenPoint.z > 0 && screenPoint.x > 0 && screenPoint.x < 1 && screenPoint.y > 0 && screenPoint.y < 1;
+        return true;  // Always consider visible
     }
 
     private string GetGameObjectPath()
@@ -299,23 +448,21 @@ public class ItemView : MonoBehaviour, IModelView<Item>
 
     private void CreateOrUpdateCoverMesh(float width, float height)
     {
-        // Get or add mesh filter/renderer
-        MeshFilter meshFilter = GetComponent<MeshFilter>();
-        if (meshFilter == null)
-            meshFilter = gameObject.AddComponent<MeshFilter>();
-        
-        MeshRenderer meshRenderer = GetComponent<MeshRenderer>();
-        if (meshRenderer == null)
-            meshRenderer = gameObject.AddComponent<MeshRenderer>();
+        // Use cached mesh filter/renderer
+        if (width <= 0 || height <= 0)
+        {
+            Debug.LogWarning($"[ItemView] Invalid mesh dimensions: {width}x{height}");
+            return;
+        }
         
         // Create or update mesh
-        if (meshFilter.sharedMesh == null)
+        if (_meshFilter.sharedMesh == null)
         {
-            meshFilter.sharedMesh = MeshGenerator.CreateFlatQuad(width, height);
+            _meshFilter.sharedMesh = MeshGenerator.CreateFlatQuad(width, height);
         }
         else
         {
-            MeshGenerator.ResizeQuadMesh(meshFilter.sharedMesh, width, height);
+            MeshGenerator.ResizeQuadMesh(_meshFilter.sharedMesh, width, height);
         }
     }
 
@@ -362,16 +509,15 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         // Create/update mesh
         CreateOrUpdateCoverMesh(width, height);
         
-        // Setup material
-        MeshRenderer renderer = GetComponent<MeshRenderer>();
-        if (renderer != null)
+        // Setup material - use cached renderer
+        if (_meshRenderer != null)
         {
             // Ensure we have a material
-            if (renderer.material == null)
-                renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            if (_meshRenderer.material == null)
+                _meshRenderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             
             // Apply texture
-            renderer.material.mainTexture = texture;
+            _meshRenderer.material.mainTexture = texture;
         }
         
         // Update UI (including title positioning)
@@ -384,14 +530,14 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         if (Item == null) return;
 
         // If we don't have a texture yet, create a standard book-shaped mesh
-        if (GetComponent<MeshRenderer>()?.material?.mainTexture == null)
+        if (_meshRenderer?.material?.mainTexture == null)
         {
-            BoxCollider boxCollider = GetComponent<BoxCollider>();
-            if (boxCollider == null) return;
+            // Use cached box collider if available
+            if (_boxCollider == null) return;
 
             // Get collider dimensions
-            float colliderWidth = boxCollider.size.x;
-            float colliderHeight = boxCollider.size.z;  // Using Z since we're flat on the ground
+            float colliderWidth = _boxCollider.size.x;
+            float colliderHeight = _boxCollider.size.z;  // Using Z since we're flat on the ground
 
             // Use standard book aspect ratio for placeholder (2:3)
             float defaultAspect = 2f/3f;  // width:height ratio
@@ -403,32 +549,27 @@ public class ItemView : MonoBehaviour, IModelView<Item>
             height = colliderHeight;
             width = height * defaultAspect;
 
-            // Create/update mesh
-            MeshFilter meshFilter = GetComponent<MeshFilter>();
-            if (meshFilter == null)
-                meshFilter = gameObject.AddComponent<MeshFilter>();
-            
-            if (meshFilter.sharedMesh == null)
+            // Create/update mesh - use cached mesh filter
+            if (_meshFilter.sharedMesh == null)
             {
-                meshFilter.sharedMesh = MeshGenerator.CreateCoverMesh(width, height);
+                _meshFilter.sharedMesh = MeshGenerator.CreateCoverMesh(width, height);
             }
             else
             {
-                MeshGenerator.ResizeQuadMesh(meshFilter.sharedMesh, width, height);
+                MeshGenerator.ResizeQuadMesh(_meshFilter.sharedMesh, width, height);
             }
             
             // Create a simple unlit material for the placeholder
-            MeshRenderer renderer = GetComponent<MeshRenderer>();
-            if (renderer != null)
+            if (_meshRenderer != null)
             {
                 Material material = new Material(Shader.Find("Unlit/Texture"));
                 if (_loadingMaterial != null)
                 {
-                    renderer.material = _loadingMaterial;
+                    _meshRenderer.material = _loadingMaterial;
                 }
                 else
                 {
-                    renderer.material = material;
+                    _meshRenderer.material = material;
                 }
             }
         }
@@ -456,102 +597,473 @@ public class ItemView : MonoBehaviour, IModelView<Item>
             return string.Empty;
             
         // Don't include file extension - Unity will find the right asset type
-        return $"Content/collections/{Item.collectionId}/items/{itemId}/cover";
+        return $"Content/collections/{Item.ParentCollectionId}/items/{itemId}/cover";
     }
 
-    // Method to load an image
+    /// <summary>
+    /// Loads the cover image for the item
+    /// </summary>
     public void LoadItemImage()
     {
         if (Item == null || string.IsNullOrEmpty(Item.Id))
             return;
 
-        // Create initial mesh and renderer
-        MeshFilter meshFilter = GetComponent<MeshFilter>();
-        if (meshFilter == null)
-            meshFilter = gameObject.AddComponent<MeshFilter>();
-        
-        MeshRenderer renderer = GetComponent<MeshRenderer>();
-        if (renderer == null)
-            renderer = gameObject.AddComponent<MeshRenderer>();
-
-        // Set initial loading state with proper book cover proportions
+        // Use placeholder material while loading
         if (_loadingMaterial != null)
+            _meshRenderer.material = _loadingMaterial;
+
+        // Create standard book cover mesh
+        CreateOrUpdateCoverMesh(_itemWidth, _itemHeight);
+
+        // Check if cover image is already loaded in the Item
+        if (Item.cover != null)
         {
-            renderer.material = _loadingMaterial;
+            ApplyLoadedTexture(Item.cover);
+            return;
         }
 
-        // Create standard book cover mesh for loading state
-        float loadingWidth = _itemWidth;
-        float loadingHeight = _itemWidth * 1.5f; // Book cover aspect ratio
-        if (loadingHeight > _itemHeight)
+        // Construct the path to the cover image
+        string coverPath = System.IO.Path.Combine(
+            Application.streamingAssetsPath,
+            "Content",
+            "collections",
+            Item.ParentCollectionId,
+            "items",
+            Item.Id,
+            "cover.jpg"
+        );
+        
+        // If the direct cover.jpg file doesn't exist, try to locate any image in the folder
+        if (!System.IO.File.Exists(coverPath))
         {
-            loadingHeight = _itemHeight;
-            loadingWidth = loadingHeight / 1.5f;
+            string itemFolder = System.IO.Path.GetDirectoryName(coverPath);
+            
+            if (System.IO.Directory.Exists(itemFolder))
+            {
+                // Get all image files using separate calls to avoid Concat issues
+                List<string> imageFiles = new List<string>();
+                imageFiles.AddRange(System.IO.Directory.GetFiles(itemFolder, "*.jpg"));
+                imageFiles.AddRange(System.IO.Directory.GetFiles(itemFolder, "*.png"));
+                imageFiles.AddRange(System.IO.Directory.GetFiles(itemFolder, "*.jpeg"));
+                
+                if (imageFiles.Count > 0)
+                {
+                    coverPath = imageFiles[0]; // Use the first image file found
+                }
+            }
         }
-        CreateOrUpdateCoverMesh(loadingWidth, loadingHeight);
+        
+        if (!System.IO.File.Exists(coverPath))
+            return;
 
-        // Load texture from Resources
-        string resourcePath = GetItemThumbnailUrl(Item.Id);
-        Texture2D texture = Resources.Load<Texture2D>(resourcePath);
-        if (texture != null)
-        {
-            ApplyLoadedTexture(texture);
+        // FORCE IMMEDIATE LOAD FIRST - try to load without callback 
+        try {
+            byte[] imageData = System.IO.File.ReadAllBytes(coverPath);
+            Texture2D directTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (directTexture.LoadImage(imageData)) {
+                // Force-set the texture on the model
+                Item.cover = directTexture;
+                
+                // Apply to the renderer
+                ApplyLoadedTexture(directTexture);
+                
+                // NOTIFY ALL OTHER VIEWS that we've updated the model texture
+                Item.NotifyViewsOfUpdate();
+                
+                // Done - direct loading was successful
+                return;
+            }
+        } catch (Exception ex) {
+            // Silently fall back to async
         }
-        else
-        {
-            Debug.LogWarning($"Failed to load texture from Resources: {resourcePath}");
-        }
+        
+        // If direct loading failed, fall back to the async version
+        // Start the download/load process
+        ItemImageLoader.StartDownload(
+            Item.Id,
+            coverPath,
+            (texture) => {
+                // Store the texture in the model for caching
+                if (texture != null && Item != null)
+                {
+                    // FORCEFULLY set the texture on the model
+                    Item.cover = texture;
+                    
+                    // Double check that Item.cover is set
+                    if (Item.cover == null) {
+                        Item.cover = texture; // Try again
+                    }
+                    
+                    // Apply the texture to our material
+                    ApplyLoadedTexture(texture);
+                    
+                    // Force update any other views
+                    Item.NotifyViewsOfUpdate();
+                }
+            },
+            true // Try immediate loading first
+        );
     }
 
     private void ApplyLoadedTexture(Texture2D texture)
     {
         if (texture == null) return;
+        if (_meshRenderer == null) return;
 
-        BoxCollider boxCollider = GetComponent<BoxCollider>();
-        if (boxCollider == null) return;
-
-        // Get collider dimensions
-        float colliderWidth = boxCollider.size.x;
-        float colliderHeight = boxCollider.size.z;  // This is our height in XZ plane
-
-        // Get actual texture aspect ratio (width/height)
-        float textureAspect = (float)texture.width / texture.height;
+        // Create a new material with an unlit texture shader - fast and WebGL compatible
+        Shader shader = Shader.Find("Unlit/Texture");
+        if (shader == null) 
+        {
+            shader = Shader.Find("Diffuse"); // Minimal fallback
+        }
         
-        float width, height;
+        if (shader == null)
+        {
+            Material errorMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            errorMaterial.color = Color.magenta;
+            _meshRenderer.material = errorMaterial;
+            return;
+        }
         
-        // Scale by the LONGEST dimension first, then let the other one be proportionally smaller
-        if (textureAspect >= 1.0f)  // Width is longest dimension
-        {
-            width = colliderWidth;  // Fill width
-            height = width / textureAspect;  // Height will be smaller, creating gaps top/bottom
-        }
-        else  // Height is longest dimension
-        {
-            height = colliderHeight;  // Fill height
-            width = height * textureAspect;  // Width will be smaller, creating gaps left/right
-        }
+        Material material = new Material(shader);
+        material.mainTexture = texture;
+        _meshRenderer.material = material;
 
-        // Create/update mesh with these dimensions
-        MeshFilter meshFilter = GetComponent<MeshFilter>();
-        if (meshFilter == null)
-            meshFilter = gameObject.AddComponent<MeshFilter>();
+        // Update the mesh to match the texture's aspect ratio
+        float aspectRatio = (float)texture.width / texture.height;
+        float coverWidth = _itemWidth;
+        float coverHeight = coverWidth / aspectRatio;
         
-        if (meshFilter.sharedMesh == null)
+        // If height exceeds maximum, scale width down
+        if (coverHeight > _itemHeight)
         {
-            meshFilter.sharedMesh = MeshGenerator.CreateCoverMesh(width, height);
+            coverHeight = _itemHeight;
+            coverWidth = coverHeight * aspectRatio;
         }
-        else
+        
+        CreateOrUpdateCoverMesh(coverWidth, coverHeight);
+        
+        // Force a redraw of the renderer
+        if (_meshRenderer != null)
         {
-            MeshGenerator.ResizeQuadMesh(meshFilter.sharedMesh, width, height);
+            _meshRenderer.enabled = false;
+            _meshRenderer.enabled = true;
         }
+    }
 
-        // Set up material
-        MeshRenderer renderer = GetComponent<MeshRenderer>();
-        if (renderer != null)
+    /// <summary>
+    /// Static helper class for loading item cover images asynchronously
+    /// </summary>
+    private static class ItemImageLoader
+    {
+        private static Dictionary<string, int> _activeDownloads = new Dictionary<string, int>();
+        private static Dictionary<string, List<ImageLoadedCallback>> _callbacks = new Dictionary<string, List<ImageLoadedCallback>>();
+        private static Dictionary<string, Texture2D> _textureCache = new Dictionary<string, Texture2D>();
+        private static Dictionary<string, int> _referenceCount = new Dictionary<string, int>();
+        
+        private static Dictionary<string, ImageLoadRunner> _runnerLookup = new Dictionary<string, ImageLoadRunner>();
+        
+        // Callback definition
+        public delegate void ImageLoadedCallback(Texture2D texture);
+        
+        /// <summary>
+        /// Initiates an image download with multiple optimizations:
+        /// 1. Prevents duplicate downloads for the same item
+        /// 2. Tries immediate loading before async for faster response
+        /// 3. Handles reference counting for memory management
+        /// </summary>
+        public static void StartDownload(string itemId, string imagePath, ImageLoadedCallback callback, bool checkImmediate = true)
         {
-            Material material = new Material(Shader.Find("Unlit/Texture"));
-            material.mainTexture = texture;
-            renderer.material = material;
+            // Register for reference counting
+            RegisterTextureUser(itemId);
+            
+            // Add callback to notify when download completes
+            if (!_callbacks.ContainsKey(itemId))
+            {
+                _callbacks[itemId] = new List<ImageLoadedCallback>();
+            }
+            _callbacks[itemId].Add(callback);
+            
+            // If already completed and cached, return immediately
+            if (_textureCache.ContainsKey(itemId) && _textureCache[itemId] != null)
+            {
+                NotifyCallbacks(itemId, _textureCache[itemId]);
+                return;
+            }
+            
+            // If already downloading, just wait for completion
+            if (_activeDownloads.ContainsKey(itemId) && _activeDownloads[itemId] > 0)
+            {
+                return;
+            }
+            
+            // Start fresh download
+            _activeDownloads[itemId] = 1;
+            
+            // Check if the file exists
+            if (!System.IO.File.Exists(imagePath))
+            {
+                NotifyCallbacks(itemId, null);
+                _activeDownloads.Remove(itemId);
+                return;
+            }
+            
+            // Try immediate loading if requested
+            if (checkImmediate)
+            {
+                bool immediateSuccess = TryLoadImageImmediate(itemId, imagePath);
+                if (immediateSuccess)
+                {
+                    _activeDownloads.Remove(itemId);
+                    return;
+                }
+            }
+            
+            // Start the coroutine for async loading
+            ImageLoadRunner runner = new ImageLoadRunner();
+            _runnerLookup[itemId] = runner;
+            runner.StartCoroutine(itemId, imagePath);
+        }
+        
+        /// <summary>
+        /// Try to load the image synchronously for faster loading
+        /// </summary>
+        private static bool TryLoadImageImmediate(string itemId, string imagePath)
+        {
+            try
+            {
+                // Load all bytes from the file
+                byte[] imageData = System.IO.File.ReadAllBytes(imagePath);
+                
+                // Create texture with explicit format for WebGL compatibility
+                Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                texture.filterMode = FilterMode.Bilinear; // Make it look nicer
+                
+                bool loadSuccess = texture.LoadImage(imageData);
+                
+                if (loadSuccess)
+                {
+                    // Apply mipmap generation for better quality at distance
+                    texture.Apply(true, false);
+                    
+                    // Cache the loaded texture
+                    _textureCache[itemId] = texture;
+                    
+                    // Try to find matching Item in the Brewster registry and set its cover
+                    if (Brewster.Instance != null)
+                    {
+                        // Look up the item directly from Brewster
+                        Item itemRef = Brewster.Instance.GetItem(null, itemId);
+                        if (itemRef != null)
+                        {
+                            // Found the item, directly set its cover property
+                            itemRef.cover = texture;
+                            
+                            // NOTIFY ALL VIEWS of the update to ensure everyone gets the texture
+                            itemRef.NotifyViewsOfUpdate();
+                        }
+                    }
+                    
+                    // Notify callbacks 
+                    NotifyCallbacks(itemId, texture);
+                    return true;
+                }
+                return false;
+            }
+            catch (System.Exception)
+            {
+                return false;
+            }
+        }
+        
+        // Helper class to run coroutines for async loading
+        private class ImageLoadRunner
+        {
+            private UnityEngine.Coroutine _coroutine;
+            
+            public void StartCoroutine(string itemId, string imagePath)
+            {
+                // Use the main MonoBehaviour to start our coroutine
+                if (Brewster.Instance != null)
+                {
+                    _coroutine = Brewster.Instance.StartCoroutine(LoadImageAsync(itemId, imagePath, this));
+                }
+                else
+                {
+                    NotifyCallbacks(itemId, null);
+                }
+            }
+        }
+        
+        // Coroutine for loading images
+        private static System.Collections.IEnumerator LoadImageAsync(string itemId, string imagePath, ImageLoadRunner runner)
+        {
+            if (!System.IO.File.Exists(imagePath))
+            {
+                NotifyCallbacks(itemId, null);
+                yield break;
+            }
+
+            // Add a frame delay before starting to avoid freezing UI
+            yield return null;
+            
+            // Load the file data
+            byte[] imageData = null;
+            
+            try
+            {
+                imageData = System.IO.File.ReadAllBytes(imagePath);
+            }
+            catch (System.Exception)
+            {
+                NotifyCallbacks(itemId, null);
+                _activeDownloads.Remove(itemId);
+                _runnerLookup.Remove(itemId);
+                yield break;
+            }
+
+            // Add another frame delay after loading the file
+            yield return null;
+            
+            // Check file data
+            if (imageData == null || imageData.Length == 0)
+            {
+                NotifyCallbacks(itemId, null);
+                _activeDownloads.Remove(itemId);
+                _runnerLookup.Remove(itemId);
+                yield break;
+            }
+            
+            // Create and process the texture
+            Texture2D texture = null;
+            bool success = false;
+            
+            try
+            {
+                // Create texture with explicit format for WebGL compatibility
+                texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                texture.filterMode = FilterMode.Bilinear; // Make it look nicer
+                
+                success = texture.LoadImage(imageData);
+            }
+            catch (System.Exception)
+            {
+                NotifyCallbacks(itemId, null);
+                _activeDownloads.Remove(itemId);
+                _runnerLookup.Remove(itemId);
+                yield break;
+            }
+            
+            // Process the result
+            if (success)
+            {
+                // Apply mipmap generation for better quality at distance
+                texture.Apply(true, false);
+                
+                // Cache result
+                _textureCache[itemId] = texture;
+                
+                // Try to find matching Item in the Brewster registry and set its cover
+                if (Brewster.Instance != null)
+                {
+                    // Look up the item directly from Brewster
+                    Item itemRef = Brewster.Instance.GetItem(null, itemId);
+                    if (itemRef != null)
+                    {
+                        // Found the item, directly set its cover property
+                        itemRef.cover = texture;
+                        
+                        // NOTIFY ALL VIEWS of the update to ensure everyone gets the texture
+                        itemRef.NotifyViewsOfUpdate();
+                    }
+                }
+                
+                // Notify listeners
+                NotifyCallbacks(itemId, texture);
+            }
+            else
+            {
+                NotifyCallbacks(itemId, null);
+            }
+            
+            // Clean up
+            _activeDownloads.Remove(itemId);
+            _runnerLookup.Remove(itemId);
+            
+            yield break;
+        }
+        
+        /// <summary>
+        /// Register a view with this model
+        /// </summary>
+        private static void RegisterTextureUser(string itemId)
+        {
+            if (!_referenceCount.ContainsKey(itemId))
+            {
+                _referenceCount[itemId] = 0;
+            }
+            
+            _referenceCount[itemId]++;
+        }
+        
+        /// <summary>
+        /// Unregister a view from this model
+        /// </summary>
+        public static void UnregisterTextureUser(string itemId)
+        {
+            if (_referenceCount.ContainsKey(itemId))
+            {
+                _referenceCount[itemId]--;
+                
+                // If no more references, release the texture
+                if (_referenceCount[itemId] <= 0)
+                {
+                    _referenceCount.Remove(itemId);
+                    
+                    // Clear the cache
+                    if (_textureCache.ContainsKey(itemId))
+                    {
+                        Texture2D texture = _textureCache[itemId];
+                        if (texture != null)
+                        {
+                            UnityEngine.Object.Destroy(texture);
+                        }
+                        
+                        _textureCache.Remove(itemId);
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Notify all waiting callbacks for an item
+        /// </summary>
+        private static void NotifyCallbacks(string itemId, Texture2D texture)
+        {
+            if (!_callbacks.ContainsKey(itemId))
+            {
+                return;
+            }
+            
+            foreach (var callback in _callbacks[itemId])
+            {
+                try
+                {
+                    callback(texture);
+                }
+                catch (System.Exception) { }
+            }
+            
+            // Clear callbacks after notification
+            _callbacks.Remove(itemId);
+        }
+        
+        /// <summary>
+        /// Check if an image is currently being downloaded
+        /// </summary>
+        public static bool IsDownloading(string itemId)
+        {
+            return _activeDownloads.ContainsKey(itemId) && _activeDownloads[itemId] > 0;
         }
     }
 
@@ -566,11 +1078,14 @@ public class ItemView : MonoBehaviour, IModelView<Item>
             MeshRenderer meshRenderer = _highlightMesh.AddComponent<MeshRenderer>();
             
             Mesh mesh = new Mesh();
-            BoxCollider boxCollider = GetComponent<BoxCollider>();
+            
+            // Use cached box collider
+            if (_boxCollider == null)
+                _boxCollider = GetComponent<BoxCollider>();
             
             // Get base size from collider
-            float baseWidth = boxCollider != null ? boxCollider.size.x : 1f;
-            float baseLength = boxCollider != null ? boxCollider.size.z : 1f;
+            float baseWidth = _boxCollider != null ? _boxCollider.size.x : 1f;
+            float baseLength = _boxCollider != null ? _boxCollider.size.z : 1f;
             
             // Calculate asymmetric positions
             float left = -baseWidth/2 - _highlightMarginLeft;
@@ -669,6 +1184,7 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     // Initialize with an item
     public void Initialize(Item item)
     {
+        Debug.Log($"[ItemView/INIT] Initializing with item: {item?.Id ?? "null"} - {item?.Title ?? "unknown"}");
         SetModel(item);
     }
 
@@ -676,5 +1192,23 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     public void Clear()
     {
         SetModel(null);
+    }
+
+    // Add a new method to report visibility changes
+    private void CheckVisibilityChanged()
+    {
+        bool isVisible = IsVisible();
+        
+        // Just track the state change without logging
+        if (isVisible != _wasVisibleLastFrame)
+        {
+            _wasVisibleLastFrame = isVisible;
+        }
+    }
+
+    // Helper method to check if a file exists
+    private bool CheckFileWithDiagnostics(string path, string description)
+    {
+        return System.IO.File.Exists(path);
     }
 } 
