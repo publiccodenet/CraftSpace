@@ -607,44 +607,28 @@ public class Brewster : MonoBehaviour
         if (verbose) Debug.Log($"[Brewster/Registry] Cache miss for Item: {itemCacheKey}. Attempting to load from file (Context: Collection '{collectionId}').");
         try
         {
-            // Construct path based on structured directory layout where items are in subdirectories:
-            // Content/collections/{collectionId}/items/{itemId}/item.json
+            // SINGULAR DEFINITIVE PATH CONSTRUCTION - This is the ONLY place that should construct this path
             string itemFilePath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, 
                 "collections", collectionId, "items", itemId, "item.json");
-            
-            // DEBUGGING: Print detailed path information
-            Debug.Log("[Brewster/DEBUG] Path components:");
-            Debug.Log($"[Brewster/DEBUG] - streamingAssetsPath: '{Application.streamingAssetsPath}'");
-            Debug.Log($"[Brewster/DEBUG] - baseResourcePath: '{baseResourcePath}'");
-            Debug.Log($"[Brewster/DEBUG] - Full item path: '{itemFilePath}'");
-            
-            // DEBUGGING: Check directory existence
-            string itemDirectory = Path.GetDirectoryName(itemFilePath);
-            if (!Directory.Exists(itemDirectory))
-            {
-                Debug.LogError($"[Brewster/DEBUG] Item directory does not exist: '{itemDirectory}'");
-                // Check parent directories to find where the path is breaking
-                string parent = Path.GetDirectoryName(itemDirectory);
-                while (!string.IsNullOrEmpty(parent) && !Directory.Exists(parent))
-                {
-                    Debug.LogError($"[Brewster/DEBUG] Parent directory also does not exist: '{parent}'");
-                    parent = Path.GetDirectoryName(parent);
-                }
-                if (!string.IsNullOrEmpty(parent))
-                {
-                    Debug.Log($"[Brewster/DEBUG] First existing parent directory: '{parent}'");
-                    // List contents of the existing parent directory
-                    string[] contents = Directory.GetDirectories(parent);
-                    Debug.Log($"[Brewster/DEBUG] Contents of '{parent}': {string.Join(", ", contents)}");
-                }
-            }
-            
+
             if (verbose) Debug.Log("[Brewster/Registry] Loading Item from: '" + itemFilePath + "'");
             
+            // STRICTLY CHECK EXISTENCE - Fatal error if missing
             if (!File.Exists(itemFilePath))
             {
-                Debug.LogWarning($"[Brewster/Registry] Item file not found: {itemFilePath}");
-                return null;
+                // FATAL ERROR - item.json is missing
+                Debug.LogError($"[Brewster/Registry] FATAL ERROR: Item file not found: {itemFilePath}");
+                
+                // Create placeholder item with MISSING title
+                Item placeholderItem = ScriptableObject.CreateInstance<Item>();
+                placeholderItem.Id = itemId;
+                placeholderItem.Title = "MISSING";  // Use MISSING as title
+                placeholderItem.ParentCollectionId = collectionId;
+                
+                // Add to cache so we don't keep trying to load it
+                _loadedItems[itemCacheKey] = placeholderItem;
+                
+                return placeholderItem;
             }
             
             string jsonContent = File.ReadAllText(itemFilePath);
@@ -654,38 +638,73 @@ public class Brewster : MonoBehaviour
             
             if (item != null)
             {
-                 if (item.Id != itemId)
-                 {
-                     Debug.LogWarning($"[Brewster/Registry] Item ID mismatch! Directory ID '{itemId}' does not match item.json ID '{item.Id}'. Using directory ID for caching key, but object has its own ID.");
-                     // Consider forcing ID: item.Id = itemId;
-                 }
+                if (item.Id != itemId)
+                {
+                    Debug.LogWarning($"[Brewster/Registry] Item ID mismatch! Directory ID '{itemId}' does not match item.json ID '{item.Id}'. Using directory ID for caching key, but object has its own ID.");
+                    // Consider forcing ID: item.Id = itemId;
+                }
 
-                 // Set Parent Collection ID before caching/returning
-                 item.ParentCollectionId = collectionId; 
+                // Set Parent Collection ID before caching/returning
+                item.ParentCollectionId = collectionId; 
 
-                 // Add to cache
-                 _loadedItems[itemCacheKey] = item;
-                 if (verbose) Debug.Log($"[Brewster/Registry] Loaded and cached Item: {item.Id} from Collection: {collectionId}");
+                // Add to cache
+                _loadedItems[itemCacheKey] = item;
+                if (verbose) Debug.Log($"[Brewster/Registry] Loaded and cached Item: {item.Id} from Collection: {collectionId}");
 
-                 // --- Trigger Cover Image Load ---
-                 // Load cover image after item is loaded and cached.
-                 if (verbose) Debug.Log($"[Brewster/Registry] Triggering cover image load for item: {item.Id}");
-                 item.LoadCoverImage(); 
-                 // --- End Cover Image Load ---
-                 
-                 return item;
+                // --- Trigger Cover Image Load ---
+                // Load cover image after item is loaded and cached.
+                if (verbose) Debug.Log($"[Brewster/Registry] Triggering cover image load for item: {item.Id}");
+                item.LoadCoverImage(); 
+                // --- End Cover Image Load ---
+                
+                return item;
             }
             else
             {
-                Debug.LogError($"[Brewster/Registry] Failed to parse item JSON from: {itemFilePath}");
-                return null;
+                Debug.LogError($"[Brewster/Registry] FATAL ERROR: Failed to parse item JSON from: {itemFilePath}");
+                
+                // Create placeholder item with MISSING title
+                Item placeholderItem = ScriptableObject.CreateInstance<Item>();
+                placeholderItem.Id = itemId;
+                placeholderItem.Title = "MISSING"; // Use MISSING as title for parse failures too
+                placeholderItem.ParentCollectionId = collectionId;
+                
+                // Add to cache so we don't keep trying to load it
+                _loadedItems[itemCacheKey] = placeholderItem;
+                
+                return placeholderItem;
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"[Brewster/Registry] Error loading item '{itemId}' (Collection '{collectionId}') from file: {e.Message}");
-            return null;
+            Debug.LogError($"[Brewster/Registry] FATAL ERROR: Exception loading item '{itemId}' (Collection '{collectionId}'): {e.Message}");
+            
+            // Create placeholder item with MISSING title
+            Item placeholderItem = ScriptableObject.CreateInstance<Item>();
+            placeholderItem.Id = itemId;
+            placeholderItem.Title = "MISSING"; // Use MISSING as title for exceptions too
+            placeholderItem.ParentCollectionId = collectionId;
+            
+            // Add to cache so we don't keep trying to load it
+            _loadedItems[itemCacheKey] = placeholderItem;
+            
+            return placeholderItem;
         }
+    }
+
+    /// <summary>
+    /// Converts an item ID from directory name format to a more readable title
+    /// </summary>
+    private string CleanupItemName(string itemId)
+    {
+        // Replace hyphens, underscores and dots with spaces
+        string cleanTitle = itemId.Replace('-', ' ').Replace('_', ' ').Replace('.', ' ');
+        
+        // Title case the result (capitalize first letter of each word)
+        System.Globalization.TextInfo textInfo = new System.Globalization.CultureInfo("en-US", false).TextInfo;
+        cleanTitle = textInfo.ToTitleCase(cleanTitle);
+        
+        return cleanTitle;
     }
 
     /// <summary>
