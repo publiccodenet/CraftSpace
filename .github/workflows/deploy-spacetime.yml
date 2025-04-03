@@ -6,6 +6,7 @@ on:
       - main  # or master, depending on your default branch
     paths:
       - 'WebSites/spacetime/**'  # Only trigger when files in this directory change
+  workflow_dispatch:
 
 jobs:
   deploy:
