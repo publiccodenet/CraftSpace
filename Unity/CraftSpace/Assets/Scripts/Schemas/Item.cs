@@ -21,6 +21,7 @@ using System.Linq;
 using UnityEngine;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Collections;
 
 [Serializable]
 public class Item : ItemSchema
@@ -151,6 +152,9 @@ public class Item : ItemSchema
         return null; // Or throw NotImplementedException
     }
     
+    /// <summary>
+    /// Loads the cover image for this item.
+    /// </summary>
     public void LoadCoverImage()
     {
         // Ensure ParentCollectionId is set before trying to load
@@ -166,51 +170,93 @@ public class Item : ItemSchema
             return; 
         }
         
-        try
+        // Construct path using ParentCollectionId and the item's own ID
+        // According to README.md structure: collections/collection_id/items/item_id/
+        string coverImagePath = System.IO.Path.Combine(
+            Application.streamingAssetsPath,
+            "Content",                     // Assuming Brewster.baseResourcePath is "Content"
+            "collections",
+            ParentCollectionId,            // Collection directory
+            "items",                       // Items directory
+            Id,                            // Item's directory
+            CoverImage                     // The actual image filename from schema
+        );
+        
+        // For debugging purposes
+        Debug.Log($"[Item:{Id}] Attempting to load cover image from path: {coverImagePath}");
+        
+        // For WebGL, we need to use a coroutine with UnityWebRequest
+        if (Application.platform == RuntimePlatform.WebGLPlayer)
         {
-            // Construct path using ParentCollectionId and the item's own ID
-            // According to README.md structure: collections/collection_id/items/item_id/
-            string coverImagePath = System.IO.Path.Combine(
-                Application.streamingAssetsPath,
-                "Content",                     // Assuming Brewster.baseResourcePath is "Content"
-                "collections",
-                ParentCollectionId,            // Collection directory
-                "items",                       // Items directory
-                Id,                            // Item's directory
-                CoverImage                     // The actual image filename from schema
-            );
-            
-            // For debugging purposes
-            Debug.Log($"[Item:{Id}] Attempting to load cover image from path: {coverImagePath}");
-            
-            if (System.IO.File.Exists(coverImagePath))
+            // Find a MonoBehaviour to start the coroutine
+            if (Brewster.Instance != null)
             {
-                byte[] imageData = System.IO.File.ReadAllBytes(coverImagePath);
-                Texture2D texture = new Texture2D(2, 2); // Create texture (size doesn't matter before LoadImage)
-                
-                if (texture.LoadImage(imageData)) // Load data into texture
-                {
-                    cover = texture; // Assign to the non-serialized field
-                    Debug.Log($"[Item:{Id}] Successfully loaded cover image from {coverImagePath}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[Item:{Id}] Failed to load image data from file: {coverImagePath}. File might be corrupted or not a supported format.");
-                    if (cover != null) UnityEngine.Object.Destroy(cover); // Clean up potentially bad texture
-                    cover = null;
-                }
+                Brewster.Instance.StartCoroutine(LoadCoverImageWithWebRequest(coverImagePath));
             }
             else
             {
-                Debug.LogWarning($"[Item:{Id}] Cover image file not found at calculated path: {coverImagePath}");
-                cover = null;
+                Debug.LogError($"[Item:{Id}] Cannot start WebRequest coroutine - Brewster.Instance is null");
+            }
+            return;
+        }
+        
+        // Standard file loading for non-WebGL platforms
+        try
+        {
+            if (System.IO.File.Exists(coverImagePath))
+            {
+                // Read all bytes from the file
+                byte[] imageData = System.IO.File.ReadAllBytes(coverImagePath);
+                
+                // Create a new texture and load the image data
+                Texture2D texture = new Texture2D(2, 2); // Size will be replaced on load
+                texture.LoadImage(imageData);
+                
+                // Set the texture as the CoverTexture
+                cover = texture;
+                
+                Debug.Log($"[Item:{Id}] Successfully loaded cover image: {coverImagePath}");
+                
+                // Notify all registered views of the update
+                NotifyViewsOfUpdate();
+            }
+            else
+            {
+                Debug.LogWarning($"[Item:{Id}] Cover image file not found: {coverImagePath}");
             }
         }
-        catch (Exception e)
+        catch (System.Exception e)
         {
             Debug.LogError($"[Item:{Id}] Error loading cover image: {e.Message}");
-            if (cover != null) UnityEngine.Object.Destroy(cover); // Clean up on error
-            cover = null;
+        }
+    }
+    
+    /// <summary>
+    /// WebGL-specific method to load cover image using UnityWebRequest
+    /// </summary>
+    private IEnumerator LoadCoverImageWithWebRequest(string coverImagePath)
+    {
+        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequestTexture.GetTexture(coverImagePath))
+        {
+            yield return www.SendWebRequest();
+            
+            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning($"[Item:{Id}] Cover image file not found: {coverImagePath}");
+                Debug.LogWarning($"[Item:{Id}] WebRequest error: {www.error}");
+                yield break;
+            }
+            
+            // Get texture from response
+            Texture2D texture = ((UnityEngine.Networking.DownloadHandlerTexture)www.downloadHandler).texture;
+            
+            // Set the texture
+            cover = texture;
+            
+            Debug.Log($"[Item:{Id}] Successfully loaded cover image via WebRequest: {coverImagePath}");
+            
+            // Notify all registered views of the update
+            NotifyViewsOfUpdate();
         }
     }
 

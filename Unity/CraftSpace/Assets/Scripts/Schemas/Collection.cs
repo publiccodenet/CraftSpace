@@ -22,6 +22,7 @@ using UnityEngine;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO; // Required for Path.Combine
+using System.Collections;
 
 [Serializable]
 public class Collection : CollectionSchema
@@ -322,6 +323,21 @@ public class Collection : CollectionSchema
         bool verbose = Brewster.Instance?.verbose ?? false;
         Debug.Log($"[Collection:{Id}] Attempting to load items index from: '{indexFilePath}'");
 
+        // WebGL requires special handling with UnityWebRequest
+        if (Application.platform == RuntimePlatform.WebGLPlayer)
+        {
+            if (Brewster.Instance != null)
+            {
+                Brewster.Instance.StartCoroutine(LoadItemIndexWithWebRequest(indexFilePath));
+            }
+            else
+            {
+                Debug.LogError($"[Collection:{Id}] Cannot start WebRequest coroutine - Brewster.Instance is null");
+            }
+            return;
+        }
+
+        // Standard file handling for non-WebGL platforms
         if (!File.Exists(indexFilePath))
         {
             Debug.LogWarning($"[Collection:{Id}] Items index not found at path: {indexFilePath}. Collection will have no items.");
@@ -341,11 +357,51 @@ public class Collection : CollectionSchema
              return;
         }
 
+        // Process the loaded JSON
+        ProcessItemIndexJson(indexJson, sw);
+    }
+    
+    /// <summary>
+    /// WebGL-specific loading using UnityWebRequest
+    /// </summary>
+    private IEnumerator LoadItemIndexWithWebRequest(string indexFilePath)
+    {
+        System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+        sw.Start();
+        
+        Debug.Log($"[Collection:{Id}] Using WebRequest to load items index (WebGL mode)");
+        
+        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(indexFilePath))
+        {
+            yield return www.SendWebRequest();
+            
+            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning($"[Collection:{Id}] Items index not found at path: {indexFilePath}. Collection will have no items.");
+                Debug.LogWarning($"[Collection:{Id}] WebRequest error: {www.error}");
+                yield break;
+            }
+            
+            string indexJson = www.downloadHandler.text;
+            Debug.Log($"[Collection:{Id}] File read via WebRequest completed in {sw.ElapsedMilliseconds}ms");
+            
+            // Process the loaded JSON
+            ProcessItemIndexJson(indexJson, sw);
+        }
+    }
+    
+    /// <summary>
+    /// Process item index JSON content
+    /// </summary>
+    private void ProcessItemIndexJson(string indexJson, System.Diagnostics.Stopwatch sw)
+    {
+        bool verbose = Brewster.Instance?.verbose ?? false;
+        
         if (verbose)
         {
             Debug.Log($"[Collection:{Id}] Items index JSON loaded. Length: {indexJson.Length}, Preview: {Truncate(indexJson, 100)}");
             Debug.Log($"[Collection:{Id}] First 20 characters: '{Truncate(indexJson, 20).Replace("\n", "\\n").Replace("\r", "\\r")}'");
-        
+            
             // Check if the JSON starts with [ which indicates an array
             if (indexJson.Length > 0) 
             {
@@ -358,14 +414,8 @@ public class Collection : CollectionSchema
             }
         }
 
-        // WEBGL-SAFE PARSING APPROACH
-        // Use JToken parsing approach instead of JsonConvert for WebGL/IL2CPP compatibility
-        Debug.Log($"[Collection:{Id}] Beginning JToken-based parsing of items index JSON...");
-        
-        sw.Reset();
-        sw.Start();
-        
-        try 
+        // Try to parse the items index
+        try
         {
             // Validate we have non-empty JSON
             if (string.IsNullOrWhiteSpace(indexJson))
@@ -410,45 +460,34 @@ public class Collection : CollectionSchema
             // Log some details about the first few elements (only if verbose)
             if (verbose)
             {
-                int sampleSize = Math.Min(5, array.Count);
-                Debug.Log($"[Collection:{Id}] Examining first {sampleSize} elements of array...");
+                // Show first 3 elements as sample
+                int sampleSize = Mathf.Min(3, array.Count);
                 for (int i = 0; i < sampleSize; i++)
                 {
-                    var item = array[i];
-                    Debug.Log($"[Collection:{Id}] Element[{i}]: Type={item.Type}, Value='{item}', RawValue={item.ToString(Formatting.None)}");
+                    var elem = array[i];
+                    Debug.Log($"[Collection:{Id}] Sample element {i}: Type={elem.Type}, Value={elem}");
                 }
             }
             
-            // Manual iteration and type checking
+            // Process the array of item IDs (should be an array of strings)
             List<string> parsedIds = new List<string>();
             int nonStringTokens = 0;
             
-            Debug.Log($"[Collection:{Id}] Starting iteration through {array.Count} JArray elements...");
-            foreach (Newtonsoft.Json.Linq.JToken item in array)
+            foreach (var token2 in array)
             {
-                // Verify each item is a string
-                if (item.Type == Newtonsoft.Json.Linq.JTokenType.String)
+                // Only accept string tokens, warn about others
+                if (token2.Type == JTokenType.String)
                 {
-                    string value = item.Value<string>();
-                    parsedIds.Add(value);
-                    
-                    // Only log a few to avoid spamming the console, and only if verbose
-                    if (verbose && (parsedIds.Count <= 3 || parsedIds.Count == array.Count))
-                    {
-                        Debug.Log($"[Collection:{Id}] Parsed item ID: '{value}'");
-                    }
-                    else if (verbose && parsedIds.Count == 4)
-                    {
-                        Debug.Log($"[Collection:{Id}] ... (skipping log of remaining IDs)");
-                    }
+                    string id = token2.Value<string>();
+                    parsedIds.Add(id);
                 }
                 else
                 {
                     nonStringTokens++;
-                    Debug.LogWarning($"[Collection:{Id}] Unexpected token type in items index: {item.Type}, Value: {item}. Expected string. Skipping.");
                 }
             }
             
+            // Warn about non-string tokens if any were found
             if (nonStringTokens > 0)
             {
                 Debug.LogWarning($"[Collection:{Id}] Found and skipped {nonStringTokens} non-string tokens in array");
@@ -461,7 +500,7 @@ public class Collection : CollectionSchema
         }
         catch (System.Exception e) 
         {
-             Debug.LogError($"[Collection:{Id}] Failed to parse items index JSON from '{indexFilePath}': {e.Message}");
+             Debug.LogError($"[Collection:{Id}] Failed to parse items index JSON: {e.Message}");
              if (e.InnerException != null)
              {
                  Debug.LogError($"[Collection:{Id}] Inner exception: {e.InnerException.Message}");

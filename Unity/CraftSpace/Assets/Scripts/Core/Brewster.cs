@@ -125,12 +125,12 @@ public class Brewster : MonoBehaviour
             Debug.Log("[Brewster/Registry] About to load collection IDs from index...");
             try
             {
-                LoadCollectionIdsFromIndex();
-                Debug.Log("[Brewster/Registry] Returned from LoadCollectionIdsFromIndex successfully.");
+                LoadCollectionIndex();
+                Debug.Log("[Brewster/Registry] Returned from LoadCollectionIndex successfully.");
             }
             catch (Exception loadEx)
             {
-                Debug.LogError($"[Brewster/Registry] ERROR: Exception during LoadCollectionIdsFromIndex: {loadEx.Message}");
+                Debug.LogError($"[Brewster/Registry] ERROR: Exception during LoadCollectionIndex: {loadEx.Message}");
                 Debug.LogError($"[Brewster/Registry] Exception type: {loadEx.GetType().FullName}");
                 Debug.LogError($"[Brewster/Registry] Stack trace: {loadEx.StackTrace}");
                 throw;
@@ -238,7 +238,7 @@ public class Brewster : MonoBehaviour
     /// <summary>
     /// Loads the collection IDs from the index file into the internal list.
     /// </summary>
-    private void LoadCollectionIdsFromIndex()
+    private void LoadCollectionIndex()
     {
         // (This logic is mostly the same as the old LoadCollectionIds method)
         try
@@ -329,7 +329,11 @@ public class Brewster : MonoBehaviour
                 IsInitialized = true;
                 if (loadCollectionsAutomatically)
                 {
-                    EagerLoadCollections();
+                    // Load all collections if auto-loading is enabled
+                    foreach (var collectionId in _collectionIds)
+                    {
+                        GetCollection(collectionId);
+                    }
                 }
             }
         }
@@ -444,6 +448,15 @@ public class Brewster : MonoBehaviour
 
         // 2. Load from file if not cached
         if (verbose) Debug.Log($"[Brewster/Registry] Cache miss for Collection: {collectionId}. Attempting to load from file.");
+        
+        // For WebGL, we need to use a coroutine with UnityWebRequest
+        if (Application.platform == RuntimePlatform.WebGLPlayer)
+        {
+            StartCoroutine(LoadCollectionWithWebRequest(collectionId));
+            return null; // Will be loaded asynchronously
+        }
+        
+        // Standard file loading for non-WebGL platforms
         try
         {
             string collectionPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", collectionId, "collection.json");
@@ -458,6 +471,44 @@ public class Brewster : MonoBehaviour
             string jsonContent = File.ReadAllText(collectionPath);
             if (verbose) Debug.Log($"[Brewster/Registry] Collection JSON loaded ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
             
+            return ProcessCollectionJson(collectionId, jsonContent, collectionPath);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Brewster/Registry] Error loading collection '{collectionId}' from file: {e.Message}");
+            return null;
+        }
+    }
+    
+    // WebGL-specific loading of collections using UnityWebRequest
+    private IEnumerator LoadCollectionWithWebRequest(string collectionId)
+    {
+        string collectionPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", collectionId, "collection.json");
+        if (verbose) Debug.Log("[Brewster/Registry] Loading Collection via WebRequest from: '" + collectionPath + "'");
+        
+        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(collectionPath))
+        {
+            yield return www.SendWebRequest();
+            
+            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning($"[Brewster/Registry] Collection file not found: {collectionPath}");
+                Debug.LogWarning("[Brewster/Registry] WebRequest error: " + www.error);
+                yield break;
+            }
+            
+            string jsonContent = www.downloadHandler.text;
+            if (verbose) Debug.Log($"[Brewster/Registry] Collection JSON loaded via WebRequest ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
+            
+            ProcessCollectionJson(collectionId, jsonContent, collectionPath);
+        }
+    }
+    
+    // Common processing logic for collection JSON
+    private Collection ProcessCollectionJson(string collectionId, string jsonContent, string collectionPath)
+    {
+        try
+        {
             Collection collection = Collection.FromJson(jsonContent);
             
             if (collection != null)
@@ -509,7 +560,7 @@ public class Brewster : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"[Brewster/Registry] Error loading collection '{collectionId}' from file: {e.Message}");
+            Debug.LogError($"[Brewster/Registry] Error processing collection JSON for '{collectionId}': {e.Message}");
             return null;
         }
     }
@@ -589,12 +640,27 @@ public class Brewster : MonoBehaviour
 
         // 2. Load from file if not cached
         if (verbose) Debug.Log($"[Brewster/Registry] Cache miss for Item: {itemCacheKey}. Attempting to load from file (Context: Collection '{collectionId}').");
+        
+        // SINGULAR DEFINITIVE PATH CONSTRUCTION - This is the ONLY place that should construct this path
+        string itemFilePath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, 
+            "collections", collectionId, "items", itemId, "item.json");
+            
+        // For WebGL, we need to use a coroutine with UnityWebRequest
+        if (Application.platform == RuntimePlatform.WebGLPlayer)
+        {
+            StartCoroutine(LoadItemWithWebRequest(collectionId, itemId, itemCacheKey, itemFilePath));
+            
+            // Return a temporary placeholder while loading
+            Item tempPlaceholder = ScriptableObject.CreateInstance<Item>();
+            tempPlaceholder.Id = itemId;
+            tempPlaceholder.Title = "Loading...";
+            tempPlaceholder.ParentCollectionId = collectionId;
+            return tempPlaceholder;
+        }
+            
+        // Standard file loading for non-WebGL platforms
         try
         {
-            // SINGULAR DEFINITIVE PATH CONSTRUCTION - This is the ONLY place that should construct this path
-            string itemFilePath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, 
-                "collections", collectionId, "items", itemId, "item.json");
-
             if (verbose) Debug.Log("[Brewster/Registry] Loading Item from: '" + itemFilePath + "'");
             
             // STRICTLY CHECK EXISTENCE - Fatal error if missing
@@ -618,6 +684,62 @@ public class Brewster : MonoBehaviour
             string jsonContent = File.ReadAllText(itemFilePath);
             if (verbose) Debug.Log($"[Brewster/Registry] Item JSON loaded ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
             
+            return ProcessItemJson(itemId, collectionId, itemCacheKey, jsonContent, itemFilePath);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Brewster/Registry] FATAL ERROR: Exception loading item '{itemId}' (Collection '{collectionId}'): {e.Message}");
+            
+            // Create placeholder item with MISSING title
+            Item placeholderItem = ScriptableObject.CreateInstance<Item>();
+            placeholderItem.Id = itemId;
+            placeholderItem.Title = "MISSING"; // Use MISSING as title for exceptions too
+            placeholderItem.ParentCollectionId = collectionId;
+            
+            // Add to cache so we don't keep trying to load it
+            _loadedItems[itemCacheKey] = placeholderItem;
+            
+            return placeholderItem;
+        }
+    }
+    
+    // WebGL-specific loading of items using UnityWebRequest
+    private IEnumerator LoadItemWithWebRequest(string collectionId, string itemId, string itemCacheKey, string itemFilePath)
+    {
+        if (verbose) Debug.Log("[Brewster/Registry] Loading Item via WebRequest from: '" + itemFilePath + "'");
+        
+        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(itemFilePath))
+        {
+            yield return www.SendWebRequest();
+            
+            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"[Brewster/Registry] FATAL ERROR: Item file not found: {itemFilePath}");
+                Debug.LogError($"[Brewster/Registry] WebRequest error: {www.error}");
+                
+                // Create placeholder item with MISSING title
+                Item placeholderItem = ScriptableObject.CreateInstance<Item>();
+                placeholderItem.Id = itemId;
+                placeholderItem.Title = "MISSING";
+                placeholderItem.ParentCollectionId = collectionId;
+                
+                // Add to cache so we don't keep trying to load it
+                _loadedItems[itemCacheKey] = placeholderItem;
+                yield break;
+            }
+            
+            string jsonContent = www.downloadHandler.text;
+            if (verbose) Debug.Log($"[Brewster/Registry] Item JSON loaded via WebRequest ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
+            
+            ProcessItemJson(itemId, collectionId, itemCacheKey, jsonContent, itemFilePath);
+        }
+    }
+    
+    // Common processing logic for item JSON
+    private Item ProcessItemJson(string itemId, string collectionId, string itemCacheKey, string jsonContent, string itemFilePath)
+    {
+        try
+        {
             Item item = Item.FromJson(jsonContent);
             
             if (item != null)
@@ -661,7 +783,7 @@ public class Brewster : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"[Brewster/Registry] FATAL ERROR: Exception loading item '{itemId}' (Collection '{collectionId}'): {e.Message}");
+            Debug.LogError($"[Brewster/Registry] FATAL ERROR: Exception processing item JSON for '{itemId}' (Collection '{collectionId}'): {e.Message}");
             
             // Create placeholder item with MISSING title
             Item placeholderItem = ScriptableObject.CreateInstance<Item>();
