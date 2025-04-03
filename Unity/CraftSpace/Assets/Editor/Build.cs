@@ -52,10 +52,13 @@ public static class Build
     public static void BuildWebGL_Dev()
     {
         Debug.Log("Starting WebGL Development Build...");
+        // Set the WebGL template to SpaceCraft
+        PlayerSettings.WebGL.template = "SpaceCraft";
+        
         BuildPlayerOptions options = new BuildPlayerOptions
         {
             scenes = GetBuildScenes(),
-            locationPathName = Path.Combine("Builds", "WebGL_Development"), // Specific folder for WebGL Dev
+            locationPathName = Path.Combine("Builds", "SpaceCraft"), // Correct relative path
             target = BuildTarget.WebGL,
             options = BuildOptions.Development // Add development flag if needed
         };
@@ -67,15 +70,31 @@ public static class Build
     public static void BuildWebGL_Prod()
     {
         Debug.Log("Starting WebGL Production Build...");
+        // Set the WebGL template to SpaceCraft
+        PlayerSettings.WebGL.template = "SpaceCraft";
+        
         BuildPlayerOptions options = new BuildPlayerOptions
         {
             scenes = GetBuildScenes(),
-            locationPathName = Path.Combine("Builds", "WebGL_Production"), // Specific folder for WebGL Prod
+            locationPathName = Path.Combine("Builds", "SpaceCraft"), // Correct relative path
             target = BuildTarget.WebGL,
             options = BuildOptions.None
         };
 
         PerformBuild(options);
+    }
+    
+    // CraftSpace Menu Items
+    [MenuItem("CraftSpace/Build WebGL (Development)")]
+    public static void CraftSpaceWebGL_Dev()
+    {
+        BuildWebGL_Dev();
+    }
+    
+    [MenuItem("CraftSpace/Build WebGL (Production)")]
+    public static void CraftSpaceWebGL_Prod()
+    {
+        BuildWebGL_Prod();
     }
     // --- END WebGL Builds ---
 

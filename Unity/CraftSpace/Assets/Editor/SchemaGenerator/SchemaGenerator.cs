@@ -62,18 +62,8 @@ public class SchemaGenerator : EditorWindow
         Debug.Log("=== Regenerating Schemas (Menu Triggered) ===");
         try
         {
-            // Get an instance of the generator window (doesn't show it)
-            SchemaGenerator generatorInstance = GetWindow<SchemaGenerator>(); 
-            if (generatorInstance == null)
-            {
-                Debug.LogError("Failed to get instance of SchemaGenerator window.");
-                if (Application.isBatchMode) EditorApplication.Exit(1); // Exit with error code in batch mode
-                return;
-            }
-
-            // Call the existing instance method that contains the core logic
-            generatorInstance.GenerateSchemas(); 
-
+            // Run import directly without getting window instance
+            ImportAllSchemas();
             Debug.Log("=== Schema Regeneration Complete (Menu Triggered) ===");
             if (Application.isBatchMode) EditorApplication.Exit(0); // Exit successfully in batch mode
         }

@@ -243,17 +243,13 @@ public class Brewster : MonoBehaviour
         // (This logic is mostly the same as the old LoadCollectionIds method)
         try
         {
-            // Debug.Log("[Brewster/Registry] STEP 1: Starting LoadCollectionIdsFromIndex.");
-            
             _collectionIds.Clear();
-            // Debug.Log("[Brewster/Registry] STEP 2: Cleared collection IDs list.");
             
             if(verbose) Debug.Log("[Brewster/Registry] Loading collections index file.");
             
             string indexFilePath = "";
             try 
             {
-                // Debug.Log("[Brewster/Registry] STEP 3: About to build index file path.");
                 indexFilePath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections-index.json");
                 if(verbose) Debug.Log($"[Brewster/Registry] Built index file path: '{indexFilePath}'.");
             }
@@ -267,13 +263,19 @@ public class Brewster : MonoBehaviour
             
             if(verbose) Debug.Log("[Brewster/Registry] Attempting to load collections index from: '" + indexFilePath + "'");
             
+            // WebGL requires special handling
+            if (Application.platform == RuntimePlatform.WebGLPlayer)
+            {
+                StartCoroutine(LoadCollectionIndexWithWebRequest(indexFilePath));
+                return; // Early return, coroutine will continue processing
+            }
+            
+            // Standard file handling for non-WebGL platforms
             if (!File.Exists(indexFilePath))
             {
                 Debug.LogWarning("[Brewster/Registry] Collections index not found at: " + indexFilePath);
                 return;
             }
-            
-            // Debug.Log($"[Brewster/Registry] STEP 5: File exists, about to read content from '{indexFilePath}'.");
             
             string jsonContent = "";
             try
@@ -289,145 +291,7 @@ public class Brewster : MonoBehaviour
                 throw;
             }
             
-            if (string.IsNullOrEmpty(jsonContent))
-            {
-                Debug.LogError("[Brewster/Registry] ERROR: JSON content is empty or null.");
-                return;
-            }
-            
-            if (verbose) 
-            {
-                try
-                {
-                    Debug.Log($"[Brewster/Registry] Index JSON Preview: {Truncate(jsonContent, 100)}");
-                }
-                catch (Exception previewEx)
-                {
-                    Debug.LogError($"[Brewster/Registry] ERROR in preview generation: {previewEx.Message}");
-                }
-            }
-            
-            // Parse as array
-            Debug.Log("[Brewster/Registry] About to deserialize JSON content...");
-            List<string> parsedIds = null;
-            
-            try {
-                Debug.Log("[Brewster/Registry] Beginning JToken-based JSON parsing...");
-                // Debug.Log($"[Brewster/Registry] Json content to parse: '{jsonContent}'");
-                
-                // JToken-based parsing approach
-                try
-                {
-                    // Debug.Log("[Brewster/Registry] STEP 7.3.1: Validating JSON input");
-                    if (string.IsNullOrEmpty(jsonContent))
-                    {
-                        Debug.LogError("[Brewster/Registry] JSON content is null or empty");
-                        return;
-                    }
-                    
-                    // Debug.Log("[Brewster/Registry] STEP 7.3.2: Parsing JSON to JToken");
-                    JToken token = JToken.Parse(jsonContent);
-                    // Debug.Log("[Brewster/Registry] STEP 7.3.3: JSON parsed to JToken successfully");
-                    
-                    // Debug.Log("[Brewster/Registry] STEP 7.3.4: Checking if token is JArray");
-                    if (!(token is JArray array))
-                    {
-                        Debug.LogError("[Brewster/Registry] JSON is not an array");
-                        return;
-                    }
-                    
-                    // Debug.Log($"[Brewster/Registry] STEP 7.3.5: JArray found with {array.Count} elements");
-                    
-                    // Initialize result list
-                    parsedIds = new List<string>();
-                    
-                    // Debug.Log("[Brewster/Registry] STEP 7.3.6: Iterating through JArray elements");
-                    foreach (JToken item in array)
-                    {
-                        try
-                        {
-                            // Debug.Log($"[Brewster/Registry] Processing JToken: {item.Type}");
-                            
-                            if (item.Type == JTokenType.String)
-                            {
-                                string value = item.Value<string>();
-                                if (verbose) Debug.Log($"[Brewster/Registry] Found string value: '{value}'");
-                                parsedIds.Add(value);
-                            }
-                            else
-                            {
-                                // Debug.Log($"[Brewster/Registry] Skipping non-string token: {item.Type}");
-                            }
-                        }
-                        catch (Exception itemEx)
-                        {
-                            Debug.LogError($"[Brewster/Registry] Error processing JToken: {itemEx.Message}");
-                            // Continue processing other items
-                        }
-                    }
-                    
-                    // Debug.Log($"[Brewster/Registry] STEP 7.3.7: Completed parsing {parsedIds.Count} string items");
-                    Debug.Log("[Brewster/Registry] JToken parsing complete. Found " + parsedIds.Count + " collection IDs");
-                }
-                catch (Exception generalEx)
-                {
-                    Debug.LogError($"[Brewster/Registry] Error during JToken parsing: {generalEx.Message}");
-                    Debug.LogError($"[Brewster/Registry] Exception type: {generalEx.GetType().FullName}");
-                    Debug.LogError($"[Brewster/Registry] Stack trace: {generalEx.StackTrace}");
-                    throw;
-                }
-                
-                // Debug.Log("[Brewster/Registry] STEP 7.5: JSON parsing complete.");
-            }
-            catch (Exception jsonEx) {
-                Debug.LogError("[Brewster/Registry] Outer JSON parsing error: " + jsonEx.Message);
-                Debug.LogError("[Brewster/Registry] Exception type: " + jsonEx.GetType().FullName);
-                Debug.LogError("[Brewster/Registry] Stack trace: " + jsonEx.StackTrace);
-                throw;
-            }
-            
-            // Debug.Log("[Brewster/Registry] STEP 8: Checking parsed IDs.");
-            
-            if (parsedIds != null)
-            {
-                // Debug.Log("[Brewster/Registry] STEP 9: Starting to process parsed IDs...");
-                try {
-                    // Debug.Log($"[Brewster/Registry] STEP 9.1: Parsed IDs count: {parsedIds.Count}");
-                    
-                    // Debug.Log("[Brewster/Registry] STEP 9.2: Assigning parsedIds to _collectionIds...");
-                    _collectionIds = parsedIds;
-                    // Debug.Log("[Brewster/Registry] STEP 9.3: Assignment complete.");
-                    
-                    // Debug.Log("[Brewster/Registry] STEP 9.4: About to log success message...");
-                    Debug.Log("[Brewster/Registry] Successfully parsed collection index: " + _collectionIds.Count + " IDs found.");
-                    
-                    if (verbose && _collectionIds.Count > 0) {
-                        try {
-                            // Debug.Log("[Brewster/Registry] STEP 9.5: About to join collection IDs...");
-                            string joinedIds = string.Join(", ", _collectionIds);
-                            // Debug.Log("[Brewster/Registry] STEP 9.6: Joining complete.");
-                            Debug.Log("[Brewster/Registry] Collection IDs: " + joinedIds);
-                        }
-                        catch (Exception joinEx) {
-                            Debug.LogError($"[Brewster/Registry] Error joining IDs: {joinEx.Message}");
-                            // Continue despite this non-critical error
-                        }
-                    }
-                    // Debug.Log("[Brewster/Registry] STEP 9.7: parsedIds processing complete.");
-                }
-                catch (Exception processEx) {
-                    Debug.LogError("[Brewster/Registry] Error processing parsed IDs: " + processEx.Message);
-                    Debug.LogError("[Brewster/Registry] Exception type: " + processEx.GetType().FullName);
-                    Debug.LogError("[Brewster/Registry] Stack trace: " + processEx.StackTrace);
-                    throw;
-                }
-            }
-            else 
-            {
-                 Debug.LogError("[Brewster/Registry] Failed to deserialize collection index JSON into a list of strings.");
-            }
-            
-            // Debug.Log("[Brewster/Registry] STEP 10: LoadCollectionIdsFromIndex completed successfully.");
+            ProcessCollectionIndexJson(jsonContent);
         }
         catch (Exception e)
         {
@@ -436,10 +300,130 @@ public class Brewster : MonoBehaviour
             Debug.LogError("[Brewster/Registry] Stack trace: " + e.StackTrace);
             _collectionIds.Clear(); // Ensure list is empty on error
         }
-        
-        // Debug.Log("[Brewster/Registry] STEP 11: Exiting LoadCollectionIdsFromIndex, returning to caller.");
     }
     
+    // WebGL-specific loading using UnityWebRequest
+    private IEnumerator LoadCollectionIndexWithWebRequest(string indexFilePath)
+    {
+        Debug.Log("[Brewster/Registry] Using WebRequest to load collections index (WebGL mode)");
+        
+        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(indexFilePath))
+        {
+            yield return www.SendWebRequest();
+            
+            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning("[Brewster/Registry] Collections index not found at: " + indexFilePath);
+                Debug.LogWarning("[Brewster/Registry] WebRequest error: " + www.error);
+                yield break;
+            }
+            
+            string jsonContent = www.downloadHandler.text;
+            if(verbose) Debug.Log($"[Brewster/Registry] Successfully read file content via WebRequest. Length: {jsonContent.Length}");
+            
+            ProcessCollectionIndexJson(jsonContent);
+            
+            // Now that we're initialized, notify any listeners
+            if (_collectionIds.Count > 0)
+            {
+                IsInitialized = true;
+                if (loadCollectionsAutomatically)
+                {
+                    EagerLoadCollections();
+                }
+            }
+        }
+    }
+    
+    // Common JSON processing logic extracted to avoid duplication
+    private void ProcessCollectionIndexJson(string jsonContent)
+    {
+        if (string.IsNullOrEmpty(jsonContent))
+        {
+            Debug.LogError("[Brewster/Registry] ERROR: JSON content is empty or null.");
+            return;
+        }
+        
+        if (verbose) 
+        {
+            try
+            {
+                Debug.Log($"[Brewster/Registry] Index JSON Preview: {Truncate(jsonContent, 100)}");
+            }
+            catch (Exception previewEx)
+            {
+                Debug.LogError($"[Brewster/Registry] ERROR in preview generation: {previewEx.Message}");
+            }
+        }
+        
+        // Parse as array
+        Debug.Log("[Brewster/Registry] About to deserialize JSON content...");
+        List<string> parsedIds = null;
+        
+        try
+        {
+            parsedIds = JsonConvert.DeserializeObject<List<string>>(jsonContent);
+            if (parsedIds != null)
+            {
+                Debug.Log($"[Brewster/Registry] Successfully parsed {parsedIds.Count} collection IDs from JSON.");
+            }
+        }
+        catch (Exception jsonEx)
+        {
+            Debug.LogError($"[Brewster/Registry] Error deserializing collections index: {jsonEx.Message}");
+            
+            // Try a different deserialization approach
+            try
+            {
+                var collectionIndex = JsonConvert.DeserializeObject<CollectionIndex>(jsonContent);
+                if (collectionIndex != null && collectionIndex.collections != null)
+                {
+                    parsedIds = new List<string>(collectionIndex.collections);
+                    Debug.Log($"[Brewster/Registry] Successfully parsed {parsedIds.Count} collection IDs from CollectionIndex object.");
+                }
+            }
+            catch (Exception altEx)
+            {
+                Debug.LogError($"[Brewster/Registry] Error in alternate deserialization: {altEx.Message}");
+            }
+        }
+        
+        if (parsedIds != null)
+        {
+            try
+            {
+                foreach (string id in parsedIds)
+                {
+                    if (!string.IsNullOrEmpty(id) && !_collectionIds.Contains(id))
+                    {
+                        _collectionIds.Add(id);
+                    }
+                }
+                
+                if (verbose && _collectionIds.Count > 0) {
+                    try {
+                        string joinedIds = string.Join(", ", _collectionIds);
+                        Debug.Log("[Brewster/Registry] Collection IDs: " + joinedIds);
+                    }
+                    catch (Exception joinEx) {
+                        Debug.LogError($"[Brewster/Registry] Error joining IDs: {joinEx.Message}");
+                        // Continue despite this non-critical error
+                    }
+                }
+            }
+            catch (Exception processEx) {
+                Debug.LogError("[Brewster/Registry] Error processing parsed IDs: " + processEx.Message);
+                Debug.LogError("[Brewster/Registry] Exception type: " + processEx.GetType().FullName);
+                Debug.LogError("[Brewster/Registry] Stack trace: " + processEx.StackTrace);
+                throw;
+            }
+        }
+        else 
+        {
+             Debug.LogError("[Brewster/Registry] Failed to deserialize collection index JSON into a list of strings.");
+        }
+    }
+
     /// <summary>
     /// Gets a collection by ID. Loads from file/cache on demand.
     /// </summary>

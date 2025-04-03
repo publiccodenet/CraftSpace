@@ -89,22 +89,22 @@ if (!command) {
 
     switch (command) {
       case 'regenerate-schemas':
-        await runUnityCommand('-batchmode -projectPath . -ignoreCompilerErrors -executeMethod CraftSpace.Editor.SchemaGenerator.ImportAllSchemasMenuItem -quit', unityEnv);
+        await runUnityCommand('-batchmode -projectPath . -ignoreCompilerErrors -executeMethod CraftSpace.Editor.SchemaGenerator.ImportAllSchemasMenuItem -quit -logFile -', unityEnv);
         break;
       case 'build-dev':
-        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildDev -quit', unityEnv);
+        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildDev -quit -logFile -', unityEnv);
         break;
       case 'build-prod':
-        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildProd -quit', unityEnv);
+        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildProd -quit -logFile -', unityEnv);
         break;
       case 'build-webgl-dev':
-        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildWebGL_Dev -quit', unityEnv);
+        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildWebGL_Dev -quit -logFile -', unityEnv);
         break;
       case 'build-webgl-prod':
-        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildWebGL_Prod -quit', unityEnv);
+        await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildWebGL_Prod -quit -logFile -', unityEnv);
         break;
       case 'test':
-        await runUnityCommand('-batchmode -projectPath . -runTests -testResults ./test-results.xml -quit', unityEnv);
+        await runUnityCommand('-batchmode -projectPath . -runTests -testResults ./test-results.xml -quit -logFile -', unityEnv);
         break;
       case 'ci':
         // CI script likely runs unity-env itself, so just execute
@@ -304,53 +304,61 @@ else
     ARGS="$@"
 fi
 
-# Add log file argument if not already specified
-# Assumes execution within the project directory context set by the caller (unity-automation.js)
-if [[ "$ARGS" != *"-logFile"* ]]; then
-    LOGFILE="unity-$(date +%Y%m%d-%H%M%S).log"
-    ARGS="$ARGS -logFile $LOGFILE"
-    echo "Log file will be saved to: $LOGFILE"
-fi
+# Check if -logFile - is specified (stream to stdout)
+if [[ "$ARGS" == *"-logFile -"* ]]; then
+    echo "Streaming Unity logs directly to stdout"
+    # Run Unity and pass stdout/stderr through directly
+    "$UNITY_PATH" $ARGS
+    EXIT_CODE=$?
+else
+    # Add log file argument if not already specified
+    # Assumes execution within the project directory context set by the caller (unity-automation.js)
+    if [[ "$ARGS" != *"-logFile"* ]]; then
+        LOGFILE="unity-$(date +%Y%m%d-%H%M%S).log"
+        ARGS="$ARGS -logFile $LOGFILE"
+        echo "Log file will be saved to: $LOGFILE"
+    fi
 
-echo "Running Unity command: $UNITY_PATH $ARGS"
+    echo "Running Unity command: $UNITY_PATH $ARGS"
 
-# Run Unity and tee the output to both the log file and stdout
-# Use a temp file for the command output
-TEMP_LOG=$(mktemp)
-"$UNITY_PATH" $ARGS > "$TEMP_LOG" 2>&1 & 
-PID=$!
+    # Run Unity and tee the output to both the log file and stdout
+    # Use a temp file for the command output
+    TEMP_LOG=$(mktemp)
+    "$UNITY_PATH" $ARGS > "$TEMP_LOG" 2>&1 & 
+    PID=$!
 
-# Tail the log file in real-time while Unity is running
-if [[ "$ARGS" == *"-logFile"* ]]; then
-    # Extract the logfile name from arguments
-    LOG_PATTERN=".*-logFile[= ]([^ ]+).*"
-    if [[ $ARGS =~ $LOG_PATTERN ]]; then
-        UNITY_LOGFILE="${BASH_REMATCH[1]}"
-        echo "Streaming Unity log file: $UNITY_LOGFILE"
-        # Wait for log file to be created
-        while [ ! -f "$UNITY_LOGFILE" ] && kill -0 $PID 2>/dev/null; do
-            sleep 0.5
-        done
-        # Tail the log if it exists
-        if [ -f "$UNITY_LOGFILE" ]; then
-            tail -f "$UNITY_LOGFILE" &
-            TAIL_PID=$!
+    # Tail the log file in real-time while Unity is running
+    if [[ "$ARGS" == *"-logFile"* ]]; then
+        # Extract the logfile name from arguments
+        LOG_PATTERN=".*-logFile[= ]([^ ]+).*"
+        if [[ $ARGS =~ $LOG_PATTERN ]]; then
+            UNITY_LOGFILE="${BASH_REMATCH[1]}"
+            echo "Streaming Unity log file: $UNITY_LOGFILE"
+            # Wait for log file to be created
+            while [ ! -f "$UNITY_LOGFILE" ] && kill -0 $PID 2>/dev/null; do
+                sleep 0.5
+            done
+            # Tail the log if it exists
+            if [ -f "$UNITY_LOGFILE" ]; then
+                tail -f "$UNITY_LOGFILE" &
+                TAIL_PID=$!
+            fi
         fi
     fi
+
+    # Wait for Unity to exit
+    wait $PID
+    EXIT_CODE=$?
+
+    # Stop the tail process if it's running
+    if [ ! -z \${TAIL_PID+x} ]; then
+        kill $TAIL_PID 2>/dev/null || true
+    fi
+
+    # Output the temp log
+    cat "$TEMP_LOG"
+    rm "$TEMP_LOG"
 fi
-
-# Wait for Unity to exit
-wait $PID
-EXIT_CODE=$?
-
-# Stop the tail process if it's running
-if [ ! -z \${TAIL_PID+x} ]; then
-    kill $TAIL_PID 2>/dev/null || true
-fi
-
-# Output the temp log
-cat "$TEMP_LOG"
-rm "$TEMP_LOG"
 
 echo "Unity process finished with exit code: $EXIT_CODE"
 exit $EXIT_CODE`;
