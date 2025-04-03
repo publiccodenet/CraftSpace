@@ -419,7 +419,7 @@ public class ItemView : MonoBehaviour, IModelView<Item>, IItemView
                 ApplyLoadedTexture(texture);
             }
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             Debug.LogError($"[ItemView] Exception loading cover: {ex.Message}");
         }
@@ -674,7 +674,8 @@ public class ItemView : MonoBehaviour, IModelView<Item>, IItemView
                 return;
             }
         } catch (Exception ex) {
-            // Silently fall back to async
+            // Log the exception before falling back to async
+            Debug.LogWarning($"[ItemView/LOAD] Direct loading failed for {Item.Id}, falling back to async: {ex.Message}");
         }
         
         // If direct loading failed, fall back to the async version
