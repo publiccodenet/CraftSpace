@@ -2,858 +2,583 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq; // Add this for ToList()
+using System.Linq;
 using UnityEngine;
-using Newtonsoft.Json;
+using UnityEngine.Networking;
 using Newtonsoft.Json.Linq;
 
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
-
 /// <summary>
-/// Brewster acts as the central Content Registry.
-/// Responsible for loading, caching, and providing access to Collections and Items on demand.
+/// Central content registry that loads all collections and items.
 /// </summary>
 [DefaultExecutionOrder(-200)] 
 public class Brewster : MonoBehaviour
 {
-    // Static instance for global access
     public static Brewster Instance { get; private set; }
+    
+    // Event fired when ALL content is loaded
+    public event Action OnAllContentLoaded;
 
-    // Public property to check if core index is loaded
-    public bool IsInitialized { get; private set; }
-
-    // Content paths and settings
     [Header("Content Settings")]
     public string baseResourcePath = "Content";
     public bool loadOnStart = true;
-    public bool loadCollectionsAutomatically = true;
-    public bool loadItemsAutomatically = true;
-
-    [Header("Debug")]
-    public bool verbose = false;
     
-    // --- Central Registry Caches ---
-    private List<string> _collectionIds = new List<string>();
-    private Dictionary<string, Collection> _loadedCollections = new Dictionary<string, Collection>();
-    private Dictionary<string, Item> _loadedItems = new Dictionary<string, Item>(); // Key: Item ID, Value: Item object
-    // Note: Item lookup might need collection context if IDs aren't globally unique,
-    // or use a composite key like "collectionId/itemId". For now, assume item IDs are unique.
+    // Collections and items - final loaded objects
+    private Dictionary<string, Collection> _collections = new Dictionary<string, Collection>();
+    private Dictionary<string, Item> _items = new Dictionary<string, Item>();
+    
+    // Tracking for collection loading phases
+    private List<string> _collectionIdsPending = new List<string>();
+    private HashSet<string> _collectionIdsLoading = new HashSet<string>();
+    
+    // Tracking for item loading phases
+    private HashSet<string> _itemIdsPending = new HashSet<string>();
+    private HashSet<string> _itemIdsLoading = new HashSet<string>();
+    
+    // Add a texture cache
+    private Dictionary<string, Texture2D> _textureCache = new Dictionary<string, Texture2D>();
+    private HashSet<string> _texturesLoading = new HashSet<string>();
     
     void Awake()
     {
-        try
+        if (Instance != null && Instance != this)
         {
-            Debug.Log("[Brewster/Awake] Starting - Setting up singleton instance.");
-            
-            // Set up singleton instance
-            if (Instance != null && Instance != this)
-            {
-                Debug.Log("[Brewster/Awake] Another instance already exists. Destroying this instance.");
-                Destroy(gameObject);
-                return;
-            }
-            
-            Debug.Log("[Brewster/Awake] Setting singleton instance reference.");
-            Instance = this;
-            
-            Debug.Log("[Brewster/Awake] Calling DontDestroyOnLoad on this instance.");
-            DontDestroyOnLoad(gameObject);
+            Destroy(gameObject);
+            return;
+        }
+        
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
 
-            // Load core content index if enabled
-            if (loadOnStart)
-            { 
-                Debug.Log("[Brewster/Awake] loadOnStart is true, about to initialize registry.");
-                try
-                {
-                    // Load only the collection index initially
-                    InitializeRegistry();
-                    Debug.Log("[Brewster/Awake] InitializeRegistry completed successfully.");
-                }
-                catch (Exception initEx)
-                {
-                    Debug.LogError($"[Brewster/Awake] FATAL ERROR in InitializeRegistry: {initEx.Message}");
-                    Debug.LogError($"[Brewster/Awake] Exception type: {initEx.GetType().FullName}");
-                    Debug.LogError($"[Brewster/Awake] Stack trace: {initEx.StackTrace}");
-                }
-            }
-            else
-            {
-                Debug.Log("[Brewster/Awake] loadOnStart is false, skipping initialization.");
-            }
-            
-            Debug.Log("[Brewster/Awake] Awake completed successfully.");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Brewster/Awake] FATAL ERROR in Awake: {e.Message}");
-            Debug.LogError($"[Brewster/Awake] Exception type: {e.GetType().FullName}");
-            Debug.LogError($"[Brewster/Awake] Stack trace: {e.StackTrace}");
-        }
+        if (loadOnStart)
+            StartCoroutine(LoadContentSequence());
     }
     
     void OnDestroy()
     {
-        IsInitialized = false;
-        // Consider clearing caches if needed
-        _loadedCollections.Clear();
-        _loadedItems.Clear();
-        _collectionIds.Clear();
+        _collections.Clear();
+        _items.Clear();
+        _collectionIdsPending.Clear();
+        _collectionIdsLoading.Clear();
+        _itemIdsPending.Clear();
+        _itemIdsLoading.Clear();
+        
+        // Clean up textures
+        foreach (var texture in _textureCache.Values)
+        {
+            if (texture != null)
+            {
+                Destroy(texture);
+            }
+        }
+        _textureCache.Clear();
+        _texturesLoading.Clear();
     }
 
     /// <summary>
-    /// Initializes the registry by loading the list of available collection IDs.
-    /// Also loads all collections (if loadCollectionsAutomatically is true)
-    /// and their items (if loadItemsAutomatically is true).
+    /// Main sequence that loads all content in the correct order
     /// </summary>
-    public void InitializeRegistry()
+    private IEnumerator LoadContentSequence()
     {
-        Debug.Log("[Brewster/Registry] InitializeRegistry starting...");
-        try
+        Debug.Log("Brewster: Starting content loading sequence");
+        
+        _collections.Clear();
+        _items.Clear();
+        _collectionIdsPending.Clear();
+        _collectionIdsLoading.Clear();
+        _itemIdsPending.Clear();
+        _itemIdsLoading.Clear();
+        
+        // Clean up textures
+        foreach (var texture in _textureCache.Values)
         {
-            // Debug.Log("[Brewster/Registry] Initializing - Loading collection index.");
-            
-            // Debug.Log("[Brewster/Registry] Clearing existing collections and items...");
-            _loadedCollections.Clear();
-            _loadedItems.Clear(); 
-            _collectionIds.Clear();
-            IsInitialized = false;
-            // Debug.Log("[Brewster/Registry] Caches cleared successfully.");
-            
-            // Load collection IDs from index file
-            Debug.Log("[Brewster/Registry] About to load collection IDs from index...");
-            try
+            if (texture != null)
             {
-                LoadCollectionIndex();
-                Debug.Log("[Brewster/Registry] Returned from LoadCollectionIndex successfully.");
+                Destroy(texture);
             }
-            catch (Exception loadEx)
-            {
-                Debug.LogError($"[Brewster/Registry] ERROR: Exception during LoadCollectionIndex: {loadEx.Message}");
-                Debug.LogError($"[Brewster/Registry] Exception type: {loadEx.GetType().FullName}");
-                Debug.LogError($"[Brewster/Registry] Stack trace: {loadEx.StackTrace}");
-                throw;
-            }
-            
-            // Debug.Log("[Brewster/Registry] About to check collection IDs count...");
-            int idCount = 0;
-            try
-            {
-                idCount = _collectionIds.Count;
-                Debug.Log("[Brewster/Registry] Collection IDs count: " + idCount);
-            }
-            catch (Exception countEx)
-            {
-                Debug.LogError($"[Brewster/Registry] Error checking collection IDs count: {countEx.Message}");
-                Debug.LogError($"[Brewster/Registry] Exception type: {countEx.GetType().FullName}");
-                Debug.LogError($"[Brewster/Registry] Stack trace: {countEx.StackTrace}");
-                throw;
-            }
-            
-            // Debug.Log("[Brewster/Registry] Setting IsInitialized based on count...");
-            IsInitialized = idCount > 0;
-            
-            // Eagerly load all collections (and items if auto-loading is enabled)
-            if (IsInitialized && loadCollectionsAutomatically)
-            {
-                string loadMessage = "Eagerly loading all collections";
-                if (loadItemsAutomatically) 
-                    loadMessage += " and their items...";
-                else
-                    loadMessage += " (items will be loaded on demand)...";
-                
-                Debug.Log($"[Brewster/Registry] {loadMessage}");
-                LoadAllCollections();
-            }
-            else if (IsInitialized)
-            {
-                Debug.Log("[Brewster/Registry] Collection auto-loading disabled - collections will be loaded on demand");
-            }
-            
-            Debug.Log($"[Brewster/Registry] Initialization complete. {idCount} collection IDs found. IsInitialized={IsInitialized}");
         }
-        catch (Exception e)
+        _textureCache.Clear();
+        _texturesLoading.Clear();
+        
+        // PHASE 1: Load collection index
+        Debug.Log("Brewster: PHASE 1 - Loading collection index");
+        yield return LoadCollectionIndex();
+        
+        if (_collectionIdsPending.Count == 0)
         {
-            Debug.LogError("[Brewster/Registry] Error during initialization: " + e.Message);
-            Debug.LogError("[Brewster/Registry] Exception type: " + e.GetType().FullName);
-            Debug.LogError("[Brewster/Registry] Stack trace: " + e.StackTrace);
-            IsInitialized = false;
+            Debug.LogError("Brewster: Failed to load collection index");
+            yield break;
         }
-        // Debug.Log("[Brewster/Registry] InitializeRegistry completed.");
+        
+        // PHASE 2: Load ALL collections
+        Debug.Log("Brewster: PHASE 2 - Loading all collections");
+        yield return LoadAllCollections();
+        
+        // PHASE 3: Load ALL item indexes
+        Debug.Log("Brewster: PHASE 3 - Loading all item indexes");
+        yield return LoadAllItemIndexes();
+        
+        // PHASE 4: Load ALL items
+        Debug.Log("Brewster: PHASE 4 - Loading all items");
+        yield return LoadAllItems();
+        
+        // COMPLETE: All content is loaded
+        Debug.Log($"Brewster: Content loading complete. Loaded {_collections.Count} collections and {_items.Count} items.");
+        
+        // Notify listeners that all content is loaded
+        OnAllContentLoaded?.Invoke();
     }
-
+    
     /// <summary>
-    /// Loads all collections based on the collection IDs
+    /// Phase 1: Load collection index
     /// </summary>
-    private void LoadAllCollections()
+    private IEnumerator LoadCollectionIndex()
     {
-        try
-        {
-            if (_collectionIds == null || _collectionIds.Count == 0) return;
-            
-            Debug.Log($"[Brewster/Registry] Starting eager load of all {_collectionIds.Count} collections");
-            
-            int loadedCount = 0;
-            int errorCount = 0;
-            System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
-            sw.Start();
-            
-            foreach (string collectionId in _collectionIds)
-            {
-                try
-                {
-                    Collection collection = GetCollection(collectionId);
-                    if (collection != null)
-                    {
-                        loadedCount++;
-                        if (verbose) Debug.Log($"[Brewster/Registry] Eagerly loaded collection: {collectionId}");
-                    }
-                    else
-                    {
-                        errorCount++;
-                        Debug.LogWarning($"[Brewster/Registry] Failed to load collection: {collectionId}");
-                    }
-                }
-                catch (Exception collEx)
-                {
-                    errorCount++;
-                    Debug.LogError($"[Brewster/Registry] Error loading collection '{collectionId}': {collEx.Message}");
-                    // Continue with other collections despite error
-                }
-            }
-            
-            float elapsedSec = sw.ElapsedMilliseconds / 1000f;
-            Debug.Log($"[Brewster/Registry] Completed eager loading of {loadedCount}/{_collectionIds.Count} collections " +
-                     $"({(errorCount > 0 ? $"{errorCount} errors" : "no errors")}) in {elapsedSec:F2}s");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Brewster/Registry] Error during eager collection loading: {e.Message}");
-            Debug.LogError($"[Brewster/Registry] Exception type: {e.GetType().FullName}");
-            Debug.LogError($"[Brewster/Registry] Stack trace: {e.StackTrace}");
-        }
+        string indexPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections-index.json");
+        
+        JToken indexToken = null;
+        yield return LoadJson(indexPath, token => indexToken = token);
+        
+        if (indexToken != null)
+            ProcessCollectionIndex(indexToken);
     }
-
+    
     /// <summary>
-    /// Loads the collection IDs from the index file into the internal list.
+    /// Phase 2: Load all collections
     /// </summary>
-    private void LoadCollectionIndex()
+    private IEnumerator LoadAllCollections()
     {
-        // (This logic is mostly the same as the old LoadCollectionIds method)
-        try
+        List<Coroutine> loadingRoutines = new List<Coroutine>();
+        
+        foreach (string collectionId in _collectionIdsPending)
         {
-            _collectionIds.Clear();
-            
-            if(verbose) Debug.Log("[Brewster/Registry] Loading collections index file.");
-            
-            string indexFilePath = "";
-            try 
-            {
-                indexFilePath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections-index.json");
-                if(verbose) Debug.Log($"[Brewster/Registry] Built index file path: '{indexFilePath}'.");
-            }
-            catch (Exception pathEx)
-            {
-                Debug.LogError($"[Brewster/Registry] ERROR in path construction: {pathEx.Message}");
-                Debug.LogError($"[Brewster/Registry] Path exception type: {pathEx.GetType().FullName}");
-                Debug.LogError($"[Brewster/Registry] Path exception stack trace: {pathEx.StackTrace}");
-                throw;
-            }
-            
-            if(verbose) Debug.Log("[Brewster/Registry] Attempting to load collections index from: '" + indexFilePath + "'");
-            
-            // WebGL requires special handling
-            if (Application.platform == RuntimePlatform.WebGLPlayer)
-            {
-                StartCoroutine(LoadCollectionIndexWithWebRequest(indexFilePath));
-                return; // Early return, coroutine will continue processing
-            }
-            
-            // Standard file handling for non-WebGL platforms
-            if (!File.Exists(indexFilePath))
-            {
-                Debug.LogWarning("[Brewster/Registry] Collections index not found at: " + indexFilePath);
-                return;
-            }
-            
-            string jsonContent = "";
-            try
-            {
-                jsonContent = File.ReadAllText(indexFilePath);
-                if(verbose) Debug.Log($"[Brewster/Registry] Successfully read file content. Length: {jsonContent.Length}");
-            }
-            catch (Exception fileEx)
-            {
-                Debug.LogError($"[Brewster/Registry] ERROR reading file: {fileEx.Message}");
-                Debug.LogError($"[Brewster/Registry] File exception type: {fileEx.GetType().FullName}");
-                Debug.LogError($"[Brewster/Registry] File exception stack trace: {fileEx.StackTrace}");
-                throw;
-            }
-            
-            ProcessCollectionIndexJson(jsonContent);
+            loadingRoutines.Add(StartCoroutine(LoadCollection(collectionId)));
         }
-        catch (Exception e)
+        
+        // Wait for all collections to finish loading
+        foreach (var routine in loadingRoutines)
         {
-            Debug.LogError("[Brewster/Registry] Error loading collection IDs from index: " + e.Message);
-            Debug.LogError("[Brewster/Registry] Exception type: " + e.GetType().FullName);
-            Debug.LogError("[Brewster/Registry] Stack trace: " + e.StackTrace);
-            _collectionIds.Clear(); // Ensure list is empty on error
+            yield return routine;
         }
     }
     
-    // WebGL-specific loading using UnityWebRequest
-    private IEnumerator LoadCollectionIndexWithWebRequest(string indexFilePath)
-    {
-        Debug.Log("[Brewster/Registry] Using WebRequest to load collections index (WebGL mode)");
-        
-        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(indexFilePath))
-        {
-            yield return www.SendWebRequest();
-            
-            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
-            {
-                Debug.LogWarning("[Brewster/Registry] Collections index not found at: " + indexFilePath);
-                Debug.LogWarning("[Brewster/Registry] WebRequest error: " + www.error);
-                yield break;
-            }
-            
-            string jsonContent = www.downloadHandler.text;
-            if(verbose) Debug.Log($"[Brewster/Registry] Successfully read file content via WebRequest. Length: {jsonContent.Length}");
-            
-            ProcessCollectionIndexJson(jsonContent);
-            
-            // Now that we're initialized, notify any listeners
-            if (_collectionIds.Count > 0)
-            {
-                IsInitialized = true;
-                if (loadCollectionsAutomatically)
-                {
-                    // Load all collections if auto-loading is enabled
-                    foreach (var collectionId in _collectionIds)
-                    {
-                        GetCollection(collectionId);
-                    }
-                }
-            }
-        }
-    }
-    
-    // Common JSON processing logic extracted to avoid duplication
-    private void ProcessCollectionIndexJson(string jsonContent)
-    {
-        if (string.IsNullOrEmpty(jsonContent))
-        {
-            Debug.LogError("[Brewster/Registry] ERROR: JSON content is empty or null.");
-            return;
-        }
-        
-        if (verbose) 
-        {
-            try
-            {
-                Debug.Log($"[Brewster/Registry] Index JSON Preview: {Truncate(jsonContent, 100)}");
-            }
-            catch (Exception previewEx)
-            {
-                Debug.LogError($"[Brewster/Registry] ERROR in preview generation: {previewEx.Message}");
-            }
-        }
-        
-        // Parse as array
-        Debug.Log("[Brewster/Registry] About to deserialize JSON content...");
-        List<string> parsedIds = null;
-        
-        try
-        {
-            parsedIds = JsonConvert.DeserializeObject<List<string>>(jsonContent);
-            if (parsedIds != null)
-            {
-                Debug.Log($"[Brewster/Registry] Successfully parsed {parsedIds.Count} collection IDs from JSON.");
-            }
-        }
-        catch (Exception jsonEx)
-        {
-            Debug.LogError($"[Brewster/Registry] Error deserializing collections index: {jsonEx.Message}");
-            
-            // Try a different deserialization approach
-            try
-            {
-                var collectionIndex = JsonConvert.DeserializeObject<CollectionIndex>(jsonContent);
-                if (collectionIndex != null && collectionIndex.collections != null)
-                {
-                    parsedIds = new List<string>(collectionIndex.collections);
-                    Debug.Log($"[Brewster/Registry] Successfully parsed {parsedIds.Count} collection IDs from CollectionIndex object.");
-                }
-            }
-            catch (Exception altEx)
-            {
-                Debug.LogError($"[Brewster/Registry] Error in alternate deserialization: {altEx.Message}");
-            }
-        }
-        
-        if (parsedIds != null)
-        {
-            try
-            {
-                foreach (string id in parsedIds)
-                {
-                    if (!string.IsNullOrEmpty(id) && !_collectionIds.Contains(id))
-                    {
-                        _collectionIds.Add(id);
-                    }
-                }
-                
-                if (verbose && _collectionIds.Count > 0) {
-                    try {
-                        string joinedIds = string.Join(", ", _collectionIds);
-                        Debug.Log("[Brewster/Registry] Collection IDs: " + joinedIds);
-                    }
-                    catch (Exception joinEx) {
-                        Debug.LogError($"[Brewster/Registry] Error joining IDs: {joinEx.Message}");
-                        // Continue despite this non-critical error
-                    }
-                }
-            }
-            catch (Exception processEx) {
-                Debug.LogError("[Brewster/Registry] Error processing parsed IDs: " + processEx.Message);
-                Debug.LogError("[Brewster/Registry] Exception type: " + processEx.GetType().FullName);
-                Debug.LogError("[Brewster/Registry] Stack trace: " + processEx.StackTrace);
-                throw;
-            }
-        }
-        else 
-        {
-             Debug.LogError("[Brewster/Registry] Failed to deserialize collection index JSON into a list of strings.");
-        }
-    }
-
     /// <summary>
-    /// Gets a collection by ID. Loads from file/cache on demand.
+    /// Load a single collection
     /// </summary>
-    public Collection GetCollection(string collectionId)
+    private IEnumerator LoadCollection(string collectionId)
     {
-        if (string.IsNullOrEmpty(collectionId))
-        {
-            Debug.LogWarning("[Brewster/Registry] GetCollection called with null or empty ID.");
-            return null;
-        }
-
-        // 1. Check cache
-        if (_loadedCollections.TryGetValue(collectionId, out Collection cachedCollection))
-        {
-            // if (verbose) Debug.Log($"[Brewster/Registry] Cache hit for Collection: {collectionId}");
-            return cachedCollection;
-        }
-
-        // 2. Load from file if not cached
-        if (verbose) Debug.Log($"[Brewster/Registry] Cache miss for Collection: {collectionId}. Attempting to load from file.");
+        // Skip if already loaded
+        if (_collections.ContainsKey(collectionId))
+            yield break;
         
-        // For WebGL, we need to use a coroutine with UnityWebRequest
-        if (Application.platform == RuntimePlatform.WebGLPlayer)
-        {
-            StartCoroutine(LoadCollectionWithWebRequest(collectionId));
-            return null; // Will be loaded asynchronously
-        }
+        // Skip if already being loaded by another coroutine
+        if (_collectionIdsLoading.Contains(collectionId))
+            yield break;
         
-        // Standard file loading for non-WebGL platforms
+        // Mark collection as being loaded
+        _collectionIdsLoading.Add(collectionId);
+        
         try
         {
             string collectionPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", collectionId, "collection.json");
-            if (verbose) Debug.Log("[Brewster/Registry] Loading Collection from: '" + collectionPath + "'");
             
-            if (!File.Exists(collectionPath))
+            JToken collectionToken = null;
+            yield return LoadJson(collectionPath, token => collectionToken = token);
+            
+            if (collectionToken == null || !(collectionToken is JObject collectionObj)) 
+                yield break;
+            
+            // Create and initialize collection directly
+            Collection collection = ScriptableObject.CreateInstance<Collection>();
+            collection.ImportFromJToken(collectionObj);
+            
+            if (string.IsNullOrEmpty(collection.Id))
             {
-                Debug.LogWarning($"[Brewster/Registry] Collection file not found: {collectionPath}");
-                return null;
-            }
-            
-            string jsonContent = File.ReadAllText(collectionPath);
-            if (verbose) Debug.Log($"[Brewster/Registry] Collection JSON loaded ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
-            
-            return ProcessCollectionJson(collectionId, jsonContent, collectionPath);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Brewster/Registry] Error loading collection '{collectionId}' from file: {e.Message}");
-            return null;
-        }
-    }
-    
-    // WebGL-specific loading of collections using UnityWebRequest
-    private IEnumerator LoadCollectionWithWebRequest(string collectionId)
-    {
-        string collectionPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", collectionId, "collection.json");
-        if (verbose) Debug.Log("[Brewster/Registry] Loading Collection via WebRequest from: '" + collectionPath + "'");
-        
-        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(collectionPath))
-        {
-            yield return www.SendWebRequest();
-            
-            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
-            {
-                Debug.LogWarning($"[Brewster/Registry] Collection file not found: {collectionPath}");
-                Debug.LogWarning("[Brewster/Registry] WebRequest error: " + www.error);
+                Debug.LogError($"Brewster: Collection loaded from {collectionPath} has no ID");
+                ScriptableObject.Destroy(collection);
                 yield break;
             }
             
-            string jsonContent = www.downloadHandler.text;
-            if (verbose) Debug.Log($"[Brewster/Registry] Collection JSON loaded via WebRequest ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
-            
-            ProcessCollectionJson(collectionId, jsonContent, collectionPath);
+            _collections[collectionId] = collection;
+        }
+        finally
+        {
+            // Remove from loading set regardless of success or failure
+            _collectionIdsLoading.Remove(collectionId);
         }
     }
     
-    // Common processing logic for collection JSON
-    private Collection ProcessCollectionJson(string collectionId, string jsonContent, string collectionPath)
-    {
-        try
-        {
-            Collection collection = Collection.FromJson(jsonContent);
-            
-            if (collection != null)
-            {
-                if (collection.Id != collectionId)
-                {
-                     Debug.LogWarning($"[Brewster/Registry] Collection ID mismatch! Directory ID '{collectionId}' does not match collection.json ID '{collection.Id}'. Using directory ID for caching key, but object has its own ID.");
-                     // Consider whether to force the ID on the object: collection.Id = collectionId;
-                }
-
-                // Add to cache BEFORE loading item index
-                _loadedCollections[collectionId] = collection;
-                if (verbose) Debug.Log($"[Brewster/Registry] Loaded and cached Collection: {collection.Id}");
-
-                // --- Load Item Index (but not items themselves) ---
-                // This should happen lazily when Collection.Items is accessed,
-                // OR we can trigger it here if we want the index loaded when the collection is.
-                // Let's trigger it here for now, simplifying Collection.Items getter.
-                string collectionBasePath = Path.GetDirectoryName(collectionPath);
-                if (!string.IsNullOrEmpty(collectionBasePath))
-                {
-                     if (verbose) Debug.Log($"[Brewster/Registry] Triggering item *index* load for collection '{collectionId}' from path: {collectionBasePath}");
-                     collection.LoadItemIndex(collectionBasePath); // Renamed method!
-                     
-                     // Eagerly load all items for the collection if auto-loading is enabled
-                     if (loadItemsAutomatically)
-                     {
-                         Debug.Log($"[Brewster/Registry] Auto-loading all items for collection '{collectionId}'");
-                         LoadAllItemsForCollection(collection);
-                     }
-                     else if (verbose)
-                     {
-                         Debug.Log($"[Brewster/Registry] Item auto-loading disabled - items will be loaded on demand for collection '{collectionId}'");
-                     }
-                }
-                else
-                {
-                     Debug.LogError($"[Brewster/Registry] Could not determine base path for collection '{collectionId}'. Cannot load item index.");
-                }
-                // --- End Item Index Load ---
-
-                return collection;
-            }
-            else
-            {
-                Debug.LogError($"[Brewster/Registry] Failed to parse collection JSON from: {collectionPath}");
-                return null;
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Brewster/Registry] Error processing collection JSON for '{collectionId}': {e.Message}");
-            return null;
-        }
-    }
-
     /// <summary>
-    /// Eagerly loads all items for a collection
+    /// Phase 3: Load all item indexes
     /// </summary>
-    private void LoadAllItemsForCollection(Collection collection)
+    private IEnumerator LoadAllItemIndexes()
     {
-        try
-        {
-            if (collection == null) return;
-            
-            if (verbose) Debug.Log($"[Brewster/Registry] Starting eager load of all items for collection '{collection.Id}'");
-            
-            // Use the Items property to force loading of all items
-            // This is a bit of a hack - we're using the enumerator to load all items
-            int loadedItemCount = 0;
-            int errorCount = 0;
-            int totalCount = 0;
-            
-            System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
-            sw.Start();
-            
-            foreach (Item item in collection.Items)
-            {
-                totalCount++;
-                if (item != null)
-                {
-                    loadedItemCount++;
-                    // Only log individual items if in verbose mode
-                    Debug.Log($"[Brewster/Registry] Successfully loaded item: {item.Id}");
-                }
-                else
-                {
-                    errorCount++;
-                    Debug.LogWarning($"[Brewster/Registry] Failed to load item #{totalCount} from collection '{collection.Id}'");
-                }
-            }
-            
-            // Log summary statistics
-            float elapsedSec = sw.ElapsedMilliseconds / 1000f;
-            Debug.Log($"[Brewster/Registry] Collection '{collection.Id}' - Successfully loaded {loadedItemCount}/{totalCount} items " + 
-                      $"({(errorCount > 0 ? $"{errorCount} errors" : "no errors")}) in {elapsedSec:F2}s");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Brewster/Registry] Error during eager item loading for collection '{collection?.Id}': {e.Message}");
-            Debug.LogError($"[Brewster/Registry] Exception type: {e.GetType().FullName}");
-            Debug.LogError($"[Brewster/Registry] Stack trace: {e.StackTrace}");
-        }
-    }
-
-    /// <summary>
-    /// Gets an item by its ID. Loads from file/cache on demand.
-    /// Requires collection context to build the file path.
-    /// </summary>
-    public Item GetItem(string collectionId, string itemId)
-    {
-        if (string.IsNullOrEmpty(itemId) || string.IsNullOrEmpty(collectionId))
-        {
-            Debug.LogWarning($"[Brewster/Registry] GetItem called with null or empty ID (Collection: '{collectionId}', Item: '{itemId}').");
-            return null;
-        }
-
-        // --- Use Item ID as the primary key for the item cache --- 
-        // Assuming item IDs are globally unique or unique enough for runtime.
-        // If not, a composite key like $"{collectionId}/{itemId}" might be needed.
-        string itemCacheKey = itemId;
-
-        // 1. Check cache
-        if (_loadedItems.TryGetValue(itemCacheKey, out Item cachedItem))
-        {
-            // if (verbose) Debug.Log($"[Brewster/Registry] Cache hit for Item: {itemCacheKey}");
-            return cachedItem;
-        }
-
-        // 2. Load from file if not cached
-        if (verbose) Debug.Log($"[Brewster/Registry] Cache miss for Item: {itemCacheKey}. Attempting to load from file (Context: Collection '{collectionId}').");
+        List<Coroutine> loadingRoutines = new List<Coroutine>();
         
-        // SINGULAR DEFINITIVE PATH CONSTRUCTION - This is the ONLY place that should construct this path
-        string itemFilePath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, 
-            "collections", collectionId, "items", itemId, "item.json");
-            
-        // For WebGL, we need to use a coroutine with UnityWebRequest
-        if (Application.platform == RuntimePlatform.WebGLPlayer)
+        foreach (string collectionId in _collections.Keys)
         {
-            StartCoroutine(LoadItemWithWebRequest(collectionId, itemId, itemCacheKey, itemFilePath));
-            
-            // Return a temporary placeholder while loading
-            Item tempPlaceholder = ScriptableObject.CreateInstance<Item>();
-            tempPlaceholder.Id = itemId;
-            tempPlaceholder.Title = "Loading...";
-            tempPlaceholder.ParentCollectionId = collectionId;
-            return tempPlaceholder;
+            loadingRoutines.Add(StartCoroutine(LoadItemIndex(collectionId)));
         }
-            
-        // Standard file loading for non-WebGL platforms
-        try
+        
+        // Wait for all item indexes to finish loading
+        foreach (var routine in loadingRoutines)
         {
-            if (verbose) Debug.Log("[Brewster/Registry] Loading Item from: '" + itemFilePath + "'");
-            
-            // STRICTLY CHECK EXISTENCE - Fatal error if missing
-            if (!File.Exists(itemFilePath))
-            {
-                // FATAL ERROR - item.json is missing
-                Debug.LogError($"[Brewster/Registry] FATAL ERROR: Item file not found: {itemFilePath}");
-                
-                // Create placeholder item with MISSING title
-                Item placeholderItem = ScriptableObject.CreateInstance<Item>();
-                placeholderItem.Id = itemId;
-                placeholderItem.Title = "MISSING";  // Use MISSING as title
-                placeholderItem.ParentCollectionId = collectionId;
-                
-                // Add to cache so we don't keep trying to load it
-                _loadedItems[itemCacheKey] = placeholderItem;
-                
-                return placeholderItem;
-            }
-            
-            string jsonContent = File.ReadAllText(itemFilePath);
-            if (verbose) Debug.Log($"[Brewster/Registry] Item JSON loaded ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
-            
-            return ProcessItemJson(itemId, collectionId, itemCacheKey, jsonContent, itemFilePath);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Brewster/Registry] FATAL ERROR: Exception loading item '{itemId}' (Collection '{collectionId}'): {e.Message}");
-            
-            // Create placeholder item with MISSING title
-            Item placeholderItem = ScriptableObject.CreateInstance<Item>();
-            placeholderItem.Id = itemId;
-            placeholderItem.Title = "MISSING"; // Use MISSING as title for exceptions too
-            placeholderItem.ParentCollectionId = collectionId;
-            
-            // Add to cache so we don't keep trying to load it
-            _loadedItems[itemCacheKey] = placeholderItem;
-            
-            return placeholderItem;
+            yield return routine;
         }
     }
     
-    // WebGL-specific loading of items using UnityWebRequest
-    private IEnumerator LoadItemWithWebRequest(string collectionId, string itemId, string itemCacheKey, string itemFilePath)
+    /// <summary>
+    /// Load item index for a single collection
+    /// </summary>
+    private IEnumerator LoadItemIndex(string collectionId)
     {
-        if (verbose) Debug.Log("[Brewster/Registry] Loading Item via WebRequest from: '" + itemFilePath + "'");
+        Collection collection = _collections[collectionId];
+        string itemsIndexPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", collectionId, "items-index.json");
         
-        using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(itemFilePath))
+        JToken itemsIndexToken = null;
+        yield return LoadJson(itemsIndexPath, token => itemsIndexToken = token);
+        
+        if (itemsIndexToken == null || itemsIndexToken.Type != JTokenType.Array) 
+            yield break;
+        
+        // Process items index - extract string IDs from the array
+        List<string> itemIds = new List<string>();
+        
+        foreach (var idToken in itemsIndexToken)
         {
-            yield return www.SendWebRequest();
-            
-            if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            if (idToken.Type == JTokenType.String)
             {
-                Debug.LogError($"[Brewster/Registry] FATAL ERROR: Item file not found: {itemFilePath}");
-                Debug.LogError($"[Brewster/Registry] WebRequest error: {www.error}");
+                string id = (string)idToken;
+                if (!string.IsNullOrEmpty(id))
+                {
+                    itemIds.Add(id);
+                    // Add to pending items set - only load each unique item once
+                    _itemIdsPending.Add(id);
+                }
+            }
+        }
+        
+        // Set the item IDs on the collection - this is our source of truth
+        // about which items belong to which collection
+        collection.ItemIds = itemIds;
+    }
+    
+    /// <summary>
+    /// Phase 4: Load all items
+    /// </summary>
+    private IEnumerator LoadAllItems()
+    {
+        if (_itemIdsPending.Count == 0) yield break;
+        
+        // Load items collection-by-collection to maintain proper context
+        foreach (var collectionEntry in _collections)
+        {
+            string collectionId = collectionEntry.Key;
+            Collection collection = collectionEntry.Value;
+            
+            // Get the item IDs for this collection.
+            // Expect ItemIds to be a List<string> as set by LoadItemIndex.
+            List<string> collectionItemIds = collection.ItemIds;
+
+            // Bold check: If ItemIds is null (which shouldn't happen after LoadItemIndex),
+            // log it and skip this collection. Don't guess or create an empty list.
+            if (collectionItemIds == null)
+            {
+                Debug.LogWarning($"Brewster: Collection '{collectionId}' has null ItemIds. Skipping item loading for this collection.");
+                continue;
+            }
+
+            if (collectionItemIds.Count == 0)
+                continue; // Skip if no items anyway
                 
-                // Create placeholder item with MISSING title
-                Item placeholderItem = ScriptableObject.CreateInstance<Item>();
-                placeholderItem.Id = itemId;
-                placeholderItem.Title = "MISSING";
-                placeholderItem.ParentCollectionId = collectionId;
+            // Filter to only pending items that haven't been loaded yet
+            List<string> itemsToLoad = collectionItemIds
+                .Where(id => _itemIdsPending.Contains(id))
+                .ToList();
                 
-                // Add to cache so we don't keep trying to load it
-                _loadedItems[itemCacheKey] = placeholderItem;
+            // Process in batches
+            int batchSize = 10;
+            int itemsRemaining = itemsToLoad.Count;
+            int batchIndex = 0;
+            
+            while (itemsRemaining > 0)
+            {
+                List<Coroutine> batchRoutines = new List<Coroutine>();
+                int itemsInBatch = Math.Min(batchSize, itemsRemaining);
+                
+                for (int i = 0; i < itemsInBatch; i++)
+                {
+                    string itemId = itemsToLoad[batchIndex + i];
+                    
+                    // Remove from pending as we process it
+                    _itemIdsPending.Remove(itemId);
+                    
+                    // Load the item with proper collection context
+                    batchRoutines.Add(StartCoroutine(LoadItem(collectionId, itemId)));
+                }
+                
+                // Wait for the batch to complete
+                foreach (var routine in batchRoutines)
+                {
+                    yield return routine;
+                }
+                
+                // Update counters
+                batchIndex += itemsInBatch;
+                itemsRemaining -= itemsInBatch;
+                
+                // Small delay between batches to avoid hiccups
+                yield return new WaitForEndOfFrame();
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Load a single item
+    /// </summary>
+    private IEnumerator LoadItem(string collectionId, string itemId)
+    {
+        // Skip if already loaded
+        if (_items.ContainsKey(itemId))
+            yield break;
+        
+        // Skip if already being loaded by another coroutine
+        if (_itemIdsLoading.Contains(itemId))
+            yield break;
+        
+        // Mark item as being loaded
+        _itemIdsLoading.Add(itemId);
+        
+        try
+        {
+            string itemPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", collectionId, "items", itemId, "item.json");
+            
+            JToken itemToken = null;
+            yield return LoadJson(itemPath, token => itemToken = token);
+            
+            if (itemToken == null || !(itemToken is JObject itemObj))
+                yield break;
+            
+            // Create and initialize item directly
+            Item item = ScriptableObject.CreateInstance<Item>();
+            item.ImportFromJToken(itemObj);
+            
+            if (string.IsNullOrEmpty(item.Id))
+            {
+                Debug.LogError($"Brewster: Item loaded from {itemPath} has no ID");
+                ScriptableObject.Destroy(item);
                 yield break;
             }
             
+            // Store the item in our registry
+            _items[itemId] = item;
+        }
+        finally
+        {
+            // Remove from loading set regardless of success or failure
+            _itemIdsLoading.Remove(itemId);
+        }
+    }
+    
+    /// <summary>
+    /// Loads JSON from any URI
+    /// </summary>
+    private IEnumerator LoadJson(string uri, Action<JToken> callback)
+    {
+        // Convert file path to correct format for local files
+        string fullUri = uri.StartsWith("http") ? uri : "file://" + uri;
+        
+        using (UnityWebRequest www = UnityWebRequest.Get(fullUri))
+        {
+            yield return www.SendWebRequest();
+            
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Failed to load JSON from {uri}, Error: {www.error}");
+                callback?.Invoke(null);
+                yield break;
+            }
+            
+            // Parse JSON exactly once at the boundary
             string jsonContent = www.downloadHandler.text;
-            if (verbose) Debug.Log($"[Brewster/Registry] Item JSON loaded via WebRequest ({jsonContent.Length} chars), Preview: {Truncate(jsonContent, 100)}");
-            
-            ProcessItemJson(itemId, collectionId, itemCacheKey, jsonContent, itemFilePath);
-        }
-    }
-    
-    // Common processing logic for item JSON
-    private Item ProcessItemJson(string itemId, string collectionId, string itemCacheKey, string jsonContent, string itemFilePath)
-    {
-        try
-        {
-            Item item = Item.FromJson(jsonContent);
-            
-            if (item != null)
+            if (string.IsNullOrEmpty(jsonContent))
             {
-                if (item.Id != itemId)
-                {
-                    Debug.LogWarning($"[Brewster/Registry] Item ID mismatch! Directory ID '{itemId}' does not match item.json ID '{item.Id}'. Using directory ID for caching key, but object has its own ID.");
-                    // Consider forcing ID: item.Id = itemId;
-                }
-
-                // Set Parent Collection ID before caching/returning
-                item.ParentCollectionId = collectionId; 
-
-                // Add to cache
-                _loadedItems[itemCacheKey] = item;
-                if (verbose) Debug.Log($"[Brewster/Registry] Loaded and cached Item: {item.Id} from Collection: {collectionId}");
-
-                // --- Trigger Cover Image Load ---
-                // Load cover image after item is loaded and cached.
-                if (verbose) Debug.Log($"[Brewster/Registry] Triggering cover image load for item: {item.Id}");
-                item.LoadCoverImage(); 
-                // --- End Cover Image Load ---
-                
-                return item;
+                callback?.Invoke(null);
+                yield break;
             }
-            else
+            
+            try
             {
-                Debug.LogError($"[Brewster/Registry] FATAL ERROR: Failed to parse item JSON from: {itemFilePath}");
-                
-                // Create placeholder item with MISSING title
-                Item placeholderItem = ScriptableObject.CreateInstance<Item>();
-                placeholderItem.Id = itemId;
-                placeholderItem.Title = "MISSING"; // Use MISSING as title for parse failures too
-                placeholderItem.ParentCollectionId = collectionId;
-                
-                // Add to cache so we don't keep trying to load it
-                _loadedItems[itemCacheKey] = placeholderItem;
-                
-                return placeholderItem;
+                JToken token = JToken.Parse(jsonContent);
+                callback?.Invoke(token);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Error parsing JSON from {uri}: {e.Message}");
+                callback?.Invoke(null);
             }
         }
-        catch (Exception e)
+    }
+    
+    /// <summary>
+    /// Process collection index token
+    /// </summary>
+    private void ProcessCollectionIndex(JToken token)
+    {
+        if (token == null || token.Type != JTokenType.Array) return;
+        
+        foreach (JToken idToken in token)
         {
-            Debug.LogError($"[Brewster/Registry] FATAL ERROR: Exception processing item JSON for '{itemId}' (Collection '{collectionId}'): {e.Message}");
+            string id = (idToken.Type == JTokenType.String) ? (string)idToken : null;
             
-            // Create placeholder item with MISSING title
-            Item placeholderItem = ScriptableObject.CreateInstance<Item>();
-            placeholderItem.Id = itemId;
-            placeholderItem.Title = "MISSING"; // Use MISSING as title for exceptions too
-            placeholderItem.ParentCollectionId = collectionId;
-            
-            // Add to cache so we don't keep trying to load it
-            _loadedItems[itemCacheKey] = placeholderItem;
-            
-            return placeholderItem;
+            if (!string.IsNullOrEmpty(id) && !_collectionIdsPending.Contains(id))
+                _collectionIdsPending.Add(id);
         }
     }
 
     /// <summary>
-    /// Converts an item ID from directory name format to a more readable title
+    /// Gets a collection by ID from cache.
     /// </summary>
-    private string CleanupItemName(string itemId)
+    public Collection GetCollection(string collectionId)
     {
-        // Replace hyphens, underscores and dots with spaces
-        string cleanTitle = itemId.Replace('-', ' ').Replace('_', ' ').Replace('.', ' ');
+        if (string.IsNullOrEmpty(collectionId)) return null;
         
-        // Title case the result (capitalize first letter of each word)
-        System.Globalization.TextInfo textInfo = new System.Globalization.CultureInfo("en-US", false).TextInfo;
-        cleanTitle = textInfo.ToTitleCase(cleanTitle);
+        _collections.TryGetValue(collectionId, out Collection collection);
+        return collection;
+    }
+
+    /// <summary>
+    /// Gets an item by ID from cache.
+    /// </summary>
+    public Item GetItem(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return null;
         
-        return cleanTitle;
+        _items.TryGetValue(itemId, out Item item);
+        return item;
     }
 
     /// <summary>
-    /// Gets all known collection IDs.
+    /// Gets a texture by path from cache.
     /// </summary>
-    public IReadOnlyList<string> GetAllCollectionIds()
+    public Texture2D GetCachedTexture(string path)
     {
-        // Ensure initialized? Maybe call InitializeRegistry() if !IsInitialized?
-        return _collectionIds.AsReadOnly();
-    }
-
-    /// <summary>
-    /// Gets all currently loaded collections from the cache.
-    /// Does not trigger loading of collections not already requested.
-    /// </summary>
-    public IEnumerable<Collection> GetAllLoadedCollections()
-    {
-        return _loadedCollections.Values;
-    }
-
-    /// <summary>
-    /// Helper to truncate strings for logging.
-    /// </summary>
-    private static string Truncate(string value, int maxLength)
-    {
-        if (string.IsNullOrEmpty(value)) return value;
-        return value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
+        if (string.IsNullOrEmpty(path)) return null;
+        
+        _textureCache.TryGetValue(path, out Texture2D texture);
+        return texture;
     }
     
-    // --- Old Loading Methods Removed --- 
-    // LoadAllContent (replaced by InitializeRegistry and on-demand gets)
-    // LoadCollection (replaced by GetCollection)
-    // LoadItemsForCollection (logic moved to Collection.LoadItemIndex and GetItem)
-    // LoadItemCoverImage (logic moved to Item.LoadCoverImage, triggered by GetItem)
+    /// <summary>
+    /// Load a texture from any path
+    /// </summary>
+    public void LoadTexture(string path, Action<Texture2D> onLoaded)
+    {
+        // Path is now used as the cache key
+        // If already cached, return immediately
+        if (_textureCache.TryGetValue(path, out Texture2D cachedTexture))
+        {
+            onLoaded?.Invoke(cachedTexture);
+            return;
+        }
+        
+        // If already loading, skip
+        if (_texturesLoading.Contains(path))
+            return;
+            
+        // Mark as loading
+        _texturesLoading.Add(path);
+        
+        // Start texture loading coroutine
+        StartCoroutine(LoadTextureCoroutine(path, onLoaded));
+    }
     
-    // GetTotalItemCount might need rework to iterate IDs and potentially trigger loads, or just count loaded items.
-}
-
-/// <summary>
-/// Helper class for deserializing the collections index
-/// </summary>
-[Serializable]
-public class CollectionIndex
-{
-    public string[] collections;
+    /// <summary>
+    /// Load an item's cover texture
+    /// </summary>
+    public void LoadItemCover(string itemId, Action<Texture2D> onLoaded)
+    {
+        if (string.IsNullOrEmpty(itemId)) 
+        {
+            onLoaded?.Invoke(null);
+            return;
+        }
+        
+        // Get the item
+        Item item = GetItem(itemId);
+        if (item == null)
+        {
+            onLoaded?.Invoke(null);
+            return;
+        }
+        
+        // Find a collection for this item
+        string collectionId = null;
+        foreach (var collection in _collections.Values)
+        {
+            if (collection.ItemIds.Contains(itemId))
+            {
+                collectionId = collection.Id;
+                break;
+            }
+        }
+        
+        if (string.IsNullOrEmpty(collectionId))
+        {
+            Debug.LogWarning($"Brewster: Cannot load cover for item {itemId} - not found in any collection");
+            onLoaded?.Invoke(null);
+            return;
+        }
+        
+        // Build the path to the cover image
+        string coverPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", 
+            collectionId, "items", itemId, "cover.jpg");
+            
+        // Load the texture using the path as the cache key
+        LoadTexture(coverPath, texture => {
+            // When loaded, set it on the item and invoke callback
+            if (item != null && texture != null)
+            {
+                item.cover = texture;
+                item.NotifyViewsOfUpdate();
+            }
+            onLoaded?.Invoke(texture);
+        });
+    }
+    
+    /// <summary>
+    /// Coroutine to load a texture with UnityWebRequest
+    /// </summary>
+    private IEnumerator LoadTextureCoroutine(string path, Action<Texture2D> onLoaded)
+    {
+        // Convert file path to URI
+        string uri = path.StartsWith("http") ? path : "file://" + path;
+        
+        using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(uri))
+        {
+            yield return www.SendWebRequest();
+            
+            // Handle errors
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Failed to load texture from {path}: {www.error}");
+                _texturesLoading.Remove(path);
+                onLoaded?.Invoke(null);
+                yield break;
+            }
+            
+            // Get the texture
+            Texture2D texture = DownloadHandlerTexture.GetContent(www);
+            if (texture != null)
+            {
+                // Cache the texture using the path as key
+                _textureCache[path] = texture;
+            }
+            
+            // Mark as no longer loading
+            _texturesLoading.Remove(path);
+            
+            // Invoke callback
+            onLoaded?.Invoke(texture);
+        }
+    }
 }

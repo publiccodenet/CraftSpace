@@ -16,6 +16,7 @@ public class ItemViewsContainer : MonoBehaviour
     
     private List<ItemView> itemViews = new List<ItemView>();
     private Item _item;
+    private string _collectionId;
     
     /// <summary>
     /// The transform where item views will be parented
@@ -102,13 +103,30 @@ public class ItemViewsContainer : MonoBehaviour
     }
     
     /// <summary>
-    /// Create and add a new item view using the configured prefab
+    /// Sets the collection context for this container and its item views
+    /// </summary>
+    public void SetCollectionContext(string collectionId)
+    {
+        _collectionId = collectionId;
+        
+        // Update any existing item views
+        foreach (var view in itemViews)
+        {
+            if (view != null)
+            {
+                view.SetCollectionContext(collectionId);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Add an item view for a specific item
     /// </summary>
     public ItemView AddItemView(Item item)
     {
         if (item == null)
         {
-            Debug.LogError("[ItemViewsContainer] Cannot create view for null item");
+            Debug.LogError("[ItemViewsContainer] Cannot add view for null item");
             return null;
         }
         
@@ -133,6 +151,12 @@ public class ItemViewsContainer : MonoBehaviour
         
         if (itemView != null)
         {
+            // Set the collection context on the view
+            if (!string.IsNullOrEmpty(_collectionId))
+            {
+                itemView.SetCollectionContext(_collectionId);
+            }
+            
             // Set the item model on the view
             itemView.SetModel(item);
             itemViews.Add(itemView);

@@ -65,16 +65,9 @@ public abstract class SchemaGeneratedObject : ScriptableObject
     {
         try
         {
-            Debug.Log($"[SchemaGeneratedObject] Beginning ImportFromJson in {GetType().Name}");
-            Debug.Log($"[SchemaGeneratedObject] Parsing JSON string of length {json?.Length ?? 0}");
-            
-            // Log a preview of the JSON string (first 100 chars)
-            string jsonPreview = json?.Length > 100 ? json.Substring(0, 100) + "..." : json;
-            Debug.Log($"[SchemaGeneratedObject] JSON preview: {jsonPreview}");
-
             if (string.IsNullOrEmpty(json))
             {
-                Debug.LogWarning($"[SchemaGeneratedObject] Empty JSON string passed to {GetType().Name}.ImportFromJson");
+                Debug.LogWarning($"[{GetType().Name}] Empty JSON string passed to ImportFromJson");
                 return;
             }
 
@@ -82,12 +75,10 @@ public abstract class SchemaGeneratedObject : ScriptableObject
             try 
             {
                 data = JObject.Parse(json);
-                Debug.Log("[SchemaGeneratedObject] JSON successfully parsed");
             }
             catch (Exception parseEx)
             {
-                Debug.LogError($"[SchemaGeneratedObject] Failed to parse JSON: {parseEx.Message}");
-                Debug.LogError($"[SchemaGeneratedObject] Parse error stack trace: {parseEx.StackTrace}");
+                Debug.LogError($"[{GetType().Name}] Failed to parse JSON: {parseEx.Message}");
                 return; // Exit early if we can't parse the JSON
             }
             
@@ -97,37 +88,50 @@ public abstract class SchemaGeneratedObject : ScriptableObject
             // --- Call abstract/virtual methods --- 
             try
             {
-                Debug.Log($"[{GetType().Name}] Calling ImportKnownProperties");
                 ImportKnownProperties(data); // Populate derived class fields (including Id)
-                Debug.Log($"[{GetType().Name}] ImportKnownProperties completed successfully");
-
-                // <<< SET NAME AFTER Id IS POPULATED >>>
-                SetUnityObjectName();
-
-                Debug.Log($"[{GetType().Name}] Calling ImportExtraFields");
                 ImportExtraFields(data); // Populate extra fields
-                Debug.Log($"[{GetType().Name}] ImportExtraFields completed successfully");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[SchemaGeneratedObject] Error in ImportFromJson: {ex.Message}");
-                Debug.LogError($"[SchemaGeneratedObject] Exception type: {ex.GetType().FullName}");
-                Debug.LogError($"[SchemaGeneratedObject] Stack trace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    Debug.LogError($"[SchemaGeneratedObject] Inner exception: {ex.InnerException.Message}");
-                }
+                Debug.LogError($"[{GetType().Name}] Error in ImportFromJson: {ex.Message}");
             }
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[SchemaGeneratedObject] Error in {GetType().Name}.ImportFromJson: {ex.Message}");
-            Debug.LogError($"[SchemaGeneratedObject] Exception type: {ex.GetType().FullName}");
-            Debug.LogError($"[SchemaGeneratedObject] Stack trace: {ex.StackTrace}");
-            if (ex.InnerException != null)
+            Debug.LogError($"[{GetType().Name}] Error in ImportFromJson: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Import data directly from pre-parsed JObject
+    /// Avoids redundant string-to-JObject parsing
+    /// </summary>
+    public virtual void ImportFromJToken(JObject data)
+    {
+        try
+        {
+            if (data == null)
             {
-                Debug.LogError($"[SchemaGeneratedObject] Inner exception: {ex.InnerException.Message}");
+                Debug.LogWarning($"[{GetType().Name}] Null JObject passed to ImportFromJToken");
+                return;
             }
+            
+            // Clear existing extra fields before import
+            extraFields = new JObject();
+            
+            try
+            {
+                ImportKnownProperties(data); // Populate derived class fields
+                ImportExtraFields(data); // Populate extra fields
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[{GetType().Name}] Error in ImportFromJToken: {ex.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[{GetType().Name}] Error in ImportFromJToken: {ex.Message}");
         }
     }
     
@@ -141,55 +145,36 @@ public abstract class SchemaGeneratedObject : ScriptableObject
     /// </summary>
     protected virtual void ImportExtraFields(JObject json)
     {
-        Debug.Log($"[SchemaGeneratedObject] Starting ImportExtraFields in {GetType().Name}");
         try
         {
             if (json == null)
             {
-                Debug.LogError($"[SchemaGeneratedObject] ImportExtraFields called with null JObject");
+                Debug.LogError($"[{GetType().Name}] ImportExtraFields called with null JObject");
                 return;
             }
             
-            Debug.Log($"[SchemaGeneratedObject] Creating new JObject for extraFields");
             extraFields = new JObject();
-            Debug.Log($"[SchemaGeneratedObject] extraFields initialized as empty JObject");
             
-            int propertyCount = 0;
             foreach (var prop in json)
             {
                 try
                 {
-                    var propertyName = prop.Key;
-                    Debug.Log($"[SchemaGeneratedObject] Processing JSON property: {propertyName}");
-                    
-                    bool isDefined = HasDefinedProperty(propertyName);
-                    Debug.Log($"[SchemaGeneratedObject] Property {propertyName} is defined in schema: {isDefined}");
-                    
-                    if (!isDefined)
+                    string propertyName = prop.Key;
+                    if (!HasDefinedProperty(propertyName))
                     {
-                        Debug.Log($"[SchemaGeneratedObject] Adding extra field: {propertyName}");
                         extraFields[propertyName] = prop.Value;
-                        propertyCount++;
                     }
                 }
                 catch (Exception propEx)
                 {
-                    Debug.LogError($"[SchemaGeneratedObject] Error processing property {prop.Key}: {propEx.Message}");
+                    Debug.LogError($"[{GetType().Name}] Error processing property {prop.Key}: {propEx.Message}");
                     // Continue with the next property
                 }
             }
-            Debug.Log($"[SchemaGeneratedObject] Completed ImportExtraFields with {propertyCount} extra fields");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[SchemaGeneratedObject] Error in ImportExtraFields: {ex.Message}");
-            Debug.LogError($"[SchemaGeneratedObject] Error type: {ex.GetType().Name}");
-            Debug.LogError($"[SchemaGeneratedObject] Stack trace: {ex.StackTrace}");
-            if (ex.InnerException != null)
-            {
-                Debug.LogError($"[SchemaGeneratedObject] Inner exception: {ex.InnerException.Message}");
-                Debug.LogError($"[SchemaGeneratedObject] Inner exception type: {ex.InnerException.GetType().Name}");
-            }
+            Debug.LogError($"[{GetType().Name}] Error in ImportExtraFields: {ex.Message}");
             // Don't rethrow - we want to gracefully recover
         }
     }
@@ -197,7 +182,7 @@ public abstract class SchemaGeneratedObject : ScriptableObject
     /// <summary>
     /// Export to JSON string
     /// </summary>
-    public virtual string ExportToJson()
+    public virtual string ExportToJson(bool prettyPrint = true)
     {
         try
         {
@@ -214,11 +199,11 @@ public abstract class SchemaGeneratedObject : ScriptableObject
                 json[prop.Key] = prop.Value;
             }
             
-            return json.ToString(Formatting.Indented);
+            return json.ToString(prettyPrint ? Formatting.Indented : Formatting.None);
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[SchemaGeneratedObject] Error in ExportToJson: {ex.Message}");
+            Debug.LogError($"[{GetType().Name}] Error in ExportToJson: {ex.Message}");
             throw;
         }
     }
@@ -232,63 +217,97 @@ public abstract class SchemaGeneratedObject : ScriptableObject
     /// Check if a property is defined in the schema
     /// </summary>
     protected abstract bool HasDefinedProperty(string name);
-    
-    /// <summary>
-    /// Convert to JSON string - canonical method
-    /// </summary>
-    public string ToJson()
-    {
-        return ExportToJson();
-    }
-    
-    /// <summary>
-    /// Convert to JSON string with optional pretty printing
-    /// </summary>
-    public string ToJsonString(bool prettyPrint = false)
-    {
-        try
-        {
-            if (prettyPrint)
-            {
-                return ExportToJson();
-            }
-            else
-            {
-                return JObject.Parse(ExportToJson()).ToString(Formatting.None);
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[{GetType().Name}] Error in ToJsonString: {e.Message}");
-            return "{}";
-        }
-    }
 
+    #region View Registration and Management
+
+    [NonSerialized] private HashSet<object> registeredViews = new HashSet<object>();
+    
     /// <summary>
-    /// Sets the Unity ScriptableObject.name property based on the type and Id.
-    /// Called automatically during ImportFromJson after known properties are populated.
-    /// Format: "TypeName-IdValue"
+    /// Register a view to receive updates from this model
     /// </summary>
-    protected virtual void SetUnityObjectName()
+    /// <param name="view">The view to register</param>
+    public virtual void RegisterView(object view)
     {
         try
         {
-            string objectId = this.Id; // Now accesses the abstract property
-            if (!string.IsNullOrEmpty(objectId))
+            if (view != null && !registeredViews.Contains(view))
             {
-                this.name = $"{GetType().Name}-{objectId}";
-            }
-            else
-            {
-                 this.name = $"{GetType().Name}-MissingId_{GetInstanceID()}";
-                 Debug.LogWarning($"[{GetType().Name}] Could not set object name using Id because Id property was null or empty. Using fallback: {this.name}");
+                registeredViews.Add(view);
+                Debug.Log($"[{GetType().Name}] Registered view: {view.GetType().Name}");
             }
         }
         catch (Exception ex)
         {
-             Debug.LogError($"[{GetType().Name}] Error setting ScriptableObject name: {ex.Message}");
-             // Use a basic fallback name
-             this.name = $"{GetType().Name}-NameError_{GetInstanceID()}";
+            Debug.LogError($"[{GetType().Name}] Error registering view: {ex.Message}");
         }
     }
+    
+    /// <summary>
+    /// Unregister a view from this model
+    /// </summary>
+    /// <param name="view">The view to unregister</param>
+    public virtual void UnregisterView(object view)
+    {
+        try
+        {
+            if (view != null)
+            {
+                registeredViews.Remove(view);
+                Debug.Log($"[{GetType().Name}] Unregistered view: {view.GetType().Name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[{GetType().Name}] Error unregistering view: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Get all registered views of a specific type
+    /// </summary>
+    /// <typeparam name="TView">The type of views to retrieve</typeparam>
+    /// <returns>Collection of views that match the specified type</returns>
+    protected IEnumerable<TView> GetViewsOfType<TView>()
+    {
+        foreach (var view in registeredViews)
+        {
+            if (view is TView typedView)
+            {
+                yield return typedView;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Notify all registered views of a specific type
+    /// </summary>
+    /// <typeparam name="TView">The type of views to notify</typeparam>
+    /// <param name="notificationAction">The action to perform on each view</param>
+    protected void NotifyViewsOfType<TView>(Action<TView> notificationAction)
+    {
+        try
+        {
+            int count = 0;
+            foreach (var view in GetViewsOfType<TView>())
+            {
+                try
+                {
+                    notificationAction(view);
+                    count++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[{GetType().Name}] Error notifying view: {ex.Message}");
+                }
+            }
+            
+            Debug.Log($"[{GetType().Name}] Notified {count} views of type {typeof(TView).Name}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[{GetType().Name}] Error in NotifyViewsOfType: {ex.Message}");
+        }
+    }
+
+    #endregion
 } 

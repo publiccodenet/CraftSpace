@@ -94,9 +94,39 @@ This approach:
 - Ensures backward compatibility
 - Supports dynamic field access
 
+### Model-View Communication
+
+SchemaGeneratedObject also implements a robust Model-View pattern:
+
+1. **View Registration**:
+   - Models can register views via `RegisterView(object view)`
+   - Models can unregister views via `UnregisterView(object view)`
+
+2. **View Notification**:
+   - Models notify views of changes via `NotifyViewsOfType<TView>(Action<TView> action)`
+   - This enables type-safe notifications to specific view interfaces
+
+3. **Implementation Pattern**:
+   - Collection implements `NotifyViewsOfUpdate()` calling `NotifyViewsOfType<ICollectionView>()`
+   - Item implements `NotifyViewsOfUpdate()` calling `NotifyViewsOfType<IItemView>()`
+   - Views register with models via `model.RegisterView(this)`
+
+This creates a clean separation between data and presentation while maintaining type safety.
+
 ## Base Class
 All generated schema classes inherit from `SchemaGeneratedObject` (in the `CraftSpace` namespace), which provides:
-- JSON serialization/deserialization
+
+### JSON Serialization/Deserialization
+- `ExportToJson(bool prettyPrint = true)`: Serializes to JSON string with formatting option
+- Automatic handling of defined and extra fields
+
+### Model-View Communication
+- `RegisterView(object view)`: Registers a view with this model
+- `UnregisterView(object view)`: Unregisters a view from this model
+- `GetViewsOfType<TView>()`: Gets all registered views of specific type
+- `NotifyViewsOfType<TView>(Action<TView>)`: Notifies views of changes
+
+### Other Functionality
 - Dynamic field access
 - Field name normalization
 - Validation support
@@ -121,6 +151,7 @@ Generated classes use the namespace `CraftSpace.Schemas.Generated` and are inher
 1. **NEVER modify generated files**: If changes are needed, modify the schema generator or source schemas
 2. **Use extension classes**: Add functionality in non-generated files like `Item.cs` and `Collection.cs`
 3. **Treat extraFields as internal**: Don't directly access `extraFields` in your code, it's an implementation detail
+4. **Use view registration pattern**: Register views with models and implement appropriate interfaces
 
 ## Regenerating Schemas
 

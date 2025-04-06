@@ -1,122 +1,100 @@
 using UnityEngine;
-using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 
 public class ViewFactory : MonoBehaviour
 {
     [Header("Prefabs")]
-    [SerializeField] private GameObject _collectionViewPrefab;
-    [SerializeField] private GameObject _itemViewPrefab;
-    [SerializeField] private GameObject _itemViewsContainerPrefab;
-    [SerializeField] private List<GameObject> _itemViewVariantPrefabs = new List<GameObject>();
-    
-    [Header("Configuration")]
-    [SerializeField] private bool _createWithColliders = true;
-    [SerializeField] private string _defaultConfigPath = "Configs/DefaultViewConfig";
-    
-    [Header("Container References")]
-    [SerializeField] private Transform _defaultCollectionContainer;
-    [SerializeField] private Transform _defaultItemContainer;
-    
-    // JSON serializer settings with Unity converters
-    private JsonSerializerSettings _serializerSettings;
-    
-    private void Awake()
-    {
-        // Initialize serializer settings with custom converters
-        _serializerSettings = new JsonSerializerSettings
-        {
-            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
-            NullValueHandling = NullValueHandling.Ignore,
-            ObjectCreationHandling = ObjectCreationHandling.Replace
-            // Your custom Unity converters will be registered when JsonConvert is used
-        };
-    }
+    public GameObject collectionViewPrefab;
+    public GameObject itemViewPrefab;
+    public GameObject itemViewsContainerPrefab;
+    public List<GameObject> itemViewVariantPrefabs = new List<GameObject>();
     
     // Create a new collection view
-    public CollectionView CreateCollectionView(Collection model, Transform container = null, string configJson = null)
+    public CollectionView CreateCollectionView(Collection model, Transform container)
     {
-        if (_collectionViewPrefab == null)
+        if (collectionViewPrefab == null)
+        {
+            Debug.LogError("CollectionViewPrefab is not assigned in ViewFactory");
             return null;
-            
+        }
+        
         if (container == null)
-            container = _defaultCollectionContainer;
+        {
+            Debug.LogError("Container must be provided when creating a CollectionView");
+            return null;
+        }
             
-        if (container == null)
-            container = transform;
-            
-        GameObject viewObj = Instantiate(_collectionViewPrefab, container);
+        GameObject viewObj = Instantiate(collectionViewPrefab, container);
         CollectionView view = viewObj.GetComponent<CollectionView>();
         
         if (view != null)
         {
-            // Use SetModel method instead of trying to set Model property directly
+            // Set the model (view will handle its own setup)
             view.SetModel(model);
-            
-            // Then apply any JSON configuration if provided
-            if (!string.IsNullOrEmpty(configJson))
-            {
-                ConfigureFromJson(view, configJson);
-            }
-            // Otherwise check for default config
-            else if (!string.IsNullOrEmpty(_defaultConfigPath))
-            {
-                TextAsset defaultConfig = Resources.Load<TextAsset>(_defaultConfigPath + "/collection_view");
-                if (defaultConfig != null && !string.IsNullOrEmpty(defaultConfig.text))
-                {
-                    ConfigureFromJson(view, defaultConfig.text);
-                }
-            }
         }
         
         return view;
     }
     
     // Create a new item view
-    public ItemView CreateItemView(Item model, Transform container = null, string configJson = null)
+    public ItemView CreateItemView(Item model, Transform container, string collectionId)
     {
-        if (_itemViewPrefab == null)
+        if (itemViewPrefab == null)
+        {
+            Debug.LogError("ItemViewPrefab is not assigned in ViewFactory");
             return null;
-            
+        }
+        
         if (container == null)
-            container = _defaultItemContainer;
+        {
+            Debug.LogError("Container must be provided when creating an ItemView");
+            return null;
+        }
+        
+        if (string.IsNullOrEmpty(collectionId))
+        {
+            Debug.LogError("CollectionId must be provided when creating an ItemView");
+            return null;
+        }
             
-        if (container == null)
-            container = transform;
-            
-        GameObject viewObj = Instantiate(_itemViewPrefab, container);
+        GameObject viewObj = Instantiate(itemViewPrefab, container);
         ItemView view = viewObj.GetComponent<ItemView>();
         
         if (view != null)
         {
-            // Use SetModel method
-            view.SetModel(model);
+            // Set collection context
+            view.SetCollectionContext(collectionId);
             
-            // Apply configuration if provided
-            if (!string.IsNullOrEmpty(configJson))
-            {
-                ConfigureFromJson(view, configJson);
-            }
+            // Set the model (view will handle its own setup)
+            view.SetModel(model);
         }
         
         return view;
     }
     
     // Create a container with multiple views for an item
-    public ItemViewsContainer CreateItemViewsContainer(Item model, Transform container = null, string configJson = null)
+    public ItemViewsContainer CreateItemViewsContainer(Item model, Transform container, string collectionId)
     {
-        if (_itemViewsContainerPrefab == null)
+        if (itemViewsContainerPrefab == null)
+        {
+            Debug.LogError("ItemViewsContainerPrefab is not assigned in ViewFactory");
             return null;
-            
+        }
+        
         if (container == null)
-            container = _defaultItemContainer;
-            
-        if (container == null)
-            container = transform;
+        {
+            Debug.LogError("Container must be provided when creating an ItemViewsContainer");
+            return null;
+        }
+        
+        if (string.IsNullOrEmpty(collectionId))
+        {
+            Debug.LogError("CollectionId must be provided when creating an ItemViewsContainer");
+            return null;
+        }
             
         // Create container
-        GameObject containerObj = Instantiate(_itemViewsContainerPrefab, container);
+        GameObject containerObj = Instantiate(itemViewsContainerPrefab, container);
         containerObj.name = $"ItemViews_{model?.Id ?? "Unknown"}";
         
         ItemViewsContainer containerComponent = containerObj.GetComponent<ItemViewsContainer>();
@@ -125,19 +103,16 @@ public class ViewFactory : MonoBehaviour
             containerComponent = containerObj.AddComponent<ItemViewsContainer>();
         }
         
-        // Set the model
+        // Set collection context
+        containerComponent.SetCollectionContext(collectionId);
+        
+        // Set the model (container will handle its own setup)
         containerComponent.Item = model;
         
-        // Apply any JSON configuration
-        if (!string.IsNullOrEmpty(configJson))
+        // Create child views if needed
+        if (containerObj.transform.childCount == 0 && itemViewVariantPrefabs.Count > 0)
         {
-            ConfigureFromJson(containerComponent, configJson);
-        }
-        
-        // Create child views if not populated through config
-        if (containerObj.transform.childCount == 0 && _itemViewVariantPrefabs.Count > 0)
-        {
-            foreach (var prefab in _itemViewVariantPrefabs)
+            foreach (var prefab in itemViewVariantPrefabs)
             {
                 if (prefab != null)
                 {
@@ -161,39 +136,5 @@ public class ViewFactory : MonoBehaviour
         // Items will get their model from the container
         
         return view;
-    }
-    
-    // Configure an object from JSON
-    public void ConfigureFromJson<T>(T target, string json) where T : MonoBehaviour
-    {
-        if (target == null || string.IsNullOrEmpty(json))
-            return;
-            
-        try
-        {
-            // Use PopulateObject to update existing instance (rather than creating new)
-            JsonConvert.PopulateObject(json, target, _serializerSettings);
-            
-            // For collection view, might need special handling of prefab references
-            if (target is CollectionView collectionView)
-            {
-                // Any special handling for collection view
-            }
-            else if (target is ItemViewsContainer container)
-            {
-                // Any special handling for container
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"Error configuring {typeof(T).Name} from JSON: {e.Message}");
-        }
-    }
-    
-    // Load a view configuration from a resource
-    public string LoadViewConfigJson(string resourcePath)
-    {
-        TextAsset config = Resources.Load<TextAsset>(resourcePath);
-        return config?.text;
     }
 } 

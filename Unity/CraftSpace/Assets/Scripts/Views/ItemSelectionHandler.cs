@@ -40,7 +40,7 @@ public class ItemSelectionHandler : MonoBehaviour, IPointerClickHandler
     /// </summary>
     public void SelectItem()
     {
-        if (_itemView == null || _itemView.Item == null) return;
+        if (_itemView == null || _itemView.Model == null) return;
         
         // Highlight the item
         _itemView.SetHighlighted(true);
@@ -54,7 +54,7 @@ public class ItemSelectionHandler : MonoBehaviour, IPointerClickHandler
         // Invoke the event
         _onItemSelected.Invoke(_itemView);
         
-        Debug.Log($"[ItemSelectionHandler] Selected item: {_itemView.Item.Title}");
+        Debug.Log($"[ItemSelectionHandler] Selected item: {_itemView.Model.Title}");
     }
     
     /// <summary>

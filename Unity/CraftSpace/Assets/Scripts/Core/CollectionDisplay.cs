@@ -2,35 +2,95 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
-using System.Linq;
 
 /// <summary>
-/// Manages the display of collections and item details in the InfoText panel
+/// Manages the display of a collection and item details
 /// </summary>
 public class CollectionDisplay : MonoBehaviour
 {
     [Header("Collection Display")]
-    [SerializeField] private CollectionView _collectionView;
+    public CollectionView collectionView;
     
     [Header("Item Detail Display")]
-    [SerializeField] private GameObject _itemInfoPanel;
-    [SerializeField] private TextMeshProUGUI _itemTitleText;
+    public GameObject itemInfoPanel;
+    public TextMeshProUGUI itemTitleText;
     
     [Header("Settings")]
-    [SerializeField] private bool _loadOnStart = true;
-    [SerializeField] private string _defaultCollectionId;
+    public bool loadOnStart = true;
+    public string collectionId;
+    
+    [Header("Input References")]
+    public InputManager inputManager;
     
     // Cache for collections
-    private List<string> _availableCollectionIds = new List<string>();
-    private Dictionary<string, Collection> _cachedCollections = new Dictionary<string, Collection>();
-    private Item _selectedItem;
+    private Dictionary<string, Collection> cachedCollections = new Dictionary<string, Collection>();
+    private Item selectedItem;
     
     private void Start()
     {
-        if (_loadOnStart)
+        if (loadOnStart)
         {
             InitializeDisplay();
         }
+        
+        // Subscribe to InputManager events if available
+        
+        if (inputManager != null)
+        {
+            inputManager.OnItemHoverStart.AddListener(HandleItemHoverStart);
+            inputManager.OnItemHoverEnd.AddListener(HandleItemHoverEnd);
+            inputManager.OnItemSelected.AddListener(HandleItemSelected);
+            inputManager.OnItemDeselected.AddListener(HandleItemDeselected);
+        }
+        else
+        {
+            Debug.LogWarning("No InputManager found. Item hover/selection display will not function.");
+        }
+    }
+    
+    private void OnDestroy()
+    {
+        // Unsubscribe from events when destroyed
+        if (inputManager != null)
+        {
+            inputManager.OnItemHoverStart.RemoveListener(HandleItemHoverStart);
+            inputManager.OnItemHoverEnd.RemoveListener(HandleItemHoverEnd);
+            inputManager.OnItemSelected.RemoveListener(HandleItemSelected);
+            inputManager.OnItemDeselected.RemoveListener(HandleItemDeselected);
+        }
+    }
+    
+    // Event handlers
+    private void HandleItemHoverStart(ItemView itemView)
+    {
+        if (itemView != null && itemView.Model != null)
+        {
+            DisplayItemDetails(itemView.Model);
+        }
+    }
+    
+    private void HandleItemHoverEnd(ItemView itemView)
+    {
+        // Only hide if we're not currently showing a selected item
+        if (selectedItem == null)
+        {
+            HideItemDetails();
+        }
+    }
+    
+    private void HandleItemSelected(ItemView itemView)
+    {
+        if (itemView != null && itemView.Model != null)
+        {
+            selectedItem = itemView.Model;
+            DisplayItemDetails(itemView.Model);
+        }
+    }
+    
+    private void HandleItemDeselected(ItemView itemView)
+    {
+        selectedItem = null;
+        HideItemDetails();
     }
     
     /// <summary>
@@ -38,36 +98,15 @@ public class CollectionDisplay : MonoBehaviour
     /// </summary>
     public void InitializeDisplay()
     {
-        // Check if Brewster is available
-        if (Brewster.Instance == null)
+        // Show the specified collection
+        if (!string.IsNullOrEmpty(collectionId))
         {
-            Debug.LogWarning("[CollectionDisplay] Brewster instance not found. Cannot initialize display.");
-            return;
+            DisplayCollection(collectionId);
         }
-        
-        // Ensure Brewster is initialized
-        if (!Brewster.Instance.IsInitialized)
+        else
         {
-            Debug.Log("[CollectionDisplay] Brewster is not initialized yet. Initializing now.");
-            Brewster.Instance.InitializeRegistry();
+            Debug.LogError("No collection ID specified.");
         }
-        
-        // Get available collections
-        _availableCollectionIds = Brewster.Instance.GetAllCollectionIds().ToList();
-        
-        if (_availableCollectionIds.Count == 0)
-        {
-            Debug.LogWarning("[CollectionDisplay] No collections available to display.");
-            return;
-        }
-        
-        // Show default collection or first available
-        string collectionToShow = !string.IsNullOrEmpty(_defaultCollectionId) && 
-                                _availableCollectionIds.Contains(_defaultCollectionId) 
-                                ? _defaultCollectionId 
-                                : _availableCollectionIds[0];
-                                
-        DisplayCollection(collectionToShow);
         
         // Hide item details initially
         HideItemDetails();
@@ -80,27 +119,34 @@ public class CollectionDisplay : MonoBehaviour
     {
         if (string.IsNullOrEmpty(collectionId))
         {
-            Debug.LogWarning("[CollectionDisplay] Cannot display collection: collectionId is null or empty");
+            Debug.LogWarning("Cannot display collection: collectionId is null or empty");
             return;
         }
         
-        Collection collection = GetCollection(collectionId);
+        // Get collection asynchronously using callback
+        Collection collection = Brewster.Instance.GetCollection(collectionId);
+        OnCollectionLoaded(collection);
+    }
+    
+    /// <summary>
+    /// Callback when collection is loaded
+    /// </summary>
+    private void OnCollectionLoaded(Collection collection)
+    {
         if (collection == null)
         {
-            Debug.LogError($"[CollectionDisplay] Failed to load collection with ID: {collectionId}");
+            Debug.LogError($"Failed to load collection");
             return;
         }
         
-        Debug.Log($"[CollectionDisplay] Displaying collection: {collection.Title} (ID: {collection.Id})");
-        
         // Set the collection on the view
-        if (_collectionView != null)
+        if (collectionView != null)
         {
-            _collectionView.SetModel(collection);
+            collectionView.SetModel(collection);
         }
         else
         {
-            Debug.LogWarning("[CollectionDisplay] No CollectionView assigned. Cannot display collection.");
+            Debug.LogWarning("No CollectionView assigned. Cannot display collection.");
         }
         
         // Hide detail panel when changing collections
@@ -118,22 +164,16 @@ public class CollectionDisplay : MonoBehaviour
             return;
         }
         
-        _selectedItem = item;
-        
         // Show title in the InfoText component
-        if (_itemTitleText != null)
+        if (itemTitleText != null)
         {
-            _itemTitleText.text = item.Title;
+            itemTitleText.text = item.Title;
             
             // Make panel visible if it exists
-            if (_itemInfoPanel != null)
+            if (itemInfoPanel != null)
             {
-                _itemInfoPanel.SetActive(true);
+                itemInfoPanel.SetActive(true);
             }
-        }
-        else
-        {
-            Debug.Log($"[CollectionDisplay] No title text component assigned, but would show: '{item.Title}'");
         }
     }
     
@@ -142,18 +182,16 @@ public class CollectionDisplay : MonoBehaviour
     /// </summary>
     public void HideItemDetails()
     {
-        _selectedItem = null;
-        
         // Clear title text if present
-        if (_itemTitleText != null)
+        if (itemTitleText != null)
         {
-            _itemTitleText.text = "";
+            itemTitleText.text = "";
         }
         
         // Hide panel if present
-        if (_itemInfoPanel != null && _itemInfoPanel.activeSelf)
+        if (itemInfoPanel != null && itemInfoPanel.activeSelf)
         {
-            _itemInfoPanel.SetActive(false);
+            itemInfoPanel.SetActive(false);
         }
     }
     
@@ -166,37 +204,14 @@ public class CollectionDisplay : MonoBehaviour
     }
     
     /// <summary>
-    /// Get a collection by ID (with caching)
-    /// </summary>
-    private Collection GetCollection(string collectionId)
-    {
-        if (string.IsNullOrEmpty(collectionId) || Brewster.Instance == null)
-            return null;
-            
-        // Check cache first
-        if (_cachedCollections.TryGetValue(collectionId, out Collection cachedCollection))
-        {
-            return cachedCollection;
-        }
-        
-        // Load from Brewster if not cached
-        Collection collection = Brewster.Instance.GetCollection(collectionId);
-        if (collection != null)
-        {
-            _cachedCollections[collectionId] = collection;
-        }
-        
-        return collection;
-    }
-    
-    /// <summary>
     /// Handle item selection from UI or input
     /// </summary>
     public void OnItemSelected(ItemView itemView)
     {
-        if (itemView != null && itemView.Item != null)
+        if (itemView != null && itemView.Model != null)
         {
-            DisplayItemDetails(itemView.Item);
+            selectedItem = itemView.Model;
+            DisplayItemDetails(itemView.Model);
         }
         else
         {

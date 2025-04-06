@@ -3,59 +3,71 @@ using System;
 using System.Collections.Generic;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.Events;
 
 public class InputManager : MonoBehaviour
 {
     [Header("Camera References")]
-    [SerializeField] private Transform _cameraRig;
-    [SerializeField] private Camera _camera;
+    public Transform cameraRig;
+    public Camera camera;
 
     [Header("Pan Settings")]
-    [SerializeField] private float _panSpeed = 10f;
-    [SerializeField] private float _minX = -20f;
-    [SerializeField] private float _maxX = 20f;
-    [SerializeField] private float _minZ = -20f;
-    [SerializeField] private float _maxZ = 20f;
-    [SerializeField] private bool _invertDrag = false;
+    public float panSpeed = 3f;
+    public float minX = -12f;
+    public float maxX = 12f;
+    public float minZ = -12f;
+    public float maxZ = 12f;
+    public bool invertDrag = false;
 
     [Header("Zoom Settings")]
-    [SerializeField] private float _zoomSpeed = 1f;
-    [SerializeField] private float _minZoom = 2f;
-    [SerializeField] private float _maxZoom = 20f;
-    [SerializeField] private float _keyboardZoomSpeed = 5f;
+    public float zoomSpeed = 1f;
+    public float minZoom = 0.1f;
+    public float maxZoom = 100f;
+    public float keyboardZoomSpeed = 5f;
 
     [Header("Physics Settings")]
-    [SerializeField] private float _baseVelocityThreshold = 0.1f; // Renamed to indicate this is the base value
-    [SerializeField] private float _velocitySmoothingFactor = 0.8f;
-    [SerializeField] private float _frictionFactor = 0.98f;
-    [SerializeField] private float _bounceFactor = 0.8f;
+    public float baseVelocityThreshold = 0.2f;
+    public float velocitySmoothingFactor = 0.1f;
+    public float frictionFactor = 0.999f;
+    public float bounceFactor = 0.9f;
 
     [Header("UI References")]
-    [SerializeField] private ItemInfoPanel _itemInfoPanel;
-    [SerializeField] private LayerMask _itemLayer;
-    [SerializeField] private TextMeshProUGUI _infoText;
+    public ItemInfoPanel itemInfoPanel;
+    public LayerMask itemLayer;
+    public TextMeshProUGUI infoText;
+    public CollectionDisplay collectionDisplay;
 
     [Header("UI Settings")]
-    [SerializeField] private float _descriptionScale = 0.8f;
+    public float descriptionScale = 0.8f;
+    
+    [Header("Selection Settings")]
+    public float maxSelectionDistance = 100f;
+    
+    // Selection events
+    public UnityEvent<ItemView> OnItemSelected = new UnityEvent<ItemView>();
+    public UnityEvent<ItemView> OnItemDeselected = new UnityEvent<ItemView>();
+    public UnityEvent<ItemView> OnItemHoverStart = new UnityEvent<ItemView>();
+    public UnityEvent<ItemView> OnItemHoverEnd = new UnityEvent<ItemView>();
 
     // State variables
-    private bool _isDragging = false;
-    private Vector3 _previousMousePosition;
-    private Vector3 _cameraVelocity = Vector3.zero;
-    private Vector3 _filteredVelocity = Vector3.zero;
-    private bool _physicsEnabled = true;
-    private float _lastDragTime;
-    private ItemView _hoveredItem;
-    private ItemView _currentHighlightedItem;
+    // Runtime state that changes during execution
+    private bool isDragging = false;
+    private Vector3 previousMousePosition;
+    private Vector3 cameraVelocity = Vector3.zero;
+    private Vector3 filteredVelocity = Vector3.zero;
+    private bool physicsEnabled = true;
+    private float lastDragTime;
+    
+    // Item tracking state - made public so it's visible in inspector
+    public ItemView hoveredItem;
+    public ItemView currentHighlightedItem;
+    public ItemView selectedItem;
 
     private void Start()
     {
-        if (_camera == null) 
-            _camera = Camera.main;
-
-        if (_camera == null)
+        if (camera == null) 
         {
-            Debug.LogError("No camera assigned to InputManager and no main camera found!");
+            Debug.LogError("No camera assigned to InputManager in the Inspector!");
             enabled = false;
         }
     }
@@ -65,67 +77,81 @@ public class InputManager : MonoBehaviour
         // Only handle input capture in Update
         HandleInput();
         UpdateHoveredItem();
+        
+        // Handle selection clicks
+        if (Input.GetMouseButtonDown(0) && hoveredItem != null && hoveredItem != selectedItem)
+        {
+            SelectItem(hoveredItem);
+        }
+        else if (Input.GetMouseButtonDown(0) && hoveredItem == null && selectedItem != null)
+        {
+            DeselectItem();
+        }
     }
 
     private void HandleInput()
     {
         if (Input.GetMouseButtonDown(0))
         {
-            _isDragging = true;
-            _previousMousePosition = Input.mousePosition;
-            _lastDragTime = Time.realtimeSinceStartup;
-            _physicsEnabled = false;
-            _cameraVelocity = Vector3.zero;
+            // Only start dragging if not clicking on an item
+            if (hoveredItem == null)
+            {
+                isDragging = true;
+                previousMousePosition = Input.mousePosition;
+                lastDragTime = Time.realtimeSinceStartup;
+                physicsEnabled = false;
+                cameraVelocity = Vector3.zero;
+            }
         }
         else if (Input.GetMouseButtonUp(0))
         {
-            _isDragging = false;
-            if (_filteredVelocity.magnitude > GetScaledVelocityThreshold())
+            isDragging = false;
+            if (filteredVelocity.magnitude > GetScaledVelocityThreshold())
             {
-                _cameraVelocity = _filteredVelocity;
-                _physicsEnabled = true;
+                cameraVelocity = filteredVelocity;
+                physicsEnabled = true;
             }
         }
         
         // Handle active dragging AND velocity calculation in ONE place
-        if (_isDragging)
+        if (isDragging)
         {
             float currentTime = Time.realtimeSinceStartup;
-            float deltaTime = currentTime - _lastDragTime;
+            float deltaTime = currentTime - lastDragTime;
             
             if (deltaTime > 0.001f)
             {
                 // Get ACTUAL world positions
-                Vector3 oldWorldPos = GetMouseWorldPosition(_previousMousePosition);
+                Vector3 oldWorldPos = GetMouseWorldPosition(previousMousePosition);
                 Vector3 newWorldPos = GetMouseWorldPosition(Input.mousePosition);
                 Vector3 worldDelta = oldWorldPos - newWorldPos;  // Direction matches camera movement
                 
                 // Apply inversion if needed
-                if (_invertDrag)
+                if (invertDrag)
                 {
                     worldDelta = -worldDelta;
                 }
                 
                 // Update tracking
-                _previousMousePosition = Input.mousePosition;
-                _lastDragTime = currentTime;
+                previousMousePosition = Input.mousePosition;
+                lastDragTime = currentTime;
                 
                 // Calculate velocity from actual world movement
                 Vector3 instantVelocity = worldDelta / deltaTime;
-                _filteredVelocity = Vector3.Lerp(_filteredVelocity, instantVelocity, _velocitySmoothingFactor);
+                filteredVelocity = Vector3.Lerp(filteredVelocity, instantVelocity, velocitySmoothingFactor);
                 
                 // Move camera
-                Vector3 newPosition = _cameraRig.position + worldDelta;
-                newPosition.x = Mathf.Clamp(newPosition.x, _minX, _maxX);
-                newPosition.z = Mathf.Clamp(newPosition.z, _minZ, _maxZ);
-                _cameraRig.position = newPosition;
+                Vector3 newPosition = cameraRig.position + worldDelta;
+                newPosition.x = Mathf.Clamp(newPosition.x, minX, maxX);
+                newPosition.z = Mathf.Clamp(newPosition.z, minZ, maxZ);
+                cameraRig.position = newPosition;
             }
         }
 
         HandleKeyboardPan();
         HandleZoom();
         
-        if (_physicsEnabled)
+        if (physicsEnabled)
         {
             ApplyPhysics();
         }
@@ -135,44 +161,44 @@ public class InputManager : MonoBehaviour
     private void ApplyPhysics()
     {
         // Stop if velocity is very small
-        if (_cameraVelocity.sqrMagnitude < 0.0001f)
+        if (cameraVelocity.sqrMagnitude < 0.0001f)
         {
-            _cameraVelocity = Vector3.zero;
+            cameraVelocity = Vector3.zero;
             return;
         }
         
         // Apply friction
-        _cameraVelocity *= _frictionFactor;
+        cameraVelocity *= frictionFactor;
         
         // Calculate new position
-        Vector3 newPosition = _cameraRig.position + _cameraVelocity * Time.deltaTime;
+        Vector3 newPosition = cameraRig.position + cameraVelocity * Time.deltaTime;
         
         // Check boundaries and bounce on X axis
-        if (newPosition.x < _minX)
+        if (newPosition.x < minX)
         {
-            newPosition.x = _minX;
-            _cameraVelocity.x = -_cameraVelocity.x * _bounceFactor;
+            newPosition.x = minX;
+            cameraVelocity.x = -cameraVelocity.x * bounceFactor;
         }
-        else if (newPosition.x > _maxX)
+        else if (newPosition.x > maxX)
         {
-            newPosition.x = _maxX;
-            _cameraVelocity.x = -_cameraVelocity.x * _bounceFactor;
+            newPosition.x = maxX;
+            cameraVelocity.x = -cameraVelocity.x * bounceFactor;
         }
         
         // Check boundaries and bounce on Z axis
-        if (newPosition.z < _minZ)
+        if (newPosition.z < minZ)
         {
-            newPosition.z = _minZ;
-            _cameraVelocity.z = -_cameraVelocity.z * _bounceFactor;
+            newPosition.z = minZ;
+            cameraVelocity.z = -cameraVelocity.z * bounceFactor;
         }
-        else if (newPosition.z > _maxZ)
+        else if (newPosition.z > maxZ)
         {
-            newPosition.z = _maxZ;
-            _cameraVelocity.z = -_cameraVelocity.z * _bounceFactor;
+            newPosition.z = maxZ;
+            cameraVelocity.z = -cameraVelocity.z * bounceFactor;
         }
         
         // Apply new position
-        _cameraRig.position = newPosition;
+        cameraRig.position = newPosition;
     }
 
     private void HandleKeyboardPan()
@@ -191,22 +217,22 @@ public class InputManager : MonoBehaviour
         if (moveDirection != Vector3.zero)
         {
             // Disable physics when using keyboard controls
-            _physicsEnabled = false;
-            _cameraVelocity = Vector3.zero;
+            physicsEnabled = false;
+            cameraVelocity = Vector3.zero;
             
             moveDirection.Normalize();
-            float moveSpeed = _panSpeed * Time.deltaTime * _camera.orthographicSize * 0.5f;
-            Vector3 newPosition = _cameraRig.position + moveDirection * moveSpeed;
+            float moveSpeed = panSpeed * Time.deltaTime * camera.orthographicSize * 0.5f;
+            Vector3 newPosition = cameraRig.position + moveDirection * moveSpeed;
             
-            newPosition.x = Mathf.Clamp(newPosition.x, _minX, _maxX);
-            newPosition.z = Mathf.Clamp(newPosition.z, _minZ, _maxZ);
+            newPosition.x = Mathf.Clamp(newPosition.x, minX, maxX);
+            newPosition.z = Mathf.Clamp(newPosition.z, minZ, maxZ);
             
-            _cameraRig.position = newPosition;
+            cameraRig.position = newPosition;
         }
-        else if (!_isDragging && !_physicsEnabled)
+        else if (!isDragging && !physicsEnabled)
         {
             // Re-enable physics when keyboard controls are released
-            _physicsEnabled = true;
+            physicsEnabled = true;
         }
     }
 
@@ -216,7 +242,7 @@ public class InputManager : MonoBehaviour
         float scrollAmount = Input.GetAxis("Mouse ScrollWheel");
         if (scrollAmount != 0)
         {
-            ApplyZoomAroundCursor(-scrollAmount * _zoomSpeed * _camera.orthographicSize);
+            ApplyZoomAroundCursor(-scrollAmount * zoomSpeed * camera.orthographicSize);
         }
 
         // Keyboard zoom
@@ -226,7 +252,7 @@ public class InputManager : MonoBehaviour
         
         if (keyboardZoomInput != 0)
         {
-            float zoomAmount = keyboardZoomInput * _keyboardZoomSpeed * Time.deltaTime;
+            float zoomAmount = keyboardZoomInput * keyboardZoomSpeed * Time.deltaTime;
             ApplyZoomAroundCursor(zoomAmount);
         }
     }
@@ -238,18 +264,18 @@ public class InputManager : MonoBehaviour
         Vector3 mouseWorldPosBefore = GetMouseWorldPosition();
         
         // Track velocity before zoom to scale it
-        Vector3 velocityBeforeZoom = _cameraVelocity;
-        float oldSize = _camera.orthographicSize;
+        Vector3 velocityBeforeZoom = cameraVelocity;
+        float oldSize = camera.orthographicSize;
         
         // Apply zoom
-        float newSize = Mathf.Clamp(_camera.orthographicSize + zoomAmount, _minZoom, _maxZoom);
-        _camera.orthographicSize = newSize;
+        float newSize = Mathf.Clamp(camera.orthographicSize + zoomAmount, minZoom, maxZoom);
+        camera.orthographicSize = newSize;
         
         // Scale velocity to maintain world speed
-        if (oldSize > 0 && _physicsEnabled)
+        if (oldSize > 0 && physicsEnabled)
         {
             float velocityScale = newSize / oldSize;
-            _cameraVelocity = velocityBeforeZoom * velocityScale;
+            cameraVelocity = velocityBeforeZoom * velocityScale;
         }
         
         // Get world position at mouse after zoom
@@ -257,11 +283,11 @@ public class InputManager : MonoBehaviour
         Vector3 adjustment = mouseWorldPosBefore - mouseWorldPosAfter;
         
         // Apply adjustment to camera position with strict boundary enforcement
-        Vector3 newPosition = _cameraRig.position + adjustment;
-        newPosition.x = Mathf.Clamp(newPosition.x, _minX, _maxX);
-        newPosition.z = Mathf.Clamp(newPosition.z, _minZ, _maxZ);
+        Vector3 newPosition = cameraRig.position + adjustment;
+        newPosition.x = Mathf.Clamp(newPosition.x, minX, maxX);
+        newPosition.z = Mathf.Clamp(newPosition.z, minZ, maxZ);
         
-        _cameraRig.position = newPosition;
+        cameraRig.position = newPosition;
         
         // One final boundary check to be certain we're within limits
         EnforceBoundaries();
@@ -270,16 +296,16 @@ public class InputManager : MonoBehaviour
     // Utility method to ensure camera is always within boundaries
     private void EnforceBoundaries()
     {
-        Vector3 position = _cameraRig.position;
-        position.x = Mathf.Clamp(position.x, _minX, _maxX);
-        position.z = Mathf.Clamp(position.z, _minZ, _maxZ);
-        _cameraRig.position = position;
+        Vector3 position = cameraRig.position;
+        position.x = Mathf.Clamp(position.x, minX, maxX);
+        position.z = Mathf.Clamp(position.z, minZ, maxZ);
+        cameraRig.position = position;
     }
 
     private Vector3 GetMouseWorldPosition()
     {
         Plane plane = new Plane(Vector3.up, Vector3.zero);
-        Ray ray = _camera.ScreenPointToRay(Input.mousePosition);
+        Ray ray = camera.ScreenPointToRay(Input.mousePosition);
         
         if (plane.Raycast(ray, out float enter))
         {
@@ -287,59 +313,70 @@ public class InputManager : MonoBehaviour
         }
         
         Vector3 mousePos = Input.mousePosition;
-        mousePos.z = _camera.nearClipPlane;
-        return _camera.ScreenToWorldPoint(mousePos);
+        mousePos.z = camera.nearClipPlane;
+        return camera.ScreenToWorldPoint(mousePos);
     }
 
     private float GetScaledVelocityThreshold()
     {
-        return _baseVelocityThreshold * (_camera.orthographicSize / _minZoom);
+        return baseVelocityThreshold * (camera.orthographicSize / minZoom);
     }
 
     // Add overload to handle arbitrary screen positions
     private Vector3 GetMouseWorldPosition(Vector3 screenPos)
     {
         Plane plane = new Plane(Vector3.up, Vector3.zero);
-        Ray ray = _camera.ScreenPointToRay(screenPos);
+        Ray ray = camera.ScreenPointToRay(screenPos);
         
         if (plane.Raycast(ray, out float enter))
         {
             return ray.GetPoint(enter);
         }
         
-        screenPos.z = _camera.nearClipPlane;
-        return _camera.ScreenToWorldPoint(screenPos);
+        screenPos.z = camera.nearClipPlane;
+        return camera.ScreenToWorldPoint(screenPos);
     }
 
     private void UpdateHoveredItem()
     {
-        Ray ray = _camera.ScreenPointToRay(Input.mousePosition);
+        Ray ray = camera.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
         
-        if (Physics.Raycast(ray, out hit, Mathf.Infinity, _itemLayer))
+        if (Physics.Raycast(ray, out hit, maxSelectionDistance, itemLayer))
         {
-            ItemView itemView = hit.collider.GetComponent<ItemView>();
+            ItemView itemView = hit.collider.GetComponentInParent<ItemView>();
             if (itemView != null && itemView.Model != null)
             {
                 // Only update the UI if we hover over a new item
-                if (_hoveredItem != itemView)
+                if (hoveredItem != itemView)
                 {
-                    _hoveredItem = itemView;
-                    _itemInfoPanel.UpdateInfo(itemView.Model.Title);
+                    // Fire hover end for previous item
+                    if (hoveredItem != null)
+                    {
+                        OnItemHoverEnd?.Invoke(hoveredItem);
+                    }
+                    
+                    hoveredItem = itemView;
+                    
+                    // Fire hover start
+                    OnItemHoverStart?.Invoke(hoveredItem);
                 }
                 
                 // Highlight the item if it's not already highlighted
-                if (_currentHighlightedItem != itemView)
+                if (currentHighlightedItem != itemView)
                 {
-                    // Remove highlight from previous item
-                    if (_currentHighlightedItem != null)
+                    // Remove highlight from previous item if not selected
+                    if (currentHighlightedItem != null && currentHighlightedItem != selectedItem)
                     {
-                        _currentHighlightedItem.SetHighlighted(false);
+                        currentHighlightedItem.SetHighlighted(false);
                     }
                     
-                    // Highlight new item
-                    _currentHighlightedItem = itemView;
-                    _currentHighlightedItem.SetHighlighted(true);
+                    // Highlight new item if not selected (selection takes priority)
+                    currentHighlightedItem = itemView;
+                    if (currentHighlightedItem != selectedItem)
+                    {
+                        currentHighlightedItem.SetHighlighted(true);
+                    }
                 }
             }
             else
@@ -355,16 +392,58 @@ public class InputManager : MonoBehaviour
     
     private void ClearItemState()
     {
-        if (_hoveredItem != null)
+        if (hoveredItem != null)
         {
-            _hoveredItem = null;
-            _itemInfoPanel.Clear();
+            OnItemHoverEnd?.Invoke(hoveredItem);
+            hoveredItem = null;
         }
         
-        if (_currentHighlightedItem != null)
+        if (currentHighlightedItem != null && currentHighlightedItem != selectedItem)
         {
-            _currentHighlightedItem.SetHighlighted(false);
-            _currentHighlightedItem = null;
+            currentHighlightedItem.SetHighlighted(false);
+            currentHighlightedItem = null;
         }
+    }
+    
+    // Selection methods
+    public void SelectItem(ItemView itemView)
+    {
+        // Don't reselect same item
+        if (selectedItem == itemView)
+            return;
+            
+        // Deselect current item if exists
+        if (selectedItem != null)
+        {
+            DeselectItem();
+        }
+        
+        // Set new selection
+        selectedItem = itemView;
+        selectedItem.SetSelected(true);
+        OnItemSelected?.Invoke(selectedItem);
+    }
+    
+    public void DeselectItem()
+    {
+        if (selectedItem != null)
+        {
+            selectedItem.SetSelected(false);
+            
+            // If this was also the hovered item, reapply hover effect
+            if (hoveredItem == selectedItem || currentHighlightedItem == selectedItem)
+            {
+                selectedItem.SetHighlighted(true);
+            }
+            
+            OnItemDeselected?.Invoke(selectedItem);
+            selectedItem = null;
+        }
+    }
+    
+    // Get currently selected item
+    public ItemView GetSelectedItem()
+    {
+        return selectedItem;
     }
 } 

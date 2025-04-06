@@ -64,20 +64,10 @@ public class Tile: MonoBehaviour {
             updateMaterial = true;
 
             if (!string.IsNullOrEmpty(textureName)) {
-
                 texture = (Texture2D)Resources.Load(textureName);
-
-                Debug.Log("Tile: Update: updateTexture: textureName: " + textureName + " texture: " + texture + " meshRenderer: " + meshRenderer + " material: " + meshRenderer.material.mainTexture + " mainTexture: " + meshRenderer.material.mainTexture + " shader: " + meshRenderer.material.shader);
-
-                //meshRenderer.material.mainTexture = texture;
-
-                //Debug.Log("Tile: Update: updateTexture: textureName: " + textureName + " texture: " + texture + " material: " + meshRenderer.material);
-
+                Debug.Log("Tile: Loaded texture from Resources: " + textureName);
             } else if (!string.IsNullOrEmpty(textureURL)) {
-
-                //Debug.Log("Tile: Update: updateTexture: textureURL: " + textureURL);
                 StartCoroutine(LoadTexture(textureURL));
-
             }
 
         }
@@ -151,24 +141,23 @@ public class Tile: MonoBehaviour {
 
     IEnumerator LoadTexture(string url)
     {
-        //Debug.Log("Tile: LoadTexture: start: url: " + url);
-
-        using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(url))
-        {
-            yield return www.SendWebRequest();
-
-            if (www.result == UnityWebRequest.Result.Success)
-            {
-                meshRenderer.material.mainTexture = ((DownloadHandlerTexture)www.downloadHandler).texture;
+        // Use Brewster's centralized texture loading instead of direct web request
+        // Define a callback that will run when the texture is loaded
+        Action<Texture2D> onTextureLoaded = (texture) => {
+            if (texture != null) {
+                meshRenderer.material.mainTexture = texture;
                 updateMaterial = true;
-
-                Debug.Log("Tile: LoadTexure: url: " + url + " texture: " + meshRenderer.material.mainTexture);
+                Debug.Log("Tile: Loaded texture: " + url);
+            } else {
+                Debug.LogError("Tile: Failed to load texture: " + url);
             }
-            else
-            {
-                Debug.LogError("Tile: LoadTexture: Failed to load texture from " + url + ": " + www.error);
-            }
-        }
+        };
+        
+        // Request texture through Brewster (now using path as the cache key)
+        Brewster.Instance.LoadTexture(url, onTextureLoaded);
+        
+        // No need to actually yield anything since Brewster handles the async loading
+        yield break;
     }
 
 

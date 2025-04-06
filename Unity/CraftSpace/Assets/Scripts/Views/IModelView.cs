@@ -5,14 +5,9 @@
 public interface IModelView<T> where T : class
 {
     /// <summary>
-    /// Gets the current model being displayed
+    /// Gets or sets the current model being displayed
     /// </summary>
-    T Model { get; }
-    
-    /// <summary>
-    /// Sets the model to be displayed
-    /// </summary>
-    void SetModel(T model);
+    T Model { get; set; }
     
     /// <summary>
     /// Called when the model is updated and the view should refresh

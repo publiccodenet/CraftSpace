@@ -14,32 +14,32 @@ public class CollectionGridLayout : MonoBehaviour
 
     [Header("Grid Settings")]
     [Tooltip("Size of each cell in the grid")]
-    [SerializeField] private float _cellSize = 1f;
+    public float cellSize = 1f;
     
     [Tooltip("Horizontal spacing between cells")]
-    [SerializeField] private float _spacingHorizontal = 0.1f;
+    public float spacingHorizontal = 0.2f;
     
     [Tooltip("Vertical spacing between cells")]
-    [SerializeField] private float _spacingVertical = 0.1f;
+    public float spacingVertical = 0.8f;
     
     [Tooltip("Number of columns in the grid")]
-    [SerializeField] private int _columns = 4;
+    public int columns = 4;
     
     [Header("Advanced Settings")]
     [Tooltip("Should layout update automatically when items are added/removed")]
-    [SerializeField] private bool _autoUpdateLayout = true;
+    public bool autoUpdateLayout = true;
     
     [Tooltip("Center the grid horizontally relative to the transform")]
-    [SerializeField] private bool _centerHorizontally = true;
+    public bool centerHorizontally = true;
 
     #endregion
 
     #region Private Fields
 
-    private List<Transform> _itemTransforms = new List<Transform>();
-    private Collection _collection;
-    private CollectionView _collectionView;
-    private bool _initialized = false;
+    public List<Transform> itemTransforms = new List<Transform>();
+    public Collection collection;
+    public CollectionView collectionView;
+    public bool initialized = false;
 
     #endregion
 
@@ -47,29 +47,29 @@ public class CollectionGridLayout : MonoBehaviour
 
     private void Awake()
     {
-        _collectionView = GetComponent<CollectionView>();
-        if (_collectionView != null)
+        collectionView = GetComponent<CollectionView>();
+        if (collectionView != null)
         {
-            _collectionView.ModelUpdated += OnModelUpdated;
+            collectionView.ModelUpdated += OnModelUpdated;
         }
-        _initialized = true;
+        initialized = true;
     }
 
     private void OnDestroy()
     {
-        if (_collectionView != null)
+        if (collectionView != null)
         {
-            _collectionView.ModelUpdated -= OnModelUpdated;
+            collectionView.ModelUpdated -= OnModelUpdated;
         }
     }
 
     private void OnValidate()
     {
         // Ensure columns is at least 1
-        _columns = Mathf.Max(1, _columns);
+        columns = Mathf.Max(1, columns);
         
         // If already initialized in play mode, update the layout
-        if (_initialized && _autoUpdateLayout && Application.isPlaying)
+        if (initialized && autoUpdateLayout && Application.isPlaying)
         {
             UpdateLayout();
         }
@@ -85,19 +85,19 @@ public class CollectionGridLayout : MonoBehaviour
     /// <param name="collection">The collection to display</param>
     public void SetCollection(Collection collection)
     {
-        _collection = collection;
+        this.collection = collection;
         
         // Get the CollectionView component and update it
-        if (_collectionView != null)
+        if (collectionView != null)
         {
-            _collectionView.SetModel(collection);
+            collectionView.SetModel(collection);
         }
         else 
         {
             Debug.LogWarning($"[CollectionGridLayout] Missing CollectionView component on {gameObject.name}");
         }
         
-        if (_autoUpdateLayout)
+        if (autoUpdateLayout)
         {
             ApplyLayout();
         }
@@ -111,10 +111,10 @@ public class CollectionGridLayout : MonoBehaviour
         try 
         {
             // Get all item containers from the CollectionView
-            if (_collectionView == null)
+            if (collectionView == null)
             {
-                _collectionView = GetComponent<CollectionView>();
-                if (_collectionView == null)
+                collectionView = GetComponent<CollectionView>();
+                if (collectionView == null)
                 {
                     Debug.LogError($"[CollectionGridLayout] Cannot apply layout - missing CollectionView component on {gameObject.name}");
                     return;
@@ -122,10 +122,10 @@ public class CollectionGridLayout : MonoBehaviour
             }
             
             // Clear existing items
-            _itemTransforms.Clear();
+            itemTransforms.Clear();
             
             // Get all containers
-            var containers = _collectionView.GetItemContainers();
+            var containers = collectionView.GetItemContainers();
             if (containers == null || containers.Count == 0)
             {
                 Debug.Log($"[CollectionGridLayout] No item containers found in CollectionView on {gameObject.name}");
@@ -137,7 +137,7 @@ public class CollectionGridLayout : MonoBehaviour
             {
                 if (container != null)
                 {
-                    _itemTransforms.Add(container.transform);
+                    itemTransforms.Add(container.transform);
                 }
             }
             
@@ -163,12 +163,12 @@ public class CollectionGridLayout : MonoBehaviour
         
         // Default to a single cell if no items
         if (itemCount == 0)
-            return new Vector2(_cellSize, _cellSize);
+            return new Vector2(cellSize, cellSize);
             
-        int rows = Mathf.CeilToInt((float)itemCount / _columns);
+        int rows = Mathf.CeilToInt((float)itemCount / columns);
         
-        float width = _columns * _cellSize + (_columns - 1) * _spacingHorizontal;
-        float height = rows * _cellSize + (rows - 1) * _spacingVertical;
+        float width = columns * cellSize + (columns - 1) * spacingHorizontal;
+        float height = rows * cellSize + (rows - 1) * spacingVertical;
         
         return new Vector2(width, height);
     }
@@ -181,9 +181,9 @@ public class CollectionGridLayout : MonoBehaviour
     {
         if (transform == null) return;
         
-        _itemTransforms.Add(transform);
+        itemTransforms.Add(transform);
         
-        if (_autoUpdateLayout)
+        if (autoUpdateLayout)
         {
             UpdateLayout();
         }
@@ -197,9 +197,9 @@ public class CollectionGridLayout : MonoBehaviour
     {
         if (transform == null) return;
         
-        _itemTransforms.Remove(transform);
+        itemTransforms.Remove(transform);
         
-        if (_autoUpdateLayout)
+        if (autoUpdateLayout)
         {
             UpdateLayout();
         }
@@ -210,9 +210,9 @@ public class CollectionGridLayout : MonoBehaviour
     /// </summary>
     public void Clear()
     {
-        _itemTransforms.Clear();
+        itemTransforms.Clear();
         
-        if (_autoUpdateLayout)
+        if (autoUpdateLayout)
         {
             UpdateLayout();
         }
@@ -225,10 +225,10 @@ public class CollectionGridLayout : MonoBehaviour
     /// <returns>Vector2Int where x is the column and y is the row</returns>
     public Vector2Int GetGridPosition(int index)
     {
-        if (_columns <= 0) _columns = 1; // Safety check
+        if (columns <= 0) columns = 1; // Safety check
         
-        int row = index / _columns;
-        int col = index % _columns;
+        int row = index / columns;
+        int col = index % columns;
         
         return new Vector2Int(col, row);
     }
@@ -241,14 +241,14 @@ public class CollectionGridLayout : MonoBehaviour
     public Vector3 GetPositionForGridPosition(Vector2Int gridPosition)
     {
         // Calculate base position - use different spacing for horizontal and vertical
-        float xPos = gridPosition.x * (_cellSize + _spacingHorizontal);
-        float zPos = -gridPosition.y * (_cellSize + _spacingVertical); // Negative to grow downward in z
+        float xPos = gridPosition.x * (cellSize + spacingHorizontal);
+        float zPos = -gridPosition.y * (cellSize + spacingVertical); // Negative to grow downward in z
         
         // Apply horizontal centering if enabled
-        if (_centerHorizontally)
+        if (centerHorizontally)
         {
-            float gridWidth = _columns * (_cellSize + _spacingHorizontal) - _spacingHorizontal; // Subtract trailing spacing
-            float offset = gridWidth * 0.5f - _cellSize * 0.5f;
+            float gridWidth = columns * (cellSize + spacingHorizontal) - spacingHorizontal; // Subtract trailing spacing
+            float offset = gridWidth * 0.5f - cellSize * 0.5f;
             xPos -= offset;
         }
         
@@ -266,14 +266,14 @@ public class CollectionGridLayout : MonoBehaviour
     {
         try
         {
-            if (_itemTransforms == null || _itemTransforms.Count == 0) return;
+            if (itemTransforms == null || itemTransforms.Count == 0) return;
             
             // Recalculate optimal columns before layout
             CalculateOptimalColumns();
             
-            for (int i = 0; i < _itemTransforms.Count; i++)
+            for (int i = 0; i < itemTransforms.Count; i++)
             {
-                var item = _itemTransforms[i];
+                var item = itemTransforms[i];
                 if (item == null) continue;
                 
                 Vector2Int gridPos = GetGridPosition(i);
@@ -296,13 +296,13 @@ public class CollectionGridLayout : MonoBehaviour
     private int GetItemCount()
     {
         // First check our direct items list
-        if (_itemTransforms != null && _itemTransforms.Count > 0)
-            return _itemTransforms.Count;
+        if (itemTransforms != null && itemTransforms.Count > 0)
+            return itemTransforms.Count;
             
         // Otherwise check the collection
-        if (_collection != null) 
+        if (collection != null) 
         {
-            return _collection.Items.Count();
+            return collection.Items.Count();
         }
         
         return 0;
@@ -313,7 +313,7 @@ public class CollectionGridLayout : MonoBehaviour
     /// </summary>
     private void OnModelUpdated()
     {
-        if (_autoUpdateLayout)
+        if (autoUpdateLayout)
         {
             ApplyLayout();
         }
@@ -329,19 +329,19 @@ public class CollectionGridLayout : MonoBehaviour
         // Handle special cases to avoid crashes
         if (itemCount <= 0)
         {
-            _columns = 1; // Default to 1 column for empty collections
+            columns = 1; // Default to 1 column for empty collections
             return;
         }
         
         if (itemCount == 1)
         {
-            _columns = 1; // Single item needs just 1 column
+            columns = 1; // Single item needs just 1 column
             return;
         }
         
         // Calculate columns as ceiling of square root of item count
         // This creates a grid that's roughly square
-        _columns = Mathf.CeilToInt(Mathf.Sqrt(itemCount));
+        columns = Mathf.CeilToInt(Mathf.Sqrt(itemCount));
     }
 
     #endregion

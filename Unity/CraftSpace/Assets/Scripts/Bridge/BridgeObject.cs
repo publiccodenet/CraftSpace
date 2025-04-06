@@ -3,10 +3,12 @@
 // Copyright (C) 2018 by Don Hopkins, Ground Up Software.
 
 
-using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using UnityEngine;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -22,48 +24,15 @@ public class BridgeObject : MonoBehaviour {
     // Instance Variables
 
 
-    [SerializeField] private string _id;
-    
-    // Dynamic properties storage
-    protected Dictionary<string, object> _properties = new Dictionary<string, object>();
-    
-    // Component cache for performance
-    private Dictionary<Type, Component> _componentCache = new Dictionary<Type, Component>();
-    
-    // Events
-    public event Action<string, object> OnPropertyChanged;
-    public event Action<Dictionary<string, object>> OnMessageReceived;
-    
-    public string id 
-    { 
-        get => _id;
-        set => _id = value;
-    }
-    
-    public string Id 
-    { 
-        get => _id;
-        set => _id = value;
-    }
-    
+    public string id;
+    public Bridge bridge;
     public JObject interests;
     public bool destroyed = false;
     public bool destroying = false;
-    public Bridge bridge;
 
 
     ////////////////////////////////////////////////////////////////////////
     // Instance Methods
-
-
-    private void Awake()
-    {
-        // Make sure we have an ID
-        if (string.IsNullOrEmpty(_id))
-        {
-            _id = System.Guid.NewGuid().ToString();
-        }
-    }
 
 
     public virtual void OnDestroy()
@@ -347,13 +316,7 @@ public class BridgeObject : MonoBehaviour {
             //Debug.Log("BridgeObject: SendEventName: eventName: " + eventName + " interest: " + interest, this);
             if (interest != null) {
 
-                bool disabled = false;
-                JToken disabledToken = interest["disabled"];
-                if (disabledToken != null && disabledToken.Type == JTokenType.Boolean)
-                {
-                    disabled = (bool)disabledToken;
-                }
-                
+                bool disabled = interest.GetBoolean("disabled");
                 if (!disabled) {
 
                     foundInterest = true;
@@ -375,11 +338,7 @@ public class BridgeObject : MonoBehaviour {
                         HandleEvents(events);
                     }
 
-                    JToken doNotSendToken = interest["doNotSend"];
-                    if (doNotSendToken != null && doNotSendToken.Type == JTokenType.Boolean)
-                    {
-                        doNotSend = (bool)doNotSendToken;
-                    }
+                    doNotSend = interest.GetBoolean("doNotSend");
 
                     if (doNotSend) {
                         //Debug.Log("BridgeObject: SendEventName: doNotSend: interest: " + interest);
@@ -444,252 +403,4 @@ public class BridgeObject : MonoBehaviour {
         Debug.Log("Animation not available - LeanTween functionality is disabled");
 #endif
     }
-
-
-    /// <summary>
-    /// Configure this object from a JSON string
-    /// </summary>
-    public virtual void ConfigureFromJson(string json)
-    {
-        if (string.IsNullOrEmpty(json)) return;
-        
-        try
-        {
-            var settings = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
-            if (settings != null)
-            {
-                foreach (var kvp in settings)
-                {
-                    SetProperty(kvp.Key, kvp.Value);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Error configuring BridgeObject from JSON: {ex.Message}");
-        }
-    }
-    
-    /// <summary>
-    /// Set a property with type inference
-    /// </summary>
-    public void SetProperty<T>(string key, T value)
-    {
-        _properties[key] = value;
-        OnPropertyChanged?.Invoke(key, value);
-        
-        // Try to apply the property to any matching component property
-        ApplyToComponents(key, value);
-    }
-    
-    /// <summary>
-    /// Get a property with type casting
-    /// </summary>
-    public T GetProperty<T>(string key, T defaultValue = default)
-    {
-        if (_properties.TryGetValue(key, out var value))
-        {
-            if (value is T typedValue)
-                return typedValue;
-            
-            try
-            {
-                // Try conversion for primitive types
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch 
-            {
-                return defaultValue;
-            }
-        }
-        return defaultValue;
-    }
-    
-    /// <summary>
-    /// Check if a property exists
-    /// </summary>
-    public bool HasProperty(string key)
-    {
-        return _properties.ContainsKey(key);
-    }
-    
-    /// <summary>
-    /// Remove a property
-    /// </summary>
-    public void RemoveProperty(string key)
-    {
-        if (_properties.ContainsKey(key))
-        {
-            _properties.Remove(key);
-            OnPropertyChanged?.Invoke(key, null);
-        }
-    }
-    
-    /// <summary>
-    /// Clear all properties
-    /// </summary>
-    public void ClearProperties()
-    {
-        _properties.Clear();
-        OnPropertyChanged?.Invoke("*", null);
-    }
-    
-    /// <summary>
-    /// Handle a JSON message
-    /// </summary>
-    public void HandleMessage(string json)
-    {
-        if (string.IsNullOrEmpty(json)) return;
-        
-        try
-        {
-            var message = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
-            if (message != null)
-            {
-                // Extract action
-                if (message.TryGetValue("action", out var actionObj) && actionObj is string action)
-                {
-                    // Handle standard actions
-                    switch (action)
-                    {
-                        case "setProperty":
-                            if (message.TryGetValue("key", out var keyObj) && 
-                                message.TryGetValue("value", out var valueObj) &&
-                                keyObj is string key)
-                            {
-                                SetProperty(key, valueObj);
-                            }
-                            break;
-                                
-                        case "getProperty":
-                            // Would need a callback mechanism to return value
-                            break;
-                                
-                        case "invokeMethod":
-                            if (message.TryGetValue("method", out var methodObj) && 
-                                methodObj is string method)
-                            {
-                                object[] args = null;
-                                if (message.TryGetValue("args", out var argsObj) && 
-                                    argsObj is object[] argsArray)
-                                {
-                                    args = argsArray;
-                                }
-                                
-                                InvokeMethod(method, args);
-                            }
-                            break;
-                    }
-                }
-                
-                // Notify subscribers
-                OnMessageReceived?.Invoke(message);
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Error handling message: {ex.Message}");
-        }
-    }
-    
-    /// <summary>
-    /// Apply a property to matching components
-    /// </summary>
-    private void ApplyToComponents<T>(string propertyName, T value)
-    {
-        // Get all components
-        var components = GetComponentsInChildren<Component>();
-        foreach (var component in components)
-        {
-            if (component == null) continue;
-            
-            try
-            {
-                // Try to set property via reflection
-                var propInfo = component.GetType().GetProperty(propertyName);
-                if (propInfo != null && propInfo.CanWrite)
-                {
-                    // Check if types are compatible
-                    if (propInfo.PropertyType.IsAssignableFrom(typeof(T)))
-                    {
-                        propInfo.SetValue(component, value);
-                    }
-                    else if (value is IConvertible)
-                    {
-                        // Try conversion for primitive types
-                        var convertedValue = Convert.ChangeType(value, propInfo.PropertyType);
-                        propInfo.SetValue(component, convertedValue);
-                    }
-                }
-                
-                // Try field as fallback
-                var fieldInfo = component.GetType().GetField(propertyName);
-                if (fieldInfo != null)
-                {
-                    if (fieldInfo.FieldType.IsAssignableFrom(typeof(T)))
-                    {
-                        fieldInfo.SetValue(component, value);
-                    }
-                    else if (value is IConvertible)
-                    {
-                        var convertedValue = Convert.ChangeType(value, fieldInfo.FieldType);
-                        fieldInfo.SetValue(component, convertedValue);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Ignore reflection errors
-                Debug.LogWarning($"Failed to set {propertyName} on {component.GetType().Name}: {ex.Message}");
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Invoke a method on a component by name
-    /// </summary>
-    private void InvokeMethod(string methodName, object[] args = null)
-    {
-        // Get all components
-        var components = GetComponentsInChildren<Component>();
-        foreach (var component in components)
-        {
-            if (component == null) continue;
-            
-            try
-            {
-                var methodInfo = component.GetType().GetMethod(methodName);
-                if (methodInfo != null)
-                {
-                    methodInfo.Invoke(component, args);
-                    break; // Only invoke on first match
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"Failed to invoke {methodName} on {component.GetType().Name}: {ex.Message}");
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Get a component with caching for performance
-    /// </summary>
-    public T GetCachedComponent<T>() where T : Component
-    {
-        var type = typeof(T);
-        if (_componentCache.TryGetValue(type, out var component))
-        {
-            return component as T;
-        }
-        
-        var newComponent = GetComponent<T>();
-        if (newComponent != null)
-        {
-            _componentCache[type] = newComponent;
-        }
-        
-        return newComponent;
-    }
-
 }

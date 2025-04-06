@@ -318,13 +318,13 @@ This outlines the key locations and their roles in the schema pipeline, followin
     *   `Unity/CraftSpace/Assets/Scripts/Core/Brewster.cs`
     *   *Purpose:* Manages the runtime loading and caching of all schema-derived `ScriptableObject` instances.
         *   Maintains flat dictionaries (maps) per content type (e.g., `Dictionary<string, Collection> _loadedCollections`, `Dictionary<string, Item> _loadedItems`).
-        *   Provides public static singleton instance methods to retrieve objects by ID (e.g., `GetCollection(string id)`, `GetItem(string collectionId, string itemId)`).
+        *   Provides public static singleton instance methods to retrieve objects by ID (e.g., `GetCollection(string id)`, `GetItem(string itemId)`).
         *   Handles **on-demand loading**: If an object is requested but not in its dictionary, the registry:
             1.  Constructs the path to the object's JSON file in `StreamingAssets`.
             2.  Reads the JSON file.
             3.  Calls the static `FromJson` factory method for the corresponding type.
             4.  Adds the newly created `ScriptableObject` instance to the appropriate dictionary (cache).
-            5.  Triggers necessary post-load actions (like `LoadItemIndex` for collections, `LoadCoverImage` for items).
+            5.  Triggers necessary post-load actions (like `LoadItemIndex` for collections).
             6.  Returns the instance.
         *   Initializes by loading only the collection index (`collections-index.json`).
 

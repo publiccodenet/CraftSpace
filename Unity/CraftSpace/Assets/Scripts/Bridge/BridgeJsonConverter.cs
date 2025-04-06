@@ -3,251 +3,12 @@
 // Copyright (C) 2018 by Don Hopkins, Ground Up Software.
 
 
-using UnityEngine;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using UnityEngine;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
-
-
-/// <summary>
-/// JSON converter for UnityEngine.Vector3
-/// </summary>
-public class Vector3Converter : JsonConverter<Vector3>
-{
-    /// <summary>
-    /// Read Vector3 from JSON
-    /// </summary>
-    public override Vector3 ReadJson(JsonReader reader, Type objectType, Vector3 existingValue, bool hasExistingValue, JsonSerializer serializer)
-    {
-        JObject jo = JObject.Load(reader);
-        
-        float x = jo["x"]?.Value<float>() ?? 0f;
-        float y = jo["y"]?.Value<float>() ?? 0f;
-        float z = jo["z"]?.Value<float>() ?? 0f;
-        
-        return new Vector3(x, y, z);
-    }
-    
-    /// <summary>
-    /// Write Vector3 to JSON
-    /// </summary>
-    public override void WriteJson(JsonWriter writer, Vector3 value, JsonSerializer serializer)
-    {
-        writer.WriteStartObject();
-        writer.WritePropertyName("x");
-        writer.WriteValue(value.x);
-        writer.WritePropertyName("y");
-        writer.WriteValue(value.y);
-        writer.WritePropertyName("z");
-        writer.WriteValue(value.z);
-        writer.WriteEndObject();
-    }
-}
-
-
-/// <summary>
-/// JSON converter for UnityEngine.Vector2
-/// </summary>
-public class Vector2Converter : JsonConverter<Vector2>
-{
-    /// <summary>
-    /// Read Vector2 from JSON
-    /// </summary>
-    public override Vector2 ReadJson(JsonReader reader, Type objectType, Vector2 existingValue, bool hasExistingValue, JsonSerializer serializer)
-    {
-        JObject jo = JObject.Load(reader);
-        
-        float x = jo["x"]?.Value<float>() ?? 0f;
-        float y = jo["y"]?.Value<float>() ?? 0f;
-        
-        return new Vector2(x, y);
-    }
-    
-    /// <summary>
-    /// Write Vector2 to JSON
-    /// </summary>
-    public override void WriteJson(JsonWriter writer, Vector2 value, JsonSerializer serializer)
-    {
-        writer.WriteStartObject();
-        writer.WritePropertyName("x");
-        writer.WriteValue(value.x);
-        writer.WritePropertyName("y");
-        writer.WriteValue(value.y);
-        writer.WriteEndObject();
-    }
-}
-
-
-/// <summary>
-/// JSON converter for UnityEngine.Quaternion
-/// </summary>
-public class QuaternionConverter : JsonConverter<Quaternion>
-{
-    /// <summary>
-    /// Read Quaternion from JSON
-    /// </summary>
-    public override Quaternion ReadJson(JsonReader reader, Type objectType, Quaternion existingValue, bool hasExistingValue, JsonSerializer serializer)
-    {
-        JObject jo = JObject.Load(reader);
-        
-        // Support both quaternion format and Euler angles
-        if (jo["w"] != null)
-        {
-            // Direct quaternion
-            float x = jo["x"]?.Value<float>() ?? 0f;
-            float y = jo["y"]?.Value<float>() ?? 0f;
-            float z = jo["z"]?.Value<float>() ?? 0f;
-            float w = jo["w"]?.Value<float>() ?? 1f;
-            
-            return new Quaternion(x, y, z, w);
-        }
-        else
-        {
-            // Euler angles (degrees)
-            float x = jo["x"]?.Value<float>() ?? 0f;
-            float y = jo["y"]?.Value<float>() ?? 0f;
-            float z = jo["z"]?.Value<float>() ?? 0f;
-            
-            return Quaternion.Euler(x, y, z);
-        }
-    }
-    
-    /// <summary>
-    /// Write Quaternion to JSON
-    /// </summary>
-    public override void WriteJson(JsonWriter writer, Quaternion value, JsonSerializer serializer)
-    {
-        // Write as Euler angles for better human readability
-        Vector3 angles = value.eulerAngles;
-        
-        writer.WriteStartObject();
-        writer.WritePropertyName("x");
-        writer.WriteValue(angles.x);
-        writer.WritePropertyName("y");
-        writer.WriteValue(angles.y);
-        writer.WritePropertyName("z");
-        writer.WriteValue(angles.z);
-        writer.WriteEndObject();
-    }
-}
-
-
-/// <summary>
-/// JSON converter for UnityEngine.Color
-/// </summary>
-public class ColorConverter : JsonConverter<Color>
-{
-    /// <summary>
-    /// Read Color from JSON
-    /// </summary>
-    public override Color ReadJson(JsonReader reader, Type objectType, Color existingValue, bool hasExistingValue, JsonSerializer serializer)
-    {
-        JObject jo = JObject.Load(reader);
-        
-        float r = jo["r"]?.Value<float>() ?? 0f;
-        float g = jo["g"]?.Value<float>() ?? 0f;
-        float b = jo["b"]?.Value<float>() ?? 0f;
-        float a = jo["a"]?.Value<float>() ?? 1f;
-        
-        return new Color(r, g, b, a);
-    }
-    
-    /// <summary>
-    /// Write Color to JSON
-    /// </summary>
-    public override void WriteJson(JsonWriter writer, Color value, JsonSerializer serializer)
-    {
-        writer.WriteStartObject();
-        writer.WritePropertyName("r");
-        writer.WriteValue(value.r);
-        writer.WritePropertyName("g");
-        writer.WriteValue(value.g);
-        writer.WritePropertyName("b");
-        writer.WriteValue(value.b);
-        writer.WritePropertyName("a");
-        writer.WriteValue(value.a);
-        writer.WriteEndObject();
-    }
-}
-
-
-/// <summary>
-/// Converts between a string and an array of strings (joining with newlines)
-/// </summary>
-public class StringOrArrayConverter : JsonConverter
-{
-    public override bool CanConvert(Type objectType)
-    {
-        return objectType == typeof(string);
-    }
-
-    public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-    {
-        if (reader.TokenType == JsonToken.StartArray)
-        {
-            // Handle array of strings by reading them and joining with newlines
-            List<string> items = serializer.Deserialize<List<string>>(reader);
-            return string.Join("\n", items);
-        }
-        else if (reader.TokenType == JsonToken.String)
-        {
-            // Already a string, just return it
-            return serializer.Deserialize<string>(reader);
-        }
-        else if (reader.TokenType == JsonToken.Null)
-        {
-            return null;
-        }
-        
-        // Unexpected token type, return empty string
-        return string.Empty;
-    }
-
-    public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-    {
-        // When writing, just write as a string (not converting back to array)
-        writer.WriteValue((string)value);
-    }
-}
-
-
-/// <summary>
-/// Static utility class to setup JSON.NET serialization for the application
-/// </summary>
-public static class JsonSetup
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    public static void SetupGlobalJsonSettings()
-    {
-        // Configure default settings for JSON.NET
-        JsonConvert.DefaultSettings = () => new JsonSerializerSettings
-        {
-            Converters = new List<JsonConverter>
-            {
-                // Unity primitive types
-                new Vector2Converter(),
-                new Vector3Converter(),
-                new QuaternionConverter(),
-                new ColorConverter(),
-                new StringOrArrayConverter(),
-                
-                // Bridge converters
-                new BridgeJsonConverter()
-            },
-            
-            // Settings that improve performance and security
-            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
-            NullValueHandling = NullValueHandling.Ignore,
-            ObjectCreationHandling = ObjectCreationHandling.Replace,
-            TypeNameHandling = TypeNameHandling.Auto
-        };
-        
-        Debug.Log("Registered all JSON converters for Unity");
-    }
-}
 
 
 public class BridgeJsonConverter : JsonConverter {
@@ -262,15 +23,8 @@ public class BridgeJsonConverter : JsonConverter {
         {
             if (_jsonSerializer == null) {
                 _jsonSerializer = new JsonSerializer();
-                
-                // Add all converters
                 _jsonSerializer.Converters.Add(new BridgeJsonConverter());
                 _jsonSerializer.Converters.Add(new StringEnumConverter());
-                _jsonSerializer.Converters.Add(new Vector2Converter());
-                _jsonSerializer.Converters.Add(new Vector3Converter());
-                _jsonSerializer.Converters.Add(new QuaternionConverter());
-                _jsonSerializer.Converters.Add(new ColorConverter());
-                _jsonSerializer.Converters.Add(new StringOrArrayConverter());
                 
                 // Configure serializer settings
                 _jsonSerializer.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
@@ -532,10 +286,6 @@ public class BridgeJsonConverter : JsonConverter {
             convertToObjectMap.ContainsKey(objectType);
         bool canConvert = 
             canConvertFrom || canConvertTo;
-
-        if (canConvert) {
-            //Debug.Log("BridgeJsonConverter: CanConvert: objectType: " + objectType + " canConvertFrom: " + canConvertFrom + " canConvertTo: " + canConvertTo);
-        }
 
         return canConvert;
     }
