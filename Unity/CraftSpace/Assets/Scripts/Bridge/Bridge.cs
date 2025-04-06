@@ -100,7 +100,9 @@ public class Bridge : MonoBehaviour {
         //Debug.Log("Bridge: Start: this: " + this + " bridge: " +  ((bridge == null) ? "null" : ("" + bridge)) + " enabled: " + this.enabled);
 
 #if !UNITY_EDITOR && UNITY_WEBGL
-        WebGLInput.captureAllKeyboardInput = false;
+        // Ensure WebGL input doesn't capture everything if running in browser
+        // Use explicit namespace to resolve potential build issues
+        UnityEngine.WebGLInput.captureAllKeyboardInput = false;
 #endif
 
         StartBridge();

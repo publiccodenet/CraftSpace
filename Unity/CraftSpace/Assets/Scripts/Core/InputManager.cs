@@ -5,11 +5,14 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.Events;
 
+/// <summary>
+/// Handles camera panning, zooming, physics-based movement, and item selection.
+/// Relies on an assigned CameraController to access the camera and its rig.
+/// </summary>
 public class InputManager : MonoBehaviour
 {
-    [Header("Camera References")]
-    public Transform cameraRig;
-    public Camera camera;
+    [Header("Camera Control References")]
+    public CameraController cameraController; // Reference to the controller managing the camera
 
     [Header("Pan Settings")]
     public float panSpeed = 3f;
@@ -65,10 +68,25 @@ public class InputManager : MonoBehaviour
 
     private void Start()
     {
-        if (camera == null) 
+        // Check if CameraController and its controlled camera are assigned
+        if (cameraController == null)
         {
-            Debug.LogError("No camera assigned to InputManager in the Inspector!");
+            Debug.LogError("InputManager: No CameraController assigned in the Inspector!");
             enabled = false;
+            return;
+        }
+        if (cameraController.controlledCamera == null)
+        {
+            Debug.LogError("InputManager: The assigned CameraController does not have a controlled camera assigned!");
+            enabled = false;
+            return;
+        }
+        // Check if the CameraController has a cameraRig assigned
+        if (cameraController.cameraRig == null)
+        {
+            Debug.LogError("InputManager: The assigned CameraController does not have a cameraRig assigned!");
+            enabled = false;
+            return;
         }
     }
 
@@ -78,7 +96,8 @@ public class InputManager : MonoBehaviour
         HandleInput();
         UpdateHoveredItem();
         
-        // Handle selection clicks
+        // Handle selection clicks - COMMENTED OUT TEMPORARILY
+        /*
         if (Input.GetMouseButtonDown(0) && hoveredItem != null && hoveredItem != selectedItem)
         {
             SelectItem(hoveredItem);
@@ -87,21 +106,22 @@ public class InputManager : MonoBehaviour
         {
             DeselectItem();
         }
+        */
     }
 
     private void HandleInput()
     {
         if (Input.GetMouseButtonDown(0))
         {
-            // Only start dragging if not clicking on an item
-            if (hoveredItem == null)
-            {
-                isDragging = true;
-                previousMousePosition = Input.mousePosition;
-                lastDragTime = Time.realtimeSinceStartup;
-                physicsEnabled = false;
-                cameraVelocity = Vector3.zero;
-            }
+            // Start dragging regardless of hover state - MODIFIED
+            // if (hoveredItem == null) 
+            // {
+            isDragging = true;
+            previousMousePosition = Input.mousePosition;
+            lastDragTime = Time.realtimeSinceStartup;
+            physicsEnabled = false;
+            cameraVelocity = Vector3.zero;
+            // }
         }
         else if (Input.GetMouseButtonUp(0))
         {
@@ -140,11 +160,11 @@ public class InputManager : MonoBehaviour
                 Vector3 instantVelocity = worldDelta / deltaTime;
                 filteredVelocity = Vector3.Lerp(filteredVelocity, instantVelocity, velocitySmoothingFactor);
                 
-                // Move camera
-                Vector3 newPosition = cameraRig.position + worldDelta;
+                // Move camera rig via CameraController
+                Vector3 newPosition = cameraController.cameraRig.position + worldDelta;
                 newPosition.x = Mathf.Clamp(newPosition.x, minX, maxX);
                 newPosition.z = Mathf.Clamp(newPosition.z, minZ, maxZ);
-                cameraRig.position = newPosition;
+                cameraController.cameraRig.position = newPosition;
             }
         }
 
@@ -171,7 +191,7 @@ public class InputManager : MonoBehaviour
         cameraVelocity *= frictionFactor;
         
         // Calculate new position
-        Vector3 newPosition = cameraRig.position + cameraVelocity * Time.deltaTime;
+        Vector3 newPosition = cameraController.cameraRig.position + cameraVelocity * Time.deltaTime;
         
         // Check boundaries and bounce on X axis
         if (newPosition.x < minX)
@@ -197,8 +217,8 @@ public class InputManager : MonoBehaviour
             cameraVelocity.z = -cameraVelocity.z * bounceFactor;
         }
         
-        // Apply new position
-        cameraRig.position = newPosition;
+        // Apply new position to camera rig
+        cameraController.cameraRig.position = newPosition;
     }
 
     private void HandleKeyboardPan()
@@ -221,13 +241,15 @@ public class InputManager : MonoBehaviour
             cameraVelocity = Vector3.zero;
             
             moveDirection.Normalize();
-            float moveSpeed = panSpeed * Time.deltaTime * camera.orthographicSize * 0.5f;
-            Vector3 newPosition = cameraRig.position + moveDirection * moveSpeed;
+            // Use the camera from the cameraController for calculations
+            float moveSpeed = panSpeed * Time.deltaTime * cameraController.controlledCamera.orthographicSize * 0.5f;
+            // Move camera rig via CameraController
+            Vector3 newPosition = cameraController.cameraRig.position + moveDirection * moveSpeed;
             
             newPosition.x = Mathf.Clamp(newPosition.x, minX, maxX);
             newPosition.z = Mathf.Clamp(newPosition.z, minZ, maxZ);
             
-            cameraRig.position = newPosition;
+            cameraController.cameraRig.position = newPosition;
         }
         else if (!isDragging && !physicsEnabled)
         {
@@ -242,7 +264,8 @@ public class InputManager : MonoBehaviour
         float scrollAmount = Input.GetAxis("Mouse ScrollWheel");
         if (scrollAmount != 0)
         {
-            ApplyZoomAroundCursor(-scrollAmount * zoomSpeed * camera.orthographicSize);
+            // Use the camera from the cameraController for calculations
+            ApplyZoomAroundCursor(-scrollAmount * zoomSpeed * cameraController.controlledCamera.orthographicSize);
         }
 
         // Keyboard zoom
@@ -260,16 +283,19 @@ public class InputManager : MonoBehaviour
     // Helper method to apply zoom around cursor position
     private void ApplyZoomAroundCursor(float zoomAmount)
     {
+        // Use the camera from the cameraController
+        Camera cam = cameraController.controlledCamera;
+
         // Get world position at mouse before zoom
         Vector3 mouseWorldPosBefore = GetMouseWorldPosition();
         
         // Track velocity before zoom to scale it
         Vector3 velocityBeforeZoom = cameraVelocity;
-        float oldSize = camera.orthographicSize;
+        float oldSize = cam.orthographicSize;
         
         // Apply zoom
-        float newSize = Mathf.Clamp(camera.orthographicSize + zoomAmount, minZoom, maxZoom);
-        camera.orthographicSize = newSize;
+        float newSize = Mathf.Clamp(oldSize + zoomAmount, minZoom, maxZoom);
+        cam.orthographicSize = newSize;
         
         // Scale velocity to maintain world speed
         if (oldSize > 0 && physicsEnabled)
@@ -282,30 +308,32 @@ public class InputManager : MonoBehaviour
         Vector3 mouseWorldPosAfter = GetMouseWorldPosition();
         Vector3 adjustment = mouseWorldPosBefore - mouseWorldPosAfter;
         
-        // Apply adjustment to camera position with strict boundary enforcement
-        Vector3 newPosition = cameraRig.position + adjustment;
+        // Apply adjustment to camera rig position with strict boundary enforcement
+        Vector3 newPosition = cameraController.cameraRig.position + adjustment;
         newPosition.x = Mathf.Clamp(newPosition.x, minX, maxX);
         newPosition.z = Mathf.Clamp(newPosition.z, minZ, maxZ);
         
-        cameraRig.position = newPosition;
+        cameraController.cameraRig.position = newPosition;
         
         // One final boundary check to be certain we're within limits
         EnforceBoundaries();
     }
 
-    // Utility method to ensure camera is always within boundaries
+    // Utility method to ensure camera rig is always within boundaries
     private void EnforceBoundaries()
     {
-        Vector3 position = cameraRig.position;
+        Vector3 position = cameraController.cameraRig.position;
         position.x = Mathf.Clamp(position.x, minX, maxX);
         position.z = Mathf.Clamp(position.z, minZ, maxZ);
-        cameraRig.position = position;
+        cameraController.cameraRig.position = position;
     }
 
     private Vector3 GetMouseWorldPosition()
     {
+        // Use the camera from the cameraController
+        Camera cam = cameraController.controlledCamera;
         Plane plane = new Plane(Vector3.up, Vector3.zero);
-        Ray ray = camera.ScreenPointToRay(Input.mousePosition);
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
         
         if (plane.Raycast(ray, out float enter))
         {
@@ -313,36 +341,41 @@ public class InputManager : MonoBehaviour
         }
         
         Vector3 mousePos = Input.mousePosition;
-        mousePos.z = camera.nearClipPlane;
-        return camera.ScreenToWorldPoint(mousePos);
+        mousePos.z = cam.nearClipPlane;
+        return cam.ScreenToWorldPoint(mousePos);
     }
 
     private float GetScaledVelocityThreshold()
     {
-        return baseVelocityThreshold * (camera.orthographicSize / minZoom);
+        // Use the camera from the cameraController
+        return baseVelocityThreshold * (cameraController.controlledCamera.orthographicSize / minZoom);
     }
 
     // Add overload to handle arbitrary screen positions
     private Vector3 GetMouseWorldPosition(Vector3 screenPos)
     {
+        // Use the camera from the cameraController
+        Camera cam = cameraController.controlledCamera;
         Plane plane = new Plane(Vector3.up, Vector3.zero);
-        Ray ray = camera.ScreenPointToRay(screenPos);
+        Ray ray = cam.ScreenPointToRay(screenPos);
         
         if (plane.Raycast(ray, out float enter))
         {
             return ray.GetPoint(enter);
         }
         
-        screenPos.z = camera.nearClipPlane;
-        return camera.ScreenToWorldPoint(screenPos);
+        screenPos.z = cam.nearClipPlane;
+        return cam.ScreenToWorldPoint(screenPos);
     }
 
     private void UpdateHoveredItem()
     {
-        Ray ray = camera.ScreenPointToRay(Input.mousePosition);
+        Ray ray = cameraController.controlledCamera.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
+        float sphereRadius = 0.05f; // Small radius for the sphere cast
         
-        if (Physics.Raycast(ray, out hit, maxSelectionDistance, itemLayer))
+        // Use SphereCast instead of Raycast for potentially more robust hover detection
+        if (Physics.SphereCast(ray, sphereRadius, out hit, maxSelectionDistance, itemLayer))
         {
             ItemView itemView = hit.collider.GetComponentInParent<ItemView>();
             if (itemView != null && itemView.Model != null)
@@ -353,12 +386,14 @@ public class InputManager : MonoBehaviour
                     // Fire hover end for previous item
                     if (hoveredItem != null)
                     {
+                        // Debug.Log($"[InputManager] Invoking OnItemHoverEnd for: {hoveredItem.Model?.Title ?? "NULL"}"); // REMOVED
                         OnItemHoverEnd?.Invoke(hoveredItem);
                     }
                     
                     hoveredItem = itemView;
                     
                     // Fire hover start
+                    // Debug.Log($"[InputManager] Invoking OnItemHoverStart for: {hoveredItem.Model?.Title ?? "NULL"}"); // REMOVED
                     OnItemHoverStart?.Invoke(hoveredItem);
                 }
                 
@@ -394,6 +429,7 @@ public class InputManager : MonoBehaviour
     {
         if (hoveredItem != null)
         {
+            // Debug.Log($"[InputManager] Clearing hover state, Invoking OnItemHoverEnd for: {hoveredItem.Model?.Title ?? "NULL"}"); // REMOVED
             OnItemHoverEnd?.Invoke(hoveredItem);
             hoveredItem = null;
         }

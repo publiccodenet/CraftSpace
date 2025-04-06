@@ -131,7 +131,6 @@ GameObject:
   - component: {fileID: 466263901}
   - component: {fileID: 466263904}
   - component: {fileID: 466263903}
-  - component: {fileID: 466263902}
   m_Layer: 0
   m_Name: Brewster
   m_TagString: Untagged
@@ -147,7 +146,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 466263899}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -172,29 +171,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   baseResourcePath: Content
   loadOnStart: 1
-  loadCollectionsAutomatically: 1
-  loadItemsAutomatically: 1
-  verbose: 1
---- !u!114 &466263902
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 466263899}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 62458f323cc0447d1bfa9d3f81a553eb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _itemLayerMask:
-    serializedVersion: 2
-    m_Bits: 64
-  _maxRaycastDistance: 100
-  _itemLayerName: Items
-  _hoverCheckFrequency: 0.1
-  targetCamera: {fileID: 1026284022375847901}
-  collectionDisplay: {fileID: 466263903}
 --- !u!114 &466263903
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -207,11 +183,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c14c9f7e8143f4dd088305f259cc092d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _collectionView: {fileID: 1575444686}
-  _itemInfoPanel: {fileID: 8279063603294062899}
-  _itemTitleText: {fileID: 4778525202978386586}
-  _loadOnStart: 1
-  _defaultCollectionId: scifi
+  collectionView: {fileID: 1575444686}
+  itemInfoPanel: {fileID: 8279063603294062899}
+  itemTitleText: {fileID: 4778525202978386586}
+  loadOnStart: 1
+  collectionId: scifi
+  inputManager: {fileID: 466263904}
 --- !u!114 &466263904
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -224,28 +201,81 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4168a4ba21a274e259b7fbd379e06364, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _cameraRig: {fileID: 3205023071337114697}
-  _camera: {fileID: 1026284022375847901}
-  _panSpeed: 3
-  _minX: -12
-  _maxX: 12
-  _minZ: -12
-  _maxZ: 12
-  _invertDrag: 0
-  _zoomSpeed: 1
-  _minZoom: 0.1
-  _maxZoom: 100
-  _keyboardZoomSpeed: 5
-  _baseVelocityThreshold: 0.2
-  _velocitySmoothingFactor: 0.1
-  _frictionFactor: 0.999
-  _bounceFactor: 0.9
-  _itemInfoPanel: {fileID: 5512689547227979829}
-  _itemLayer:
+  cameraController: {fileID: 864494875500921725}
+  panSpeed: 3
+  minX: -12
+  maxX: 12
+  minZ: -12
+  maxZ: 12
+  invertDrag: 0
+  zoomSpeed: 1
+  minZoom: 0.1
+  maxZoom: 100
+  keyboardZoomSpeed: 5
+  baseVelocityThreshold: 0.2
+  velocitySmoothingFactor: 0.1
+  frictionFactor: 0.999
+  bounceFactor: 0.9
+  itemInfoPanel: {fileID: 5512689547227979829}
+  itemLayer:
     serializedVersion: 2
     m_Bits: 64
-  _infoText: {fileID: 4778525202978386586}
-  _descriptionScale: 0.8
+  infoText: {fileID: 4778525202978386586}
+  collectionDisplay: {fileID: 466263903}
+  descriptionScale: 0.8
+  maxSelectionDistance: 100
+  OnItemSelected:
+    m_PersistentCalls:
+      m_Calls: []
+  OnItemDeselected:
+    m_PersistentCalls:
+      m_Calls: []
+  OnItemHoverStart:
+    m_PersistentCalls:
+      m_Calls: []
+  OnItemHoverEnd:
+    m_PersistentCalls:
+      m_Calls: []
+  hoveredItem: {fileID: 0}
+  currentHighlightedItem: {fileID: 0}
+  selectedItem: {fileID: 0}
+--- !u!4 &1274849665 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 464012571170886491, guid: f5adfd9952e35473d9a517d096636994, type: 3}
+  m_PrefabInstance: {fileID: 1575444685}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1404500403
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1404500404}
+  m_Layer: 0
+  m_Name: CameraRig
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1404500404
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1404500403}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 10, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 8172610814526464293}
+  m_Father: {fileID: 3205023071337114697}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1575444685
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -254,6 +284,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 6578186406162160142}
     m_Modifications:
+    - target: {fileID: 3293791871657533807, guid: f5adfd9952e35473d9a517d096636994, type: 3}
+      propertyPath: itemContainer
+      value: 
+      objectReference: {fileID: 1274849665}
     - target: {fileID: 4003838307347595240, guid: f5adfd9952e35473d9a517d096636994, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -294,18 +328,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 4539241664711781046, guid: f5adfd9952e35473d9a517d096636994, type: 3}
-      propertyPath: _spacing
-      value: 0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 4539241664711781046, guid: f5adfd9952e35473d9a517d096636994, type: 3}
-      propertyPath: _spacingVertical
-      value: 0.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 4539241664711781046, guid: f5adfd9952e35473d9a517d096636994, type: 3}
-      propertyPath: _spacingHorizontal
-      value: 0.2
-      objectReference: {fileID: 0}
     - target: {fileID: 7497744607419584431, guid: f5adfd9952e35473d9a517d096636994, type: 3}
       propertyPath: m_Name
       value: CollectionViewPrefab
@@ -343,7 +365,7 @@ GameObject:
   - component: {fileID: 1026284022375847901}
   - component: {fileID: 1788857316069314452}
   m_Layer: 0
-  m_Name: TargetCamera
+  m_Name: ControlledCamera
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -361,19 +383,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c81682a0e9f3b4510a0c5453f592dc86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _targetCamera: {fileID: 1026284022375847901}
-  _moveSpeed: 5
-  _fastMoveSpeed: 15
-  _rotationSpeed: 60
-  _zoomSpeed: 10
-  _minZoom: 2
-  _maxZoom: 20
-  _movementSmoothTime: 0.2
-  _rotationSmoothTime: 0.1
-  _zoomSmoothTime: 0.1
-  _collectionFocusDistance: 10
-  _collectionFocusHeight: 5
-  _focusTransitionTime: 1
+  controlledCamera: {fileID: 1026284022375847901}
+  cameraRig: {fileID: 1404500404}
+  moveSpeed: 5
+  fastMoveSpeed: 15
+  rotationSpeed: 60
+  zoomSpeed: 10
+  minZoom: 2
+  maxZoom: 20
+  movementSmoothTime: 0.2
+  rotationSmoothTime: 0.1
+  zoomSmoothTime: 0.1
+  collectionFocusDistance: 10
+  collectionFocusHeight: 5
+  focusTransitionTime: 1
 --- !u!222 &1023645530602801513
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -608,7 +631,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 8172610814526464293}
+  - {fileID: 1404500404}
   m_Father: {fileID: 466263900}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3517346651743784064
@@ -879,12 +902,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 761013017714985360}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 10, z: 0}
+  m_LocalRotation: {x: 0.7071068, y: -0, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 3205023071337114697}
+  m_Father: {fileID: 1404500404}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!1 &8279063603294062899
 GameObject:

@@ -40,7 +40,7 @@
     "unity:ci": "tsx scripts/unity-automation.js ci",
     "unity:logs": "tsx scripts/unity-automation.js check-logs",
     "unity:env": "node scripts/unity-env.js --verbose",
-    "unity:env:shell": "node scripts/unity-env.js --shell > .unity-env && echo 'Environment saved to .unity-env'",
+    "unity:env:shell": "node scripts/unity-env.js --shell > .unity-env",
     "unity:discover": "node scripts/unity-env.js --verbose",
     "unity:list-versions": "tsx scripts/unity-automation.js list-versions",
     "unity:generate-schemas": "tsx scripts/unity-automation.js generate-schemas",

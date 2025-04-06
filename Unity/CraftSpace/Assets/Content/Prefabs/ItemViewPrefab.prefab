@@ -46,21 +46,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e979578905b44d7bb14f29d12f32717, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _model: {fileID: 0}
-  _autoInitializeRenderers: 0
-  _closeDistance: 5
-  _mediumDistance: 20
-  _farDistance: 200
-  _itemLabel: {fileID: 7599011510456966153}
-  _itemWidth: 1.2
-  _itemHeight: 1
-  _loadingMaterial: {fileID: 2100000, guid: 0e29a213f7529450cb3eb75e25f24c03, type: 2}
-  _highlightMaterial: {fileID: 2100000, guid: 7e59c25f9c2ba48568b8e1c87e9e1a7b, type: 2}
-  _highlightMarginTop: 0.7
-  _highlightMarginBottom: 0.1
-  _highlightMarginLeft: 0.1
-  _highlightMarginRight: 0.1
-  _onItemChanged:
+  model: {fileID: 0}
+  itemLabel: {fileID: 7599011510456966153}
+  itemWidth: 1.4
+  itemHeight: 1
+  loadingMaterial: {fileID: 2100000, guid: 0e29a213f7529450cb3eb75e25f24c03, type: 2}
+  highlightMesh: {fileID: 0}
+  highlightMaterial: {fileID: 2100000, guid: 7e59c25f9c2ba48568b8e1c87e9e1a7b, type: 2}
+  selectionMaterial: {fileID: 2100000, guid: 07beb7151a88444fd92397b3ee46d80f, type: 2}
+  highlightElevation: 0.1
+  highlightColor: {r: 1, g: 0.8, b: 0.2, a: 0.7}
+  selectionColor: {r: 0.084590435, g: 1, b: 0, a: 0.9}
+  collectionId: 
+  onItemChanged:
     m_PersistentCalls:
       m_Calls: []
 --- !u!65 &1945117689957070442

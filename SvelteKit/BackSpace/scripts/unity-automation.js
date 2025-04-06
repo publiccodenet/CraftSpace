@@ -104,7 +104,7 @@ if (!command) {
         await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildWebGL_Prod -quit -logFile -', unityEnv);
         break;
       case 'test':
-        await runUnityCommand('-batchmode -projectPath . -runTests -testResults ./test-results.xml -quit -logFile -', unityEnv);
+        await serveWebGLBuild();
         break;
       case 'ci':
         // CI script likely runs unity-env itself, so just execute
@@ -380,41 +380,6 @@ exit $EXIT_CODE`;
 async function createUnityFiles(unityProjectPath) {
   // Create run-unity.sh first
   await createUnityExecutableScript(unityProjectPath);
-  
-  // Create ci-build.sh for CI pipeline if needed
-  const ciBuildScript = path.join(unityProjectPath, 'ci-build.sh');
-  if (!fs.existsSync(ciBuildScript)) {
-    const ciBuildContent = `#!/bin/bash
-# CI Build Script for Unity Project
-# This script is used by the CI pipeline to build the Unity project
-
-# Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-
-# Source unity environment variables if available
-if [ -f "$SCRIPT_DIR/../SvelteKit/BackSpace/.unity-env" ]; then
-  source "$SCRIPT_DIR/../SvelteKit/BackSpace/.unity-env"
-else
-  # Set up environment variables
-  cd "$SCRIPT_DIR/../SvelteKit/BackSpace"
-  source <(node scripts/unity-env.js --shell)
-  cd "$SCRIPT_DIR"
-fi
-
-# Run Unity build
-echo "Running Unity build..."
-"$SCRIPT_DIR/run-unity.sh" -batchmode -projectPath . -executeMethod Build.BuildProd -quit
-
-exit $?`;
-
-    try {
-      fs.writeFileSync(ciBuildScript, ciBuildContent, { mode: 0o755 });
-      console.log(chalk.green(`Created CI build script at: ${ciBuildScript}`));
-    } catch (error) {
-      console.error(chalk.red(`Error creating CI script: ${error.message}`));
-      // Not a fatal error, just continue
-    }
-  }
 }
 
 /**
@@ -444,6 +409,75 @@ async function listUnityVersions() {
     console.error(chalk.red(`Error listing Unity versions: ${error.message}`));
     throw error;
   }
+}
+
+/**
+ * Starts a local HTTP server to serve the latest WebGL build for manual testing.
+ */
+async function serveWebGLBuild() {
+    console.log(chalk.blue('Serving latest WebGL build for manual testing...'));
+    // Correctly resolve the path from the script directory up 3 levels to project root, then down
+    const buildDir = path.resolve(__dirname, '../../../Unity/CraftSpace/Builds/SpaceCraft');
+    
+    if (!fs.existsSync(buildDir)) {
+        console.error(chalk.red(`Build directory not found: ${buildDir}`));
+        console.error(chalk.yellow('Please run a WebGL build first (e.g., npm run unity:build-webgl).'));
+        process.exit(1);
+    }
+    
+    console.log(chalk.green(`Attempting to serve build from: ${buildDir}`));
+    console.log(chalk.cyan('Starting local web server. Press Ctrl+C to stop.'));
+    console.log(chalk.cyan('Attempting to open browser at http://localhost:8080 ...'));
+    
+    // Use child_process to run npx http-server in the background
+    const serverCommand = `npx http-server . -p 8080 -o`;
+    console.log(chalk.gray(`Executing: ${serverCommand} in ${buildDir}`));
+
+    const serverProcess = exec(serverCommand, { cwd: buildDir }, (error, stdout, stderr) => {
+         if (error) {
+            console.error(chalk.red(`Server Error: ${error.message}`));
+            if (error.message.includes('not found') || error.message.includes('npx' + ' is not recognized')) {
+                console.error(chalk.yellow('Suggestion: Ensure Node.js and npm are installed correctly and in your PATH. You might need to install http-server globally (`npm install -g http-server`) if npx fails.'));
+            }
+            // Don't exit the main script here, just log the server error
+            return; 
+        }
+        if (stderr) {
+            // http-server often prints startup info to stderr, filter known messages
+            const knownMessages = ['Starting up http-server', 'Available on:'];
+            if (!knownMessages.some(msg => stderr.includes(msg))) {
+                console.error(chalk.red(`Server Stderr: ${stderr}`));
+            }
+            return;
+        }
+        // Log stdout only if it contains something unexpected
+        if (stdout && stdout.trim().length > 0) {
+            console.log(`Server Stdout: ${stdout}`);
+        }
+    });
+
+    serverProcess.on('exit', (code) => {
+        // Only log unexpected exits
+        if (code !== null && code !== 0) { 
+            console.log(chalk.yellow(`Server process exited unexpectedly with code ${code}`));
+        } else {
+             console.log(chalk.yellow(`Server process stopped.`));
+        }
+        // Allow the main script to exit naturally when the server stops or is killed
+        process.exit(code ?? 0); 
+    });
+
+    // Graceful shutdown handling
+    process.on('SIGINT', () => {
+        console.log(chalk.yellow('\nCaught interrupt signal (Ctrl+C). Shutting down server...'));
+        serverProcess.kill('SIGINT'); 
+        // Allow time for server process to exit before node script exits
+        setTimeout(() => process.exit(0), 500); 
+    });
+
+    // Keep the script alive until the server is killed or exits
+    // The promise is no longer needed because process.on('SIGINT') and serverProcess.on('exit') handle termination.
+    // await new Promise(() => {}); 
 }
 
 /**

@@ -52,8 +52,28 @@ public static class Build
     public static void BuildWebGL_Dev()
     {
         Debug.Log("Starting WebGL Development Build...");
-        // Set the WebGL template to SpaceCraft
-        PlayerSettings.WebGL.template = "SpaceCraft";
+
+        // --- Force Platform and Template --- 
+        BuildTarget targetPlatform = BuildTarget.WebGL;
+        BuildTargetGroup targetGroup = BuildTargetGroup.WebGL;
+        string templateName = "PROJECT:SpaceCraft"; // Ensure this folder exists in Assets/WebGLTemplates
+
+        // Switch active build target if needed
+        if (EditorUserBuildSettings.activeBuildTarget != targetPlatform) 
+        {
+            Debug.LogWarning($"[Build] Active build target is {EditorUserBuildSettings.activeBuildTarget}. Switching to {targetPlatform}...");
+            // Use the correct overload taking both Group and Target
+            EditorUserBuildSettings.SwitchActiveBuildTarget(targetGroup, targetPlatform);
+            // Note: Switching platforms can take time and recompile scripts.
+        }
+
+        // Force the WebGL template 
+        if (PlayerSettings.WebGL.template != templateName)
+        {
+            Debug.Log($"[Build] Current WebGL template is '{PlayerSettings.WebGL.template}'. Forcing to '{templateName}'.");
+            PlayerSettings.WebGL.template = templateName;
+        }
+        // --- End Force --- 
         
         BuildPlayerOptions options = new BuildPlayerOptions
         {
@@ -70,8 +90,28 @@ public static class Build
     public static void BuildWebGL_Prod()
     {
         Debug.Log("Starting WebGL Production Build...");
-        // Set the WebGL template to SpaceCraft
-        PlayerSettings.WebGL.template = "SpaceCraft";
+
+        // --- Force Platform and Template --- 
+        BuildTarget targetPlatform = BuildTarget.WebGL;
+        BuildTargetGroup targetGroup = BuildTargetGroup.WebGL;
+        string templateName = "PROJECT:SpaceCraft"; // Ensure this folder exists in Assets/WebGLTemplates
+
+        // Switch active build target if needed
+        if (EditorUserBuildSettings.activeBuildTarget != targetPlatform) 
+        {
+            Debug.LogWarning($"[Build] Active build target is {EditorUserBuildSettings.activeBuildTarget}. Switching to {targetPlatform}...");
+            // Use the correct overload taking both Group and Target
+            EditorUserBuildSettings.SwitchActiveBuildTarget(targetGroup, targetPlatform);
+             // Note: Switching platforms can take time and recompile scripts.
+        }
+
+        // Force the WebGL template
+        if (PlayerSettings.WebGL.template != templateName)
+        {
+            Debug.Log($"[Build] Current WebGL template is '{PlayerSettings.WebGL.template}'. Forcing to '{templateName}'.");
+            PlayerSettings.WebGL.template = templateName;
+        }
+         // --- End Force --- 
         
         BuildPlayerOptions options = new BuildPlayerOptions
         {

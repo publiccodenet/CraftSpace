@@ -29,7 +29,7 @@ public class Item : ItemSchema
     // Runtime-only state (not serialized)
     [NonSerialized] public Texture2D cover;
     
-    public void RegisterView(object view)
+    public override void RegisterView(object view)
     {
         base.RegisterView(view);
         
@@ -40,7 +40,7 @@ public class Item : ItemSchema
         }
     }
     
-    public void UnregisterView(object view)
+    public override void UnregisterView(object view)
     {
         base.UnregisterView(view);
         

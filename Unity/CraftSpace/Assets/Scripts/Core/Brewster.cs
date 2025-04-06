@@ -231,8 +231,20 @@ public class Brewster : MonoBehaviour
     /// </summary>
     private IEnumerator LoadItemIndex(string collectionId)
     {
-        Collection collection = _collections[collectionId];
+        // Add log at the very start
+        // Debug.Log($"Brewster: Entering LoadItemIndex for collection ID: {collectionId}"); // REMOVED
+
+        // Check if collection exists (should always exist at this phase)
+        if (!_collections.TryGetValue(collectionId, out Collection collection))
+        {
+            Debug.LogError($"Brewster: Collection '{collectionId}' not found in collections dictionary");
+            yield break;
+        }
+        
         string itemsIndexPath = Path.Combine(Application.streamingAssetsPath, baseResourcePath, "collections", collectionId, "items-index.json");
+        
+        // Log the path we are attempting to load
+        // Debug.Log($"Brewster: Attempting to load item index for collection '{collectionId}' from: {itemsIndexPath}"); // REMOVED
         
         JToken itemsIndexToken = null;
         yield return LoadJson(itemsIndexPath, token => itemsIndexToken = token);
@@ -257,6 +269,9 @@ public class Brewster : MonoBehaviour
             }
         }
         
+        // Log the count of item IDs parsed from the index
+        // Debug.Log($"Brewster: Parsed {itemIds.Count} item IDs from index for collection '{collectionId}'."); // REMOVED
+
         // Set the item IDs on the collection - this is our source of truth
         // about which items belong to which collection
         collection.ItemIds = itemIds;
@@ -277,7 +292,8 @@ public class Brewster : MonoBehaviour
             
             // Get the item IDs for this collection.
             // Expect ItemIds to be a List<string> as set by LoadItemIndex.
-            List<string> collectionItemIds = collection.ItemIds;
+            // Explicitly create a new List<string> to resolve potential type mismatch (CS0266)
+            List<string> collectionItemIds = new List<string>(collection.ItemIds ?? Enumerable.Empty<string>());
 
             // Bold check: If ItemIds is null (which shouldn't happen after LoadItemIndex),
             // log it and skip this collection. Don't guess or create an empty list.
@@ -413,7 +429,11 @@ public class Brewster : MonoBehaviour
             }
             catch (Exception e)
             {
-                Debug.LogError($"Error parsing JSON from {uri}: {e.Message}");
+                // Log the URI and the specific error message
+                Debug.LogError($"Error parsing JSON from {uri}: {e.GetType().Name} - {e.Message}");
+                // Log the raw content that failed to parse (limit length)
+                string snippet = jsonContent.Length > 500 ? jsonContent.Substring(0, 500) + "..." : jsonContent;
+                Debug.LogError($"JSON content snippet:\n{snippet}"); 
                 callback?.Invoke(null);
             }
         }

@@ -46,11 +46,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b440ce1c8df554c05a0d05dd80a45ded, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _model: {fileID: 0}
-  _itemContainer: {fileID: 464012571170886491}
-  _itemViewsContainerPrefab: {fileID: 8545906332215059116, guid: 354510ea2cae34424a027bcd990180fc, type: 3}
-  _itemViewPrefabs: []
-  _createItemViewsAutomatically: 1
+  model: {fileID: 0}
+  itemContainer: {fileID: 0}
+  itemViewsContainerPrefab: {fileID: 8545906332215059116, guid: 354510ea2cae34424a027bcd990180fc, type: 3}
 --- !u!114 &4539241664711781046
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -63,13 +61,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6fc65b3323014e13b0e9c6be3b88bc9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  itemViewContainerPrefab: {fileID: 8545906332215059116, guid: 354510ea2cae34424a027bcd990180fc, type: 3}
-  itemViewPrefab: {fileID: 4331697567644932370, guid: 8df9728067b394ca6a2e8b4bddb094cb, type: 3}
-  _cellSize: 1
-  _spacing: 0.1
-  _columns: 4
-  _autoUpdateLayout: 1
-  _centerHorizontally: 1
+  cellSize: 1
+  spacingHorizontal: 0.2
+  spacingVertical: 0.8
+  columns: 4
+  autoUpdateLayout: 1
+  centerHorizontally: 1
+  itemTransforms: []
+  collection: {fileID: 0}
+  collectionView: {fileID: 0}
+  initialized: 0
 --- !u!1 &8955703354072507967
 GameObject:
   m_ObjectHideFlags: 0

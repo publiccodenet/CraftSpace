@@ -36,7 +36,6 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     private bool isHighlighted = false;
     private bool isSelected = false;
     private Material originalMaterial;
-    private Vector3 originalPosition;
     
     // Cached component references
     private MeshFilter meshFilter;
@@ -76,9 +75,6 @@ public class ItemView : MonoBehaviour, IModelView<Item>
             meshRenderer = gameObject.AddComponent<MeshRenderer>();
             
         boxCollider = GetComponent<BoxCollider>();
-        
-        // Store original position
-        originalPosition = transform.position;
         
         // Create highlight mesh if it doesn't exist
         if (highlightMesh == null)
@@ -309,32 +305,22 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         highlightFilter.mesh = highlightQuad;
     }
     
-    // Update mesh based on aspect ratio
+    // Update mesh based on aspect ratio to fit within a 1x1 unit square
     private void UpdateMeshForAspectRatio(float aspectRatio)
     {
         float width, height;
         
         if (aspectRatio >= 1f) // Landscape or square
         {
-            width = itemWidth;
-            height = width / aspectRatio;
-            
-            if (height > itemHeight)
-            {
-                height = itemHeight;
-                width = height * aspectRatio;
-            }
+            // Set width to 1, scale height
+            width = 1.0f;
+            height = width / aspectRatio; 
         }
         else // Portrait
         {
-            height = itemHeight;
+            // Set height to 1, scale width
+            height = 1.0f;
             width = height * aspectRatio;
-            
-            if (width > itemWidth)
-            {
-                width = itemWidth;
-                height = width / aspectRatio;
-            }
         }
         
         CreateOrUpdateMesh(width, height);
@@ -381,7 +367,14 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         // Update collider if present
         if (boxCollider != null)
         {
-            boxCollider.size = new Vector3(width, 0.1f, height);
+            // Calculate collider size based on visual size, capping width at 1.0
+            float colliderWidth = Mathf.Min(1f, width);
+            float colliderHeight = height; // Use visual height directly
+            float colliderThickness = 0.1f; // Keep thickness small
+
+            boxCollider.size = new Vector3(colliderWidth, colliderThickness, colliderHeight);
+            // Optional: Adjust center if needed, but likely okay at 0,0,0 if mesh is centered
+            // boxCollider.center = Vector3.zero; 
         }
     }
     
@@ -418,6 +411,7 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     /// </summary>
     public void SetHighlighted(bool highlighted)
     {
+        // Debug.Log($"[ItemView:{Model?.Title ?? "NULL"}] SetHighlighted({highlighted})"); // REMOVED
         if (isHighlighted == highlighted) return;
         
         isHighlighted = highlighted;
@@ -436,9 +430,6 @@ public class ItemView : MonoBehaviour, IModelView<Item>
             {
                 highlightMesh.SetActive(false);
             }
-            
-            // Restore original position
-            transform.position = originalPosition;
         }
     }
     
@@ -469,9 +460,6 @@ public class ItemView : MonoBehaviour, IModelView<Item>
                 {
                     highlightMesh.SetActive(false);
                 }
-                
-                // Restore original position
-                transform.position = originalPosition;
             }
         }
     }
@@ -492,9 +480,6 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         {
             highlightRenderer.material = highlightMaterial;
         }
-        
-        // Slightly elevate the item
-        transform.position = originalPosition + Vector3.up * highlightElevation * 0.5f;
     }
     
     /// <summary>
@@ -513,8 +498,5 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         {
             highlightRenderer.material = selectionMaterial;
         }
-        
-        // Elevate the item higher than hover
-        transform.position = originalPosition + Vector3.up * highlightElevation;
     }
 } 

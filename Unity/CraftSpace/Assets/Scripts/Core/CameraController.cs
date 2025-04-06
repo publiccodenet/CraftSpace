@@ -5,8 +5,10 @@ using System.Collections.Generic;
 public class CameraController : MonoBehaviour
 {
     [Header("Camera Reference")]
-    public Camera targetCamera; // Direct reference to camera
+    public Camera controlledCamera;
     [Tooltip("Set this to the camera you want to control")]
+    public Transform cameraRig;
+    [Tooltip("Set this to the parent transform used for panning/translation")]
     
     [Header("Movement Settings")]
     public float moveSpeed = 5f;
@@ -38,14 +40,14 @@ public class CameraController : MonoBehaviour
     private void Awake()
     {
         // Use the directly referenced camera instead of Camera.main
-        if (targetCamera == null)
+        if (controlledCamera == null)
         {
             Debug.LogError("CameraController: No camera assigned! Please assign a camera in the inspector.");
             enabled = false; // Disable the script to prevent further errors
             return;
         }
         
-        cameraTransform = targetCamera.transform;
+        cameraTransform = controlledCamera.transform;
         currentZoomLevel = Vector3.Distance(cameraTransform.position, transform.position);
     }
     
