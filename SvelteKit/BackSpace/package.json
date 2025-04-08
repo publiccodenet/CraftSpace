@@ -45,6 +45,7 @@
     "unity:list-versions": "tsx scripts/unity-automation.js list-versions",
     "unity:generate-schemas": "tsx scripts/unity-automation.js generate-schemas",
     "unity:build-webgl": "tsx scripts/unity-automation.js build-webgl-prod",
+    "unity:unbuild": "rsync -av --exclude='Build/' --exclude='StreamingAssets/' ../../Unity/CraftSpace/Builds/SpaceCraft/ ../../Unity/CraftSpace/Assets/WebGLTemplates/SpaceCraft/ && rsync -av ../../Unity/CraftSpace/Builds/SpaceCraft/StreamingAssets/Bridge/ ../../Unity/CraftSpace/Assets/StreamingAssets/Bridge/",
     "unity:deploy-webgl": "rm -rf ../../WebSites/spacetime && cp -r ../../Unity/CraftSpace/Builds/SpaceCraft ../../WebSites/spacetime",
     "unity:build-and-deploy": "npm run unity:build-webgl && npm run unity:deploy-webgl",
     "unity:deploy-all": "npm run schemas:regenerate:unity && npm run unity:build-and-deploy"
