@@ -144,13 +144,6 @@
           handlePresence('selector', newState)
         })
     </script>
-
-    <!-- Bridge Scripts -->
-    <script type="text/javascript" src="StreamingAssets/Bridge/unity.js"></script>
-    <script type="text/javascript" src="StreamingAssets/Bridge/bridge.js"></script>
-    <script type="text/javascript" src="StreamingAssets/Bridge/spacecraft.js"></script>
-    <!-- End Bridge Scripts -->
-
     <canvas id="unity-canvas" width=960 height=600 tabindex="-1" style="width: 100%; height: 100%; position: fixed; top: 0; left: 0; background: #1F1F20"></canvas>
     <script src="Build/SpaceCraft.loader.js"></script>
     <script>
@@ -181,16 +174,6 @@
         // matchWebGLToCanvasSize: false, // Uncomment this to separately control WebGL canvas render size and DOM element size.
         // devicePixelRatio: 1, // Uncomment this to override low DPI rendering on high DPI displays.
       });
-
-      // --- Initialize Spacecraft Bridge --- 
-      if (typeof InitializeSpacecraftBridge === 'function') {
-        console.log("[IndexHTML] Calling InitializeSpacecraftBridge()...");
-        InitializeSpacecraftBridge();
-      } else {
-        console.error("[IndexHTML] InitializeSpacecraftBridge function not found! Check script loading order.");
-      }
-      // --- End Init --- 
-
     </script>
     <script>
       // add navigator and selector qr codes
