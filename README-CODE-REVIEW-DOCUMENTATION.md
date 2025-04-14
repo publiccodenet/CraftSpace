@@ -163,7 +163,7 @@ See the main [Project Code and Documentation Review](./README-CODE-REVIEW.md) fi
 
 ## `Unity/CraftSpace/README-UNITY-PACKAGES.md`
 
-*   **Purpose**: Describes Unity package dependencies, integration philosophy (schema-driven), UnityJS extensions, required packages (TextMeshPro, Newtonsoft, Input System, Cinemachine, ProBuilder), JSON.NET integration, NJsonSchema usage, schema examples (Material), and compatibility notes.
+*   **Purpose**: Describes Unity package dependencies, integration philosophy (schema-driven), Bridge extensions, required packages (TextMeshPro, Newtonsoft, Input System, Cinemachine, ProBuilder), JSON.NET integration, NJsonSchema usage, schema examples (Material), and compatibility notes.
 *   **Content Quality**: Good overview of the packages used and the philosophy behind integrating them using schemas. Explains the role of key dependencies.
 *   **Redundancy**: Mentions JSON.NET integration, which is also touched on in the schema documentation (`README-SCHEMAS.md` and `Unity/CraftSpace/README-SCHEMAS.md`) and potentially the bridge (`README-UNITY-BRIDGE.md`). Mentions Input System, Cinemachine, ProBuilder which have their own dedicated or related READMEs (`README-UNITY-INPUT.md`, `README-UNITY-CINEMACHINE.md`, `README-UNITY-VISUALIZATION.md`).
 *   **Suggestions**:
@@ -171,7 +171,7 @@ See the main [Project Code and Documentation Review](./README-CODE-REVIEW.md) fi
     *   Minimize the detailed explanation of *how* packages like Cinemachine or Input System are used here; instead, link to their dedicated READMEs.
     *   Focus on the *why* these packages were chosen and *how* they fit into the schema-driven architecture.
     *   The schema examples (e.g., `MaterialSchema`) are useful illustrations of the integration philosophy and should likely stay here or be moved to the main schema documentation (`README-SCHEMAS.md`) if that becomes the SSOT for schema definitions.
-    *   Clarify the relationship between UnityJS and this project's bridge/schema system.
+    *   Clarify the relationship between Bridge and this project's bridge/schema system.
 *   **Location**: Correctly placed within `Unity/CraftSpace/`.
 
 ## `Unity/CraftSpace/README-UNITY-VISUALIZATION.md`

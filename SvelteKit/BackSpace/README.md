@@ -107,3 +107,118 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+# Unity Automation Tools
+
+BackSpace includes a comprehensive suite of tools for automating Unity-related tasks. These tools simplify the workflow between SvelteKit and Unity, especially for WebGL builds.
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `unity:generate-schemas` | Generate C# classes from JSON schemas |
+| `unity:build-dev` | Build Unity project in development mode |
+| `unity:build-prod` | Build Unity project in production mode |
+| `unity:build-webgl-dev` | Build WebGL project in development mode |
+| `unity:build-webgl-prod` | Build WebGL project in production mode |
+| `unity:unbuild-webgl` | Copy files from build back to source (to preserve runtime changes) |
+| `unity:diff-webgl` | Show differences between build output and source files |
+| `unity:serve-webgl` | Serve the WebGL build locally for testing |
+| `unity:ci` | Run Unity CI build |
+| `unity:logs` | Check Unity logs for errors |
+| `unity:env` | Display Unity environment information |
+| `unity:list-versions` | List installed Unity versions |
+| `unity:deploy-webgl` | Deploy WebGL build to specified location |
+| `unity:build-and-deploy` | Build WebGL and deploy in one step |
+
+## Command Line Options
+
+All commands support these additional options:
+
+| Option | Description |
+|--------|-------------|
+| `--verbose` | Enable detailed output, including Unity environment discovery process |
+
+## Usage Examples
+
+### Basic Usage
+
+```bash
+# Build the WebGL project in production mode
+npm run unity:build-webgl
+
+# Show differences between build and source files
+npm run unity:diff-webgl
+
+# Copy runtime changes from build back to source
+npm run unity:unbuild-webgl
+```
+
+### With Verbose Output
+
+```bash
+# Run with verbose output
+npm run unity:generate-schemas -- --verbose
+```
+
+### Build and Deploy Workflow
+
+```bash
+# Full workflow - regenerate schemas, build, and deploy
+npm run unity:deploy-all
+```
+
+## Live Development Workflow
+
+The tools support a streamlined workflow for live development with Unity WebGL builds:
+
+1. **Build WebGL**: `npm run unity:build-webgl`
+   - This runs the Unity build process, which copies files from:
+     - `/CraftSpace/Unity/CraftSpace/Assets/WebGLTemplates/SpaceCraft` (HTML/JS template)
+     - `/CraftSpace/Unity/CraftSpace/Assets/StreamingAssets/Bridge` (Bridge integration)
+   - Into the build output directory: `/Unity/CraftSpace/Builds/SpaceCraft`
+
+2. **Serve and Test**: `npm run unity:serve-webgl`
+   - Serves the WebGL build locally for testing in your browser
+   - Allows live-coding by modifying the HTML and JavaScript files directly in the build directory
+   - Particularly useful for Bridge/JS development
+
+3. **Check Changes**: `npm run unity:diff-webgl`
+   - Shows differences between your modified build files and the source files
+   - Helps you identify what changes you've made during live coding
+
+4. **Preserve Changes**: `npm run unity:unbuild-webgl`
+   - Copies your changes from the .gitignored ephemeral build directory
+   - Places them back in their proper locations in the source directories
+   - Ensures your changes are saved in version control
+
+5. **Deploy to Website**: `npm run unity:deploy-webgl`
+   - Once you're satisfied with your changes, deploy the build to the WebSites directory
+   - This build will be automatically deployed when pushed to main via GitHub Actions
+
+This workflow is particularly valuable for Bridge/JS development, allowing you to iterate rapidly by modifying code directly in the browser and then preserving those changes in the source repository.
+
+### Why Two Source Locations?
+
+The separation between WebGLTemplates and StreamingAssets serves different purposes:
+- **WebGLTemplates/SpaceCraft**: Contains the HTML and top-level JS files specific to this template
+- **StreamingAssets/Bridge**: Contains Bridge integration files that are included in all builds
+
+This separation allows different WebGL templates to have modified versions of the wrapper HTML/JS while sharing the core Bridge functionality.
+
+## Environment Configuration
+
+The Unity automation tools automatically discover your Unity installation and project paths. You can override these with environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| UNITY_APP | Path to the Unity project (default: ../../Unity/CraftSpace) |
+| UNITY_VERSION | Specific Unity version to use |
+| UNITY_PATH | Direct path to Unity executable |
+| UNITY_PRECONFIGURED | Set to 'true' if running on a preconfigured CI runner |
+
+To check your current environment configuration:
+
+```bash
+npm run unity:env
+```

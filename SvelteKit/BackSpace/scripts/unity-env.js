@@ -26,10 +26,26 @@ import { PATHS } from '../src/lib/constants/paths.ts';
 
 /**
  * Discover Unity environment details
+ * @param {Object} options Configuration options
+ * @param {boolean} options.verbose Whether to output verbose logs (default: false)
  * @returns {Promise<Object>} Object containing Unity environment variables
  */
-export async function discoverUnityEnvironment() {
-  console.log('=== Unity Environment Discovery ===');
+export async function discoverUnityEnvironment(options = { verbose: false }) {
+  const { verbose = false } = options;
+  
+  const log = (message) => {
+    if (verbose) {
+      console.log(message);
+    }
+  };
+  
+  const warn = (message) => {
+    if (verbose) {
+      console.warn(message);
+    }
+  };
+  
+  log('=== Unity Environment Discovery ===');
   
   // Check if we're on a preconfigured runner
   const PRECONFIGURED = process.env.UNITY_PRECONFIGURED === 'true';
@@ -41,11 +57,11 @@ export async function discoverUnityEnvironment() {
   const unityAppBasePath = process.env.UNITY_APP || (PATHS?.UNITY_DIR || DEFAULT_UNITY_APP_PATH);
   const UNITY_PROJECT_PATH = path.resolve(unityAppBasePath);
   
-  console.log(`Using base path: ${unityAppBasePath}`);
-  console.log(`Resolved project path: ${UNITY_PROJECT_PATH}`);
+  log(`Using base path: ${unityAppBasePath}`);
+  log(`Resolved project path: ${UNITY_PROJECT_PATH}`);
   
   if (PRECONFIGURED) {
-    console.log('Running on preconfigured environment');
+    log('Running on preconfigured environment');
   }
 
   // Detect if project exists
@@ -60,39 +76,39 @@ export async function discoverUnityEnvironment() {
 
   // If preconfigured, respect provided environment variables and don't try to discover
   if (PRECONFIGURED) {
-    console.log('Using preconfigured Unity environment');
+    log('Using preconfigured Unity environment');
     
     // Set Unity version from environment or project
     if (process.env.UNITY_VERSION) {
       discoveredVersion = process.env.UNITY_VERSION;
-      console.log(`Using provided Unity version: ${discoveredVersion}`);
+      log(`Using provided Unity version: ${discoveredVersion}`);
     } else {
-      const projectVersion = readProjectVersion(UNITY_PROJECT_PATH);
+      const projectVersion = readProjectVersion(UNITY_PROJECT_PATH, verbose);
       if (projectVersion) {
         discoveredVersion = projectVersion;
-        console.log(`Using project Unity version: ${discoveredVersion}`);
+        log(`Using project Unity version: ${discoveredVersion}`);
       } else {
-        console.warn(`Warning: No Unity version specified and could not determine from project`);
+        warn(`Warning: No Unity version specified and could not determine from project`);
       }
     }
     
     // Set Unity path from environment or derive from version
     if (process.env.UNITY_PATH) {
       discoveredPath = process.env.UNITY_PATH;
-      console.log(`Using provided Unity path: ${discoveredPath}`);
+      log(`Using provided Unity path: ${discoveredPath}`);
     } else if (discoveredVersion) {
       // Try to construct path
-      discoveredPath = calculateUnityPath(discoveredVersion);
+      discoveredPath = calculateUnityPath(discoveredVersion, verbose);
     } 
     
     if (!discoveredPath) {
-      console.warn(`Warning: Could not determine Unity path in preconfigured environment.`);
+      warn(`Warning: Could not determine Unity path in preconfigured environment.`);
     }
   } else {
     // Discovery mode for non-preconfigured environments
-    versions = discoverUnityVersions();
+    versions = discoverUnityVersions(verbose);
     if (versions.length === 0) {
-      console.warn(`Warning: No Unity versions found on this system.`);
+      warn(`Warning: No Unity versions found on this system.`);
       return { 
         UNITY_PROJECT_FOUND: 'true',
         UNITY_APP: UNITY_PROJECT_PATH,
@@ -100,16 +116,16 @@ export async function discoverUnityEnvironment() {
       };
     }
     
-    console.log(`Found Unity versions: ${versions.join(', ')}`);
+    log(`Found Unity versions: ${versions.join(', ')}`);
     
     // Determine the correct Unity version to use
-    discoveredVersion = determineUnityVersion(versions, UNITY_PROJECT_PATH);
+    discoveredVersion = determineUnityVersion(versions, UNITY_PROJECT_PATH, verbose);
     if (discoveredVersion) {
-      console.log(`Selected Unity version: ${discoveredVersion}`);
+      log(`Selected Unity version: ${discoveredVersion}`);
       // Calculate the path to the Unity executable
-      discoveredPath = calculateUnityPath(discoveredVersion);
+      discoveredPath = calculateUnityPath(discoveredVersion, verbose);
       if (!discoveredPath) {
-        console.warn(`Warning: Could not determine Unity executable path for version ${discoveredVersion}`);
+        warn(`Warning: Could not determine Unity executable path for version ${discoveredVersion}`);
       }
     } else {
       console.error(`Error: Could not determine Unity version to use.`);
@@ -131,20 +147,28 @@ export async function discoverUnityEnvironment() {
     UNITY_VERSIONS_FOUND: versions ? versions.join(',') : ''
   };
 
-  console.log('=== Unity Environment Discovery Complete ===');
-  console.log(`  UNITY_PATH: ${envResult.UNITY_PATH || '(Not Found)'}`);
-  console.log(`  UNITY_VERSION: ${envResult.UNITY_VERSION || '(Not Found)'}`);
+  log('=== Unity Environment Discovery Complete ===');
+  log(`  UNITY_PATH: ${envResult.UNITY_PATH || '(Not Found)'}`);
+  log(`  UNITY_VERSION: ${envResult.UNITY_VERSION || '(Not Found)'}`);
 
   return envResult;
 }
 
 /**
  * Read the project version directly from ProjectSettings/ProjectVersion.txt
+ * @param {string} unityProjectPath Path to the Unity project
+ * @param {boolean} verbose Whether to output verbose logs (default: false)
  * @returns {string|null} Project version or null if not found
  */
-function readProjectVersion(unityProjectPath) {
+function readProjectVersion(unityProjectPath, verbose = false) {
+  const log = (message) => {
+    if (verbose) {
+      console.log(message);
+    }
+  };
+  
   const projectVersionPath = path.join(unityProjectPath, 'ProjectSettings/ProjectVersion.txt');
-  console.log(`Attempting to read project version from: ${projectVersionPath}`);
+  log(`Attempting to read project version from: ${projectVersionPath}`);
   if (fs.existsSync(projectVersionPath)) {
     try {
       const versionContent = fs.readFileSync(projectVersionPath, 'utf8');
@@ -163,9 +187,16 @@ function readProjectVersion(unityProjectPath) {
 
 /**
  * Discover installed Unity versions
+ * @param {boolean} verbose Whether to output verbose logs (default: false)
  * @returns {string[]} Array of installed Unity versions
  */
-function discoverUnityVersions() {
+function discoverUnityVersions(verbose = false) {
+  const log = (message) => {
+    if (verbose) {
+      console.log(message);
+    }
+  };
+  
   let hubPath = '';
   let checkedPaths = []; // Keep track of paths checked
 
@@ -195,14 +226,14 @@ function discoverUnityVersions() {
     if (fs.existsSync(linuxPath)) hubPath = linuxPath;
   }
   
-  console.log(`Checking for Unity Hub Editor installs in: ${checkedPaths.join(', ')}`);
+  log(`Checking for Unity Hub Editor installs in: ${checkedPaths.join(', ')}`);
 
   if (!hubPath) {
     console.warn(`Warning: Unity Hub installation directory not found in standard locations.`);
     return [];
   }
   
-  console.log(`Found Unity Hub Editor directory: ${hubPath}`);
+  log(`Found Unity Hub Editor directory: ${hubPath}`);
   try {
     // Get all directories in the Hub Editor path - these are the installed versions
     const versions = fs.readdirSync(hubPath, { withFileTypes: true })
@@ -237,16 +268,24 @@ function discoverUnityVersions() {
 /**
  * Determine the Unity version to use based on various criteria
  * @param {string[]} availableVersions List of available Unity versions
+ * @param {string} unityProjectPath Path to the Unity project
+ * @param {boolean} verbose Whether to output verbose logs (default: false)
  * @returns {string|null} The Unity version to use, or null if can't be determined
  */
-function determineUnityVersion(availableVersions, unityProjectPath) {
+function determineUnityVersion(availableVersions, unityProjectPath, verbose = false) {
+  const log = (message) => {
+    if (verbose) {
+      console.log(message);
+    }
+  };
+  
   // If UNITY_VERSION is already set in the environment, use that
   if (process.env.UNITY_VERSION) {
     const specifiedVersion = process.env.UNITY_VERSION;
     
     // Check if the specified version is available
     if (availableVersions.includes(specifiedVersion)) {
-      console.log(`Using specified Unity version: ${specifiedVersion}`);
+      log(`Using specified Unity version: ${specifiedVersion}`);
       return specifiedVersion;
     }
     
@@ -255,11 +294,11 @@ function determineUnityVersion(availableVersions, unityProjectPath) {
     const compatibleVersion = availableVersions.find(v => v.startsWith(majorMinor));
     
     if (compatibleVersion) {
-      console.warn(`Warning: Specified Unity version ${specifiedVersion} not found, using compatible: ${compatibleVersion}`);
+      log(`Warning: Specified Unity version ${specifiedVersion} not found, using compatible: ${compatibleVersion}`);
       return compatibleVersion;
     }
     
-    console.warn(`Warning: Specified Unity version ${specifiedVersion} not found, will try project version.`);
+    log(`Warning: Specified Unity version ${specifiedVersion} not found, will try project version.`);
   }
   
   // Try to detect the project's Unity version
@@ -271,11 +310,11 @@ function determineUnityVersion(availableVersions, unityProjectPath) {
       
       if (versionMatch && versionMatch[1]) {
         const projectVersion = versionMatch[1].trim();
-        console.log(`Project Unity version: ${projectVersion}`);
+        log(`Project Unity version: ${projectVersion}`);
         
         // Check if the project version is available
         if (availableVersions.includes(projectVersion)) {
-          console.log(`Using project's Unity version: ${projectVersion}`);
+          log(`Using project's Unity version: ${projectVersion}`);
           return projectVersion;
         }
         
@@ -284,23 +323,23 @@ function determineUnityVersion(availableVersions, unityProjectPath) {
         const compatibleVersion = availableVersions.find(v => v.startsWith(majorMinor));
         
         if (compatibleVersion) {
-          console.warn(`Warning: Project Unity version ${projectVersion} not found, using compatible: ${compatibleVersion}`);
+          log(`Warning: Project Unity version ${projectVersion} not found, using compatible: ${compatibleVersion}`);
           return compatibleVersion;
         }
         
-        console.warn(`Warning: Project Unity version ${projectVersion} not found, will use latest available.`);
+        log(`Warning: Project Unity version ${projectVersion} not found, will use latest available.`);
       }
     } catch (error) {
       console.error(`Error reading project version: ${error.message}`);
     }
   } else {
-    console.warn(`Warning: Project version file not found.`);
+    log(`Warning: Project version file not found.`);
   }
   
   // Default to the latest available version
   if (availableVersions.length > 0) {
     const latestVersion = availableVersions[0];
-    console.log(`Using latest available Unity version: ${latestVersion}`);
+    log(`Using latest available Unity version: ${latestVersion}`);
     return latestVersion;
   }
   
@@ -310,18 +349,25 @@ function determineUnityVersion(availableVersions, unityProjectPath) {
 /**
  * Calculate the path to the Unity executable based on version
  * @param {string} version Unity version
+ * @param {boolean} verbose Whether to output verbose logs (default: false)
  * @returns {string|null} Path to Unity executable or null if not found
  */
-function calculateUnityPath(version) {
+function calculateUnityPath(version, verbose = false) {
+  const log = (message) => {
+    if (verbose) {
+      console.log(message);
+    }
+  };
+  
   if (!version) return null;
   
   // If UNITY_PATH is already set, use that
   if (process.env.UNITY_PATH) {
-    console.log(`Using UNITY_PATH from environment: ${process.env.UNITY_PATH}`);
+    log(`Using UNITY_PATH from environment: ${process.env.UNITY_PATH}`);
     if (fs.existsSync(process.env.UNITY_PATH)) {
         return process.env.UNITY_PATH;
     } else {
-        console.warn(`Warning: Provided UNITY_PATH (${process.env.UNITY_PATH}) does not exist. Will attempt discovery.`);
+        log(`Warning: Provided UNITY_PATH (${process.env.UNITY_PATH}) does not exist. Will attempt discovery.`);
     }
   }
   
@@ -335,11 +381,11 @@ function calculateUnityPath(version) {
     const systemHubPath = `/Applications/Unity/Hub/Editor/${version}/Unity.app/Contents/MacOS/Unity`;
     pathsToCheck.push(userHubPath, systemHubPath);
 
-    console.log(`Checking for Unity executable at user path: ${userHubPath}`);
+    log(`Checking for Unity executable at user path: ${userHubPath}`);
     if (fs.existsSync(userHubPath)) {
       unityPath = userHubPath;
     } else {
-      console.log(`Not found at user path. Checking system path: ${systemHubPath}`);
+      log(`Not found at user path. Checking system path: ${systemHubPath}`);
       if (fs.existsSync(systemHubPath)) {
           unityPath = systemHubPath;
       }
@@ -351,11 +397,11 @@ function calculateUnityPath(version) {
     const appDataPath = path.join(os.homedir(), `AppData\\Roaming\\Unity\\Hub\\Editor\\${version}\\Editor\\Unity.exe`);
     pathsToCheck.push(programFilesPath, appDataPath);
     
-    console.log(`Checking for Unity executable at Program Files path: ${programFilesPath}`);
+    log(`Checking for Unity executable at Program Files path: ${programFilesPath}`);
     if (fs.existsSync(programFilesPath)) {
       unityPath = programFilesPath;
     } else {
-      console.log(`Not found at Program Files path. Checking AppData path: ${appDataPath}`);
+      log(`Not found at Program Files path. Checking AppData path: ${appDataPath}`);
       if (fs.existsSync(appDataPath)) {
            unityPath = appDataPath;
       }
@@ -364,7 +410,7 @@ function calculateUnityPath(version) {
     // Linux
     const linuxPath = path.join(os.homedir(), `.config/Unity/Hub/Editor/${version}/Editor/Unity`);
     pathsToCheck.push(linuxPath);
-    console.log(`Checking for Unity executable at Linux path: ${linuxPath}`);
+    log(`Checking for Unity executable at Linux path: ${linuxPath}`);
     if (fs.existsSync(linuxPath)) {
         unityPath = linuxPath;
     }
@@ -372,11 +418,11 @@ function calculateUnityPath(version) {
   
   // Verify the final path exists
   if (unityPath) {
-    console.log(`Determined Unity path: ${unityPath}`);
+    log(`Determined Unity path: ${unityPath}`);
     return unityPath;
   } 
   
-  console.warn(`Warning: Could not find valid Unity executable path for version ${version} after checking: ${pathsToCheck.join(', ')}`);
+  log(`Warning: Could not find valid Unity executable path for version ${version} after checking: ${pathsToCheck.join(', ')}`);
   return null;
 }
 

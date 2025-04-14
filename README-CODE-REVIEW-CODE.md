@@ -222,7 +222,7 @@ See the main [Project Code and Documentation Review](./README-CODE-REVIEW.md) fi
 ### Area 9: `Unity/CraftSpace/Assets/Plugins/` (Native Plugins)
 
 *   **Overview**: Contains native code plugins or JavaScript libraries for WebGL interaction.
-*   **`WebGL/UnityJS.jslib`**:
+*   **`WebGL/bridge.jslib`**:
     *   **Purpose**: Implements the JavaScript side of the Unity <-> JS bridge for WebGL, using Unity's `LibraryManager`.
     *   **Functionality**: Defines JS functions callable from C# via `[DllImport("__Internal")]` (`SendMessageToUnity`), receives messages from JS via `Module.SendMessage`, initializes communication, manages message queues, handles JSON, interacts with browser APIs, and likely implements interest registration (`RegisterInterest`, etc.).
     *   **Role**: Low-level communication channel enabling JS-first architecture.

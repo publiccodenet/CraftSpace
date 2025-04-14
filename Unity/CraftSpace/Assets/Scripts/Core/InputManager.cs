@@ -3,13 +3,12 @@ using System;
 using System.Collections.Generic;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.Events;
 
 /// <summary>
 /// Handles camera panning, zooming, physics-based movement, and item selection.
 /// Relies on an assigned CameraController to access the camera and its rig.
 /// </summary>
-public class InputManager : MonoBehaviour
+public class InputManager : BridgeObject
 {
     [Header("Camera Control References")]
     public CameraController cameraController; // Reference to the controller managing the camera
@@ -23,21 +22,22 @@ public class InputManager : MonoBehaviour
     public bool invertDrag = false;
 
     [Header("Zoom Settings")]
-    public float zoomSpeed = 1f;
     public float minZoom = 0.1f;
     public float maxZoom = 100f;
-    public float keyboardZoomSpeed = 5f;
+    public float scrollWheelZoomFactor = 1f;
+    public float keyboardZoomFactor = 5f;
+    public float navigatorZoomFactor = 1f;
 
     [Header("Physics Settings")]
     public float baseVelocityThreshold = 0.2f;
     public float velocitySmoothingFactor = 0.1f;
     public float frictionFactor = 0.999f;
-    public float bounceFactor = 0.9f;
+    public float bounceFactor = 0.9f; 
+    public float navigatorVelocityFactor = 1f;
 
     [Header("UI References")]
     public ItemInfoPanel itemInfoPanel;
     public LayerMask itemLayer;
-    public TextMeshProUGUI infoText;
     public CollectionDisplay collectionDisplay;
 
     [Header("UI Settings")]
@@ -45,12 +45,9 @@ public class InputManager : MonoBehaviour
     
     [Header("Selection Settings")]
     public float maxSelectionDistance = 100f;
-    
-    // Selection events
-    public UnityEvent<ItemView> OnItemSelected = new UnityEvent<ItemView>();
-    public UnityEvent<ItemView> OnItemDeselected = new UnityEvent<ItemView>();
-    public UnityEvent<ItemView> OnItemHoverStart = new UnityEvent<ItemView>();
-    public UnityEvent<ItemView> OnItemHoverEnd = new UnityEvent<ItemView>();
+    public float selectMaxClickDistance = 0.1f; // Max movement allowed for a click to be considered a selection
+    public float selectMaxClickTime = 0.3f; // Max time between press and release for a click to be considered a selection
+    public bool multiSelect = false; // Whether multiple items can be selected simultaneously
 
     // State variables
     // Runtime state that changes during execution
@@ -60,11 +57,14 @@ public class InputManager : MonoBehaviour
     private Vector3 filteredVelocity = Vector3.zero;
     private bool physicsEnabled = true;
     private float lastDragTime;
+    private Vector3 dragStartPosition; // Store position where drag started
+    private Vector3 dragStartWorldPos; // Store world position where drag started
+    private ItemView itemAtDragStart; // Store which item (if any) was under the cursor when drag started
     
-    // Item tracking state - made public so it's visible in inspector
-    public ItemView hoveredItem;
-    public ItemView currentHighlightedItem;
-    public ItemView selectedItem;
+    // Item tracking state - for input tracking only
+    private ItemView hoveredItem; // Used to track which item the mouse is currently over
+
+    private SpaceShipBridge spaceShip; // Reference to the SpaceShipBridge
 
     private void Start()
     {
@@ -88,6 +88,15 @@ public class InputManager : MonoBehaviour
             enabled = false;
             return;
         }
+        
+        // Get the SpaceShipBridge reference
+        spaceShip = GetComponent<SpaceShipBridge>();
+        if (spaceShip == null)
+        {
+            Debug.LogError("InputManager: No SpaceShipBridge found on the same GameObject. Required for selection functionality.");
+            enabled = false;
+            return;
+        }
     }
 
     private void Update()
@@ -95,42 +104,50 @@ public class InputManager : MonoBehaviour
         // Only handle input capture in Update
         HandleInput();
         UpdateHoveredItem();
-        
-        // Handle selection clicks - COMMENTED OUT TEMPORARILY
-        /*
-        if (Input.GetMouseButtonDown(0) && hoveredItem != null && hoveredItem != selectedItem)
-        {
-            SelectItem(hoveredItem);
-        }
-        else if (Input.GetMouseButtonDown(0) && hoveredItem == null && selectedItem != null)
-        {
-            DeselectItem();
-        }
-        */
     }
 
     private void HandleInput()
     {
         if (Input.GetMouseButtonDown(0))
         {
-            // Start dragging regardless of hover state - MODIFIED
-            // if (hoveredItem == null) 
-            // {
+            // Start dragging regardless of hover state
             isDragging = true;
             previousMousePosition = Input.mousePosition;
+            dragStartPosition = Input.mousePosition;
+            dragStartWorldPos = GetMouseWorldPosition();
             lastDragTime = Time.realtimeSinceStartup;
             physicsEnabled = false;
             cameraVelocity = Vector3.zero;
-            // }
+            
+            // Store the item that was under the cursor when we started dragging (if any)
+            itemAtDragStart = hoveredItem;
         }
         else if (Input.GetMouseButtonUp(0))
         {
+            bool wasDragging = isDragging;
             isDragging = false;
-            if (filteredVelocity.magnitude > GetScaledVelocityThreshold())
+            
+            if (wasDragging)
             {
-                cameraVelocity = filteredVelocity;
-                physicsEnabled = true;
+                float dragDistance = Vector3.Distance(dragStartWorldPos, GetMouseWorldPosition());
+                float dragTime = Time.realtimeSinceStartup - lastDragTime;
+                
+                // Check if this was a click (small movement, short time) on an item
+                if (dragDistance < selectMaxClickDistance && dragTime < selectMaxClickTime && itemAtDragStart != null && itemAtDragStart.Model != null)
+                {
+                    // This was a click on an item, not a drag - toggle its selection state
+                    spaceShip.ToggleItemSelection(itemAtDragStart.Model.Id);
+                }
+                else if (filteredVelocity.magnitude > GetScaledVelocityThreshold())
+                {
+                    // This was a drag with enough momentum to start physics movement
+                    cameraVelocity = filteredVelocity;
+                    physicsEnabled = true;
+                }
             }
+            
+            // Clear the stored item
+            itemAtDragStart = null;
         }
         
         // Handle active dragging AND velocity calculation in ONE place
@@ -145,7 +162,9 @@ public class InputManager : MonoBehaviour
                 Vector3 oldWorldPos = GetMouseWorldPosition(previousMousePosition);
                 Vector3 newWorldPos = GetMouseWorldPosition(Input.mousePosition);
                 Vector3 worldDelta = oldWorldPos - newWorldPos;  // Direction matches camera movement
-                
+
+                //Debug.Log("InputManager: HandleInput: oldWorldPos: " + oldWorldPos.x + " " + oldWorldPos.y + " " + oldWorldPos.z + " newWorldPos: " + newWorldPos.x + " " + newWorldPos.y + " " + newWorldPos.z + " worldDelta: " + worldDelta.x + " " + worldDelta.y + " " + worldDelta.z);
+
                 // Apply inversion if needed
                 if (invertDrag)
                 {
@@ -160,10 +179,15 @@ public class InputManager : MonoBehaviour
                 Vector3 instantVelocity = worldDelta / deltaTime;
                 filteredVelocity = Vector3.Lerp(filteredVelocity, instantVelocity, velocitySmoothingFactor);
                 
+                //Debug.Log("camera position: " + cameraController.cameraRig.position.x + " " + cameraController.cameraRig.position.y + " " + cameraController.cameraRig.position.z);
+
                 // Move camera rig via CameraController
                 Vector3 newPosition = cameraController.cameraRig.position + worldDelta;
                 newPosition.x = Mathf.Clamp(newPosition.x, minX, maxX);
                 newPosition.z = Mathf.Clamp(newPosition.z, minZ, maxZ);
+
+                //Debug.Log("newPosition: " + newPosition.x + " " + newPosition.y + " " + newPosition.z);
+
                 cameraController.cameraRig.position = newPosition;
             }
         }
@@ -265,7 +289,7 @@ public class InputManager : MonoBehaviour
         if (scrollAmount != 0)
         {
             // Use the camera from the cameraController for calculations
-            ApplyZoomAroundCursor(-scrollAmount * zoomSpeed * cameraController.controlledCamera.orthographicSize);
+            ApplyZoomAroundCursor(-scrollAmount * scrollWheelZoomFactor * cameraController.controlledCamera.orthographicSize);
         }
 
         // Keyboard zoom
@@ -275,7 +299,7 @@ public class InputManager : MonoBehaviour
         
         if (keyboardZoomInput != 0)
         {
-            float zoomAmount = keyboardZoomInput * keyboardZoomSpeed * Time.deltaTime;
+            float zoomAmount = keyboardZoomInput * keyboardZoomFactor * Time.deltaTime;
             ApplyZoomAroundCursor(zoomAmount);
         }
     }
@@ -370,6 +394,9 @@ public class InputManager : MonoBehaviour
 
     private void UpdateHoveredItem()
     {
+        if (cameraController == null || cameraController.controlledCamera == null || spaceShip == null)
+            return;
+        
         Ray ray = cameraController.controlledCamera.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
         float sphereRadius = 0.05f; // Small radius for the sphere cast
@@ -380,38 +407,19 @@ public class InputManager : MonoBehaviour
             ItemView itemView = hit.collider.GetComponentInParent<ItemView>();
             if (itemView != null && itemView.Model != null)
             {
-                // Only update the UI if we hover over a new item
+                // Only update if we hover over a new item
                 if (hoveredItem != itemView)
                 {
-                    // Fire hover end for previous item
-                    if (hoveredItem != null)
+                    // End hover for previous item
+                    if (hoveredItem != null && hoveredItem.Model != null)
                     {
-                        // Debug.Log($"[InputManager] Invoking OnItemHoverEnd for: {hoveredItem.Model?.Title ?? "NULL"}"); // REMOVED
-                        OnItemHoverEnd?.Invoke(hoveredItem);
+                        spaceShip.RemoveHighlightedItem(hoveredItem.Model.Id);
                     }
                     
                     hoveredItem = itemView;
                     
-                    // Fire hover start
-                    // Debug.Log($"[InputManager] Invoking OnItemHoverStart for: {hoveredItem.Model?.Title ?? "NULL"}"); // REMOVED
-                    OnItemHoverStart?.Invoke(hoveredItem);
-                }
-                
-                // Highlight the item if it's not already highlighted
-                if (currentHighlightedItem != itemView)
-                {
-                    // Remove highlight from previous item if not selected
-                    if (currentHighlightedItem != null && currentHighlightedItem != selectedItem)
-                    {
-                        currentHighlightedItem.SetHighlighted(false);
-                    }
-                    
-                    // Highlight new item if not selected (selection takes priority)
-                    currentHighlightedItem = itemView;
-                    if (currentHighlightedItem != selectedItem)
-                    {
-                        currentHighlightedItem.SetHighlighted(true);
-                    }
+                    // Start hover for new item
+                    spaceShip.AddHighlightedItem(hoveredItem.Model.Id);
                 }
             }
             else
@@ -427,59 +435,57 @@ public class InputManager : MonoBehaviour
     
     private void ClearItemState()
     {
-        if (hoveredItem != null)
+        if (hoveredItem != null && hoveredItem.Model != null)
         {
-            // Debug.Log($"[InputManager] Clearing hover state, Invoking OnItemHoverEnd for: {hoveredItem.Model?.Title ?? "NULL"}"); // REMOVED
-            OnItemHoverEnd?.Invoke(hoveredItem);
+            spaceShip.RemoveHighlightedItem(hoveredItem.Model.Id);
             hoveredItem = null;
         }
-        
-        if (currentHighlightedItem != null && currentHighlightedItem != selectedItem)
-        {
-            currentHighlightedItem.SetHighlighted(false);
-            currentHighlightedItem = null;
-        }
     }
     
-    // Selection methods
-    public void SelectItem(ItemView itemView)
+    // Helper to find an ItemView by its Model ID
+    public ItemView FindItemViewById(string id)
     {
-        // Don't reselect same item
-        if (selectedItem == itemView)
-            return;
-            
-        // Deselect current item if exists
-        if (selectedItem != null)
+        // Check the current highlighted items first for efficiency
+        if (hoveredItem != null && hoveredItem.Model != null && hoveredItem.Model.Id == id)
         {
-            DeselectItem();
+            return hoveredItem;
         }
         
-        // Set new selection
-        selectedItem = itemView;
-        selectedItem.SetSelected(true);
-        OnItemSelected?.Invoke(selectedItem);
-    }
-    
-    public void DeselectItem()
-    {
-        if (selectedItem != null)
+        // If not found in the quick checks, find it in the scene
+        // Use FindObjectsByType instead of FindObjectsOfType - faster when results don't need to be sorted
+        ItemView[] allItemViews = FindObjectsByType<ItemView>(FindObjectsSortMode.None);
+        foreach (var itemView in allItemViews)
         {
-            selectedItem.SetSelected(false);
-            
-            // If this was also the hovered item, reapply hover effect
-            if (hoveredItem == selectedItem || currentHighlightedItem == selectedItem)
+            if (itemView.Model != null && itemView.Model.Id == id)
             {
-                selectedItem.SetHighlighted(true);
+                return itemView;
             }
-            
-            OnItemDeselected?.Invoke(selectedItem);
-            selectedItem = null;
         }
+        
+        return null;
     }
-    
-    // Get currently selected item
-    public ItemView GetSelectedItem()
+
+    public void PushCameraPosition(float dx, float dz)
     {
-        return selectedItem;
+        Debug.Log("InputManager: PushCameraPosition: " + dx + " " + dz);
+        Vector3 newPosition = cameraController.cameraRig.position + new Vector3(dx, 0, dz);
+        cameraController.cameraRig.position = newPosition;
     }
-} 
+
+    public void PushCameraVelocity(float dx, float dz)
+    {
+        Debug.Log("InputManager: PushCameraVelocity: " + dx + " " + dz);
+        cameraVelocity += new Vector3(dx, 0, dz) * navigatorVelocityFactor;
+    }
+
+    public void PushCameraZoom(float zoomFactor)
+    {
+        Debug.Log("InputManager: PushCameraZoom: " + zoomFactor);
+        float scaledZoomFactor = zoomFactor * navigatorZoomFactor;
+        float newSize = Mathf.Clamp(
+            cameraController.controlledCamera.orthographicSize + scaledZoomFactor, 
+            minZoom, 
+            maxZoom);
+        cameraController.controlledCamera.orthographicSize = newSize;
+    }
+}

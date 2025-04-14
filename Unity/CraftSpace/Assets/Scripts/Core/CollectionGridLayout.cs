@@ -55,12 +55,14 @@ public class CollectionGridLayout : MonoBehaviour
         initialized = true;
     }
 
-    private void OnDestroy()
+    public void OnDestroy()
     {
         if (collectionView != null)
         {
             collectionView.ModelUpdated -= OnModelUpdated;
         }
+
+        //base.OnDestroy();
     }
 
     private void OnValidate()

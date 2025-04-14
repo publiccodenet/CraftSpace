@@ -8,7 +8,7 @@ public class ItemInfoPanel : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI _infoText;
 
-    public void UpdateInfo(string title)
+    public void ShowInfo(string title)
     {
         if (_infoText != null)
         {
@@ -16,7 +16,7 @@ public class ItemInfoPanel : MonoBehaviour
         }
     }
 
-    public void Clear()
+    public void ClearInfo()
     {
         if (_infoText != null)
         {

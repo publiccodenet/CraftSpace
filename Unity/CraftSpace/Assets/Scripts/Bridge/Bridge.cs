@@ -69,7 +69,7 @@ public class Bridge : MonoBehaviour {
 
     public void Awake()
     {
-        //Debug.Log("Bridge: Awake: this: " + this + " bridge: " +  ((bridge == null) ? "null" : ("" + bridge)) + " enabled: " + this.enabled);
+        Debug.Log("Bridge: Awake: this: " + this + " bridge: " +  ((bridge == null) ? "null" : ("" + bridge)) + " enabled: " + this.enabled);
 
         if (bridge == null) {
             bridge = this;
@@ -97,12 +97,13 @@ public class Bridge : MonoBehaviour {
 
     public void Start()
     {
-        //Debug.Log("Bridge: Start: this: " + this + " bridge: " +  ((bridge == null) ? "null" : ("" + bridge)) + " enabled: " + this.enabled);
+        Debug.Log("Bridge: Start: this: " + this + " bridge: " +  ((bridge == null) ? "null" : ("" + bridge)) + " enabled: " + this.enabled);
 
 #if !UNITY_EDITOR && UNITY_WEBGL
         // Ensure WebGL input doesn't capture everything if running in browser
         // Use explicit namespace to resolve potential build issues
-        UnityEngine.WebGLInput.captureAllKeyboardInput = false;
+        UnityEngine.WebGLInput.captureAllKeyboardInput = true;
+        //UnityEngine.WebGLInput.captureAllKeyboardInput = false;
 #endif
 
         StartBridge();
@@ -111,7 +112,7 @@ public class Bridge : MonoBehaviour {
 
     public void OnDestroy()
     {
-        //Debug.Log("Bridge: OnDestroy: this: " + this + " bridge: " +  ((bridge == null) ? "null" : ("" + bridge)) + " enabled: " + this.enabled);
+        Debug.Log("Bridge: OnDestroy: this: " + this + " bridge: " +  ((bridge == null) ? "null" : ("" + bridge)) + " enabled: " + this.enabled);
 
         if (bridge == this) {
             bridge = null;
@@ -153,18 +154,18 @@ public class Bridge : MonoBehaviour {
             CreateTransport();
         }
 
-        //Debug.Log("Bridge: StartTransport: initializing transport: this: " + this);
+        Debug.Log("Bridge: StartTransport: initializing transport: this: " + this);
         transport.Init(this);
 
-        //Debug.Log("Bridge: StartTransport: starting transport");
+        Debug.Log("Bridge: StartTransport: starting transport");
         transport.StartTransport();
-        //Debug.Log("Bridge: StartTransport: started transport");
+        Debug.Log("Bridge: StartTransport: started transport");
     }
 
     
     public void CreateTransport()
     {
-        //Debug.Log("Bridge: CreateTransport");
+        Debug.Log("Bridge: CreateTransport");
 
         if (transport != null) {
             Debug.LogError("Bridge: CreateTransport: called multiple times!");
@@ -183,7 +184,8 @@ public class Bridge : MonoBehaviour {
             #if USE_WEBVIEW
                 transport = gameObject.AddComponent<BridgeTransportWebView>();
             #else
-                transport = gameObject.AddComponent<BridgeTransportWebServer>();
+                // Default for Editor if others aren't defined - USE NULL TRANSPORT
+                transport = gameObject.AddComponent<BridgeTransportNull>(); 
             #endif
 #endif
 #if USE_SOCKETIO
@@ -201,7 +203,8 @@ public class Bridge : MonoBehaviour {
     #if USE_WEBVIEW
         transport = gameObject.AddComponent<BridgeTransportWebView>();
     #else
-        transport = gameObject.AddComponent<BridgeTransportWebServer>();
+        // Default for other builds if not WebGL/WebView/SocketIO
+        transport = gameObject.AddComponent<BridgeTransportNull>(); 
     #endif
     #if USE_SOCKETIO
         }
@@ -209,7 +212,7 @@ public class Bridge : MonoBehaviour {
 #endif
 #endif
 
-        //Debug.Log("Bridge: CreateTransport: created transport: " + transport);
+        Debug.Log("Bridge: CreateTransport: created transport: " + transport);
         
     }
 
@@ -227,7 +230,7 @@ public class Bridge : MonoBehaviour {
 
     public void HandleTransportStarted()
     {
-        //Debug.Log("Bridge: HandleTransportStarted: this: " + this);
+        Debug.Log("Bridge: HandleTransportStarted: this: " + this);
 
         string js = "";
 
@@ -259,27 +262,33 @@ public class Bridge : MonoBehaviour {
             JsonConvert.ToString(configuration) + 
             "); ";
 
-        //Debug.Log("Bridge: HandleTransportStarted: EvaluateJS: " + js);
+        Debug.Log("Bridge: HandleTransportStarted: EvaluateJS: " + js);
 
+        // Wrap the EvaluateJS call for bridge.start() so it doesn't run in WebGL builds.
+#if !UNITY_WEBGL
         transport.EvaluateJS(js);
+#else
+        // For WebGL, JS side will call bridge.start() after instance creation.
+        // Debug.Log("Bridge: HandleTransportStarted: WebGL build - Skipping EvaluateJS for bridge.start(). JS will initiate.");
+#endif
 
         JObject ev = new JObject();
         ev.Add("event", "StartedUnity");
 
-        //Debug.Log("Bridge: HandleTransportStarted: sending StartedUnity ev: " + ev);
+        Debug.Log("Bridge: HandleTransportStarted: sending StartedUnity ev: " + ev);
         SendEvent(ev);
     }
 
 
     public void HandleTransportStopped()
     {
-        //Debug.Log("Bridge: HandleTransportStopped: this: " + this);
+        Debug.Log("Bridge: HandleTransportStopped: this: " + this);
     }
 
 
     public void SendEvent(JObject ev)
     {
-        //Debug.Log("Bridge: SendEvent: ev: " + ev);
+        Debug.Log("Bridge: SendEvent: ev: " + ev);
 
         string evString = ev.ToString();
 
@@ -303,12 +312,12 @@ public class Bridge : MonoBehaviour {
         }
 
         string json = "[" + evListString + "]";
-        //Debug.Log("Bridge: DistributeUnityEvents: json:\n" + json);
+        Debug.Log("Bridge: DistributeUnityEvents: json:\n" + json);
 
         JArray evList = JArray.Parse(json);
-        //Debug.Log("Bridge: DistributeUnityEvents: evList: " + evList);
+        Debug.Log("Bridge: DistributeUnityEvents: evList: " + evList);
 
-        //Debug.Log("Bridge: DistributeUnityEvents: evList.Count: " + evList.Count + " json.Length: " + json.Length);
+        Debug.Log("Bridge: DistributeUnityEvents: evList.Count: " + evList.Count + " json.Length: " + json.Length);
 
         foreach (JObject ev in evList) {
             DistributeUnityEvent(ev);
@@ -325,7 +334,7 @@ public class Bridge : MonoBehaviour {
             return;
         }
 
-        //Debug.Log("Bridge: DistributeUnityEvent: eventName: " + eventName + " ev: " + ev);
+        Debug.Log("Bridge: DistributeUnityEvent: eventName: " + eventName + " ev: " + ev);
 
         switch (eventName) {
 
@@ -362,7 +371,7 @@ public class Bridge : MonoBehaviour {
 
     public void HandleStartedBridge(JObject ev)
     {
-        //Debug.Log("Bridge: DistributeUnityEvent: StartedBridge: " + ev);
+        Debug.Log("Bridge: DistributeUnityEvent: StartedBridge: " + ev);
         startedBridge = true;
     }
     
@@ -389,20 +398,20 @@ public class Bridge : MonoBehaviour {
         JObject interests = data.GetObject("interests");
         JArray postEvents = data.GetArray("postEvents");
 
-        //Debug.Log("Bridge: HandleCreate: id: " + id + " prefab: " + prefab + " component: " + component + " preEvents: " + preEvents + " parent: " + parent + " worldPositionStay: " + worldPositionStays + " update: " + update + " interests: " + interests + " postEvents: " + postEvents);
+        Debug.Log("Bridge: HandleCreate: id: " + id + " prefab: " + prefab + " component: " + component + " preEvents: " + preEvents + " parent: " + parent + " worldPositionStay: " + worldPositionStays + " update: " + update + " interests: " + interests + " postEvents: " + postEvents);
 
         GameObject instance = null;
         if (string.IsNullOrEmpty(prefab)) {
             instance = new GameObject();
         } else {
             GameObject prefabObject = Resources.Load<GameObject>(prefab);
-            //Debug.Log("Bridge: HandleCreate: prefab: " + prefab + " prefabObject: " + prefabObject);
+            Debug.Log("Bridge: HandleCreate: prefab: " + prefab + " prefabObject: " + prefabObject);
             if (prefabObject == null) {
                 Debug.LogError("Bridge: HandleCreate: Can't find prefab: " + prefab);
                 return;
             }
             instance = Instantiate(prefabObject);
-            //Debug.Log("Bridge: HandleCreate: instance: " + instance);
+            Debug.Log("Bridge: HandleCreate: instance: " + instance);
             if (instance == null) {
                 Debug.LogError("Bridge: HandleCreate: Can't instantiate prefab: " + prefab + " prefabObject: " + prefabObject);
                 return;
@@ -453,14 +462,14 @@ public class Bridge : MonoBehaviour {
         objectToID[bridgeObject] = id;
         idToObject[id] = bridgeObject;
 
-        //Debug.Log("Bridge: HandleCreate: created, position: " + bridgeObject.transform.position.x + " " + bridgeObject.transform.position.y + " " + bridgeObject.transform.position.z + " bridgeObject: " + bridgeObject, bridgeObject);
+        Debug.Log("Bridge: HandleCreate: created, position: " + bridgeObject.transform.position.x + " " + bridgeObject.transform.position.y + " " + bridgeObject.transform.position.z + " bridgeObject: " + bridgeObject, bridgeObject);
 
         if (preEvents != null) {
             bridgeObject.HandleEvents(preEvents);
         }
 
         if (!String.IsNullOrEmpty(parent)) {
-            //Debug.Log("BridgeObject: HandleCreate: parent: bridgeObject: " + bridgeObject + " parent: " + parent);
+            Debug.Log("BridgeObject: HandleCreate: parent: bridgeObject: " + bridgeObject + " parent: " + parent);
 
             Accessor accessor = null;
             if (!Accessor.FindAccessor(
@@ -514,7 +523,7 @@ public class Bridge : MonoBehaviour {
             bridgeObject.HandleEvents(postEvents);
         }
 
-        //Debug.Log("Bridge: HandleCreate: done, position: " + bridgeObject.transform.position.x + " " + bridgeObject.transform.position.y + " " + bridgeObject.transform.position.z + " bridgeObject: " + bridgeObject);
+        Debug.Log("Bridge: HandleCreate: done, position: " + bridgeObject.transform.position.x + " " + bridgeObject.transform.position.y + " " + bridgeObject.transform.position.z + " bridgeObject: " + bridgeObject);
     }
     
 
@@ -523,7 +532,7 @@ public class Bridge : MonoBehaviour {
         JObject data = ev["data"] as JObject;
         JObject query = (JObject)data["query"];
         string callbackID = (string)data["callbackID"];
-        //Debug.Log("Bridge: HandleQuery: dataObject: " + dataObject + " query: " + query + " callbackID: " + callbackID + " bridge: " + bridge);
+        Debug.Log("Bridge: HandleQuery: data: " + data + " query: " + query + " callbackID: " + callbackID + " bridge: " + bridge);
 
         JToken idToken = ev["id"];
         string idString = idToken.IsString() ? (string)idToken : null;
@@ -540,14 +549,14 @@ public class Bridge : MonoBehaviour {
         for (int i = 0, n = isSingle ? 1 : idArray.ArrayLength(); i < n; i++) {
             string id = isSingle ? idString : (string)idArray[i];
             if (id == null) {
-                //Debug.Log("Bridge: HandleQuery: empty id!");
+                Debug.Log("Bridge: HandleQuery: empty id!");
                 continue;
             }
 
-            //Debug.Log("Bridge: HandleQuery: id: " + id + " ev: " + ev);
+            Debug.Log("Bridge: HandleQuery: id: " + id + " ev: " + ev);
 
             if (string.IsNullOrEmpty(id)) {
-                Debug.LogError("Bridge: HandleQuery: undefined id on eventName: Query ev: " + ev);
+                Debug.LogError("Bridge: HandleQuery: undefined id on eventName: Query id: " + id + " ev: " + ev);
                 continue;
             }
 
@@ -557,7 +566,7 @@ public class Bridge : MonoBehaviour {
             }
 
             object obj = idToObject[id];
-            //Debug.Log("Bridge: HandleQuery: obj: " + obj);
+            Debug.Log("Bridge: HandleQuery: obj: " + obj);
 
 #if false
             BridgeObject bridgeObject = obj as BridgeObject;
@@ -572,7 +581,7 @@ public class Bridge : MonoBehaviour {
             JObject queryResult = new JObject();
             AddQueryData(obj, query, queryResult);
 
-            //Debug.Log("Bridge: QueryData: queryResult: " + queryResult);
+            Debug.Log("Bridge: QueryData: queryResult: " + queryResult);
 
             queryResults.Add(queryResult);
         }
@@ -588,7 +597,7 @@ public class Bridge : MonoBehaviour {
     {
         string eventName = (string)ev["event"];
         string id = (string)ev["id"];
-        //Debug.Log("Bridge: HandleDefaultEvent: id: " + id + " ev: " + ev);
+        Debug.Log("Bridge: HandleDefaultEvent: id: " + id + " ev: " + ev);
 
         if (string.IsNullOrEmpty(id)) {
             Debug.LogError("Bridge: HandleDefaultEvent: undefined id on eventName: " + eventName + " ev: " + ev);
@@ -601,9 +610,10 @@ public class Bridge : MonoBehaviour {
         }
 
         object obj = idToObject[id];
-        //Debug.Log("Bridge: HandleDefaultEvent: obj: " + obj);
 
         BridgeObject bridgeObject = obj as BridgeObject;
+
+        Debug.Log("Bridge: HandleDefaultEvent: id: " + id + " obj: " + obj + " type:" + obj.GetType().ToString() + " bridgeObject: " + bridgeObject + " bridge: " + bridge.ToString());
 
         if (bridgeObject == null) {
             Debug.LogError("Bridge: HandleDefaultEvent: tried to send eventName: " + eventName + " to non-BridgeObject obj: " + obj + " id: " + id + " ev: " + ev);
@@ -618,7 +628,7 @@ public class Bridge : MonoBehaviour {
     {
         string js = "bridge.boot();";
 
-        //Debug.Log("Bridge: Boot: destroying objects");
+        Debug.Log("Bridge: Boot: destroying objects");
 
         restarting = true;
 
@@ -640,7 +650,7 @@ public class Bridge : MonoBehaviour {
 
             var obj = idToObject[objectID];
 
-            //Debug.Log("Bridge: Boot: HardBoot: destroying object: " + objectID + " obj: " + obj);
+            Debug.Log("Bridge: Boot: HardBoot: destroying object: " + objectID + " obj: " + obj);
 
             DestroyObject(obj);
         }
@@ -649,6 +659,8 @@ public class Bridge : MonoBehaviour {
         objectToID = new Dictionary<object, string>();
         idToObject["bridge"] = this;
         objectToID[this] = "bridge";
+
+        Debug.Log("Bridge: Boot: set global bridge: " + bridge);
 
         textureChannels = new Dictionary<string, TextureChannelDelegate>();
 
@@ -659,11 +671,8 @@ public class Bridge : MonoBehaviour {
         objectToID = new Dictionary<object, string>();
         startedBridge = false;
 
-        //Debug.Log("Bridge: HardBoot: calling HandleTranportStarted");
-        HandleTransportStarted();
-
-        //Debug.Log("Bridge: Boot: transport: " + transport + " calling EvaluateJS: " + js);
-        transport.EvaluateJS(js);
+        Debug.Log("Bridge: Boot: transport: " + transport + " NOT calling EvaluateJS: " + js);
+        // transport.EvaluateJS(js); // This line doesn't belong here anyway
     }
 
 
@@ -698,7 +707,7 @@ public class Bridge : MonoBehaviour {
     {
         BridgeObject bridgeObject = obj as BridgeObject;
 
-        //Debug.Log("Bridge: DestroyObject: ======== obj: " + obj + " bridgeObject: " + bridgeObject + " destroying: " + bridgeObject.destroying + " destroyed: " + bridgeObject.destroyed);
+        Debug.Log("Bridge: DestroyObject: ======== obj: " + obj + " bridgeObject: " + bridgeObject + " destroying: " + bridgeObject.destroying + " destroyed: " + bridgeObject.destroyed);
 
         string id = null;
 

@@ -49,7 +49,7 @@ class Bridge {
 
     start(driver, configuration)
     {
-        //console.log("Bridge: start: driver:", driver, "configuration:", configuration);
+        console.log("Bridge: start: driver:", driver, "configuration:", configuration);
 
         this.driver = driver || "Unknown";
         this.configuration = configuration || "{}";
@@ -57,7 +57,7 @@ class Bridge {
         this.startedJS = true;
 
         this.sendEvent({
-            event: 'StartedJS'
+            event: 'StartedBridge'
         });
 
         this.handleStarted();
@@ -556,6 +556,11 @@ class Bridge {
 
     flushJSToUnityEventQueue()
     {
+        if (!this._Bridge_SendBridgeToUnityEvents) {
+            console.log("Bridge: flushJSToUnityEventQueue: _Bridge_SendBridgeToUnityEvents is not defined! jsToUnityEventQueue:", this.jsToUnityEventQueue);
+            return;
+        }
+
         if (this.jsToUnityEventQueueTimer) {
             window.clearTimeout(this.jsToUnityEventQueueTimer);
             this.jsToUnityEventQueueTimer = null;
@@ -582,7 +587,7 @@ class Bridge {
 
             case "WebGL":
                 // WebGL Runtime
-                this._Bridge_SendJSToUnityEvents(evListString);
+                this._Bridge_SendBridgeToUnityEvents(evListString);
                 break;
 
             case "SocketIO":
@@ -608,81 +613,13 @@ class Bridge {
 
     load()
     {
-        if (gSheetsIndex) {
-            var startTime = new Date();
-            LoadSheets(
-                gSheetsIndex, // gSheetsIndex global is defined in dynamically generated sheets-index.js
-                this.live,
-                (data) => { // success
-                    var endTime = new Date();
-                    var duration = endTime - startTime;
-
-                    //console.log("Bridge: load: success: duration: " + duration);
-
-                    this.spreadsheets = data.spreadsheets;
-
-                    //console.log("configuration JSON", this.configuration);
-
-                    var configuration = JSON.parse(this.configuration);
-
-                    //console.log("configuration Object", configuration);
-
-                    configuration.forEach(importSpec => {
-                        var spreadsheetName = importSpec['spreadsheetName'];
-                        var sheetName = importSpec['sheetName'];
-                        var as = importSpec['as'];
-                        var spreadsheet = this.spreadsheets[spreadsheetName];
-                        if (!spreadsheet) {
-                            console.log("Bridge: load: configuration", configuration, "missing spreadsheetName", spreadsheetName, "from", Object.keys(this.spreadsheets));
-                            return;
-                        }
-                        var sheet = spreadsheet.sheets[sheetName];
-                        if (!spreadsheet) {
-                            console.log("Bridge: load: configuration", configuration, "missing sheetName", sheetName, "from spreadsheetName", spreadsheetName, "from", Object.keys(spreadsheet.sheets));
-                            return;
-                        }
-
-                        //console.log("Bridge: load: calling SheetToScope:", "sheets:", spreadsheet.sheets, "ranges:", spreadsheet.ranges, "sheetName:", sheetName);
-
-                        var scope = SheetToScope(spreadsheet.sheets, spreadsheet.ranges, sheetName);
-                        var error = scope.error;
-                        var value = scope.value;
-
-                        //console.log("Bridge: load: called SheetToScope:", "scope:", scope, "error:", error, "value:", value);
-
-                        if (error) {
-                            console.log("Bridge: load: success: Error loading world. Error in spreadsheetName:", spreadsheetName, "sheetName:", scope.errorScope.errorSheetName, "row:", scope.errorScope.errorRow, "column:", scope.errorScope.errorColumn, "error:", error, "errorScope:", scope.errorScope);
-                        } else if (!value) {
-                            console.log("Bridge: load: success: Loaded value but it was null.", "scope:", scope);
-                        } else {
-                            //console.log("Bridge: load: importing spreadsheetName", spreadsheetName, "sheetName", sheetName, "as", as, "keys", Object.keys(value));
-                            if (!as) {
-                                Object.assign(this.world, value);
-                            } else {
-                                this.world[as] = value;
-                            }
-                        }
-
-                    });
-
-                    this.handleLoaded();
-
-                },
-                () => { // error
-                    console.log("Bridge: load: error: Error loading sheets!");
-                    this.handleLoadFailed("Error loading spreadsheets.");
-                });
-
-            return;
-        }
-
         this.handleLoaded();
     }
 
 
     boot()
     {
-        //console.log("Bridge: boot");
+        console.log("Bridge: boot");
 
         this.nextID = 0;
         this.blobID = 0;
@@ -1089,9 +1026,7 @@ class Bridge {
 ////////////////////////////////////////////////////////////////////////
 
 
-module.exports = {
-    Bridge: Bridge
-};
-
+// Simply make Bridge available globally for browser usage
+window.Bridge = Bridge;
 
 ////////////////////////////////////////////////////////////////////////

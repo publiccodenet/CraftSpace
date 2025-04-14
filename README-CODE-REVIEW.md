@@ -55,7 +55,7 @@ The project is architecturally divided into two main parts: **BackSpace** (Svelt
 
 2.  **CraftSpace (Unity):**
     *   Utilizes a **schema generation pipeline**: An Editor script (`Assets/Editor/SchemaGenerator/`) consumes the JSON schemas (placed in `Assets/StreamingAssets/` or `Content/schema/`) to generate C# data classes (`Assets/Scripts/Schemas/Generated/`) with appropriate attributes and a base class (`SchemaGeneratedObject.cs`) for handling serialization and extensibility (`extraFields`). Manual partial classes extend these generated types.
-    *   Implements a robust **JavaScript <-> Unity Bridge** (`Assets/Scripts/Bridge/`, `Assets/Plugins/WebGL/UnityJS.jslib`) enabling communication and control, particularly critical for the WebGL target, facilitating a JS-first architectural approach where appropriate.
+    *   Implements a robust **JavaScript <-> Unity Bridge** (`Assets/Scripts/Bridge/`, `Assets/Plugins/WebGL/bridge.jslib`) enabling communication and control, particularly critical for the WebGL target, facilitating a JS-first architectural approach where appropriate.
     *   Contains **core runtime systems** (`Assets/Scripts/Core/`) including application managers, input handling (Unity Input System), camera control (Cinemachine), and view instantiation (`ViewFactory`).
     *   Features a **View layer** (`Assets/Scripts/Views/`) with components (`CollectionView`, `ItemView`, Renderers) responsible for visually representing the data models (using the generated schema classes) in the Unity scene and handling user interactions.
     *   Includes **Editor scripts** (`Assets/Editor/`) for build automation (`Build.cs`) and schema generation.

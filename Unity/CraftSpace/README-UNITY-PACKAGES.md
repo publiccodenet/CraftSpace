@@ -9,12 +9,12 @@ CraftSpace uses a schema-driven approach to Unity integration:
 - **Stateless Configuration**: Enable saving, sharing, and composing Unity states
 - **Library Abstraction**: Wrap third-party Unity libraries in schema-compatible interfaces
 
-### UnityJS Integration
+### Bridge Integration
 
-The project builds upon and extends UnityJS's approach:
+The project builds upon and extends Bridge's approach:
 
 - **User-Friendly Representations**: Transform rotations available as both quaternions (x/y/z/w) and Euler angles (roll/pitch/yaw)
-- **Schema Compatibility**: All UnityJS structures now defined in Zod schemas
+- **Schema Compatibility**: All Bridge structures now defined in Zod schemas
 - **Bidirectional Binding**: Changes in Unity reflect in JS and vice-versa
 - **Portable Configurations**: Save, load, and share scene configurations as JSON
 
@@ -109,7 +109,7 @@ export const TweenSchema = z.object({
 });
 ```
 
-The existing UnityJS DOTween wrapper will be extended with these schemas.
+The existing Bridge DOTween wrapper will be extended with these schemas.
 
 ### UniTask for WebGL
 

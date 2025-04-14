@@ -43,6 +43,7 @@ const UNITY_AUTOMATION_DIR = __dirname;
 // Parse command line arguments
 const args = process.argv.slice(2);
 const command = args[0];
+const verboseFlag = args.includes('--verbose');
 
 if (!command) {
   showHelp();
@@ -53,7 +54,10 @@ if (!command) {
 (async () => {
   // Discover Unity environment
   try {
-    const unityEnv = await discoverUnityEnvironment();
+    console.log(chalk.blue(`=== Unity Automation: ${command} ===`));
+    
+    // Run discovery silently unless verbose mode is enabled
+    const unityEnv = await discoverUnityEnvironment({ verbose: verboseFlag });
     
     // Check if project was found
     if (unityEnv.UNITY_PROJECT_FOUND !== 'true') {
@@ -72,12 +76,13 @@ if (!command) {
       } catch (err) {
         console.error(chalk.red(`Error setting executable permissions for run-unity.sh: ${err.message}`));
       }
-    } else {
+    } else if (verboseFlag) {
       console.warn(chalk.yellow(`run-unity.sh not found at ${UNITY_EXECUTABLE_SCRIPT}. Run 'npm run unity:setup' or check path constants.`));
     }
 
-    console.log(chalk.blue(`=== Unity Automation: ${command} ===`));
-    console.log(chalk.gray(`Unity Project Path: ${UNITY_PROJECT_PATH}`));
+    if (verboseFlag) {
+      console.log(chalk.gray(`Unity Project Path: ${UNITY_PROJECT_PATH}`));
+    }
 
     // Check if UNITY_PATH was found before attempting commands that need it
     const needsUnityPath = !['install', 'list-versions', 'check-logs'].includes(command);
@@ -89,6 +94,7 @@ if (!command) {
 
     switch (command) {
       case 'regenerate-schemas':
+      case 'generate-schemas':
         await runUnityCommand('-batchmode -projectPath . -ignoreCompilerErrors -executeMethod CraftSpace.Editor.SchemaGenerator.ImportAllSchemasMenuItem -quit -logFile -', unityEnv);
         break;
       case 'build-dev':
@@ -103,7 +109,14 @@ if (!command) {
       case 'build-webgl-prod':
         await runUnityCommand('-batchmode -projectPath . -executeMethod Build.BuildWebGL_Prod -quit -logFile -', unityEnv);
         break;
+      case 'unbuild-webgl':
+        await unbuildWebGL(unityEnv);
+        break;
+      case 'diff-webgl':
+        await diffWebGL(unityEnv);
+        break;
       case 'test':
+      case 'serve-webgl':
         await serveWebGLBuild();
         break;
       case 'ci':
@@ -481,24 +494,208 @@ async function serveWebGLBuild() {
 }
 
 /**
+ * Unbuild WebGL - Copy files from build output back to source directories
+ * This is used to capture changes made during runtime to the WebGL template and StreamingAssets
+ * @param {object} env Environment variables discovered by discoverUnityEnvironment
+ */
+async function unbuildWebGL(env) {
+  console.log(chalk.blue('Unbuilding WebGL - Copying changes from build output back to source'));
+  
+  const unityProjectPath = env.UNITY_APP;
+  const buildPath = path.join(unityProjectPath, 'Builds/SpaceCraft');
+  const webGLTemplatePath = path.join(unityProjectPath, 'Assets/WebGLTemplates/SpaceCraft');
+  const streamingAssetsPath = path.join(unityProjectPath, 'Assets/StreamingAssets/Bridge');
+  
+  // Check if the paths exist
+  if (!fs.existsSync(buildPath)) {
+    console.error(chalk.red(`Build path not found: ${buildPath}`));
+    throw new Error('WebGL build not found. Run build-webgl first.');
+  }
+
+  try {
+    // Ensure target directories exist
+    fs.ensureDirSync(webGLTemplatePath);
+    fs.ensureDirSync(streamingAssetsPath);
+
+    // Copy from build to WebGL templates, excluding specific files
+    const excludes = ['Build/', 'StreamingAssets/', 'GUID.txt', 'ProjectVersion.txt', 'dependencies.txt'];
+    const excludeArgs = excludes.map(pattern => `--exclude='${pattern}'`).join(' ');
+    
+    const templateCmd = `rsync -av ${excludeArgs} "${buildPath}/" "${webGLTemplatePath}/"`;
+    console.log(chalk.gray(`Executing: ${templateCmd}`));
+    execSync(templateCmd, { stdio: 'inherit' });
+    
+    // Copy StreamingAssets/Bridge to Assets/StreamingAssets/Bridge
+    const bridgeCmd = `rsync -av "${buildPath}/StreamingAssets/Bridge/" "${streamingAssetsPath}/"`;
+    console.log(chalk.gray(`Executing: ${bridgeCmd}`));
+    execSync(bridgeCmd, { stdio: 'inherit' });
+    
+    console.log(chalk.green('WebGL unbuild completed successfully!'));
+  } catch (error) {
+    console.error(chalk.red(`WebGL unbuild failed: ${error.message}`));
+    throw error;
+  }
+}
+
+/**
+ * Diff WebGL - Show differences between build output and source directories
+ * This helps identify changes that need to be unbuild
+ * @param {object} env Environment variables discovered by discoverUnityEnvironment
+ */
+async function diffWebGL(env) {
+  console.log(chalk.blue('Diffing WebGL - Checking for changes between build output and source'));
+  
+  const unityProjectPath = env.UNITY_APP;
+  const buildPath = path.join(unityProjectPath, 'Builds/SpaceCraft');
+  const webGLTemplatePath = path.join(unityProjectPath, 'Assets/WebGLTemplates/SpaceCraft');
+  const streamingAssetsPath = path.join(unityProjectPath, 'Assets/StreamingAssets/Bridge');
+  
+  // Check if the paths exist
+  if (!fs.existsSync(buildPath)) {
+    console.error(chalk.red(`Build path not found: ${buildPath}`));
+    throw new Error('WebGL build not found. Run build-webgl first.');
+  }
+  
+  if (!fs.existsSync(webGLTemplatePath)) {
+    console.error(chalk.red(`WebGL template path not found: ${webGLTemplatePath}`));
+    throw new Error('WebGL template directory not found.');
+  }
+  
+  if (!fs.existsSync(streamingAssetsPath)) {
+    console.error(chalk.red(`StreamingAssets path not found: ${streamingAssetsPath}`));
+    throw new Error('StreamingAssets/Bridge directory not found.');
+  }
+  
+  try {
+    // Create a temporary exclude file for diff
+    const excludeFile = path.join(os.tmpdir(), 'unity-diff-exclude.txt');
+    
+    // List of files and directories to exclude from the diff
+    // - '*.meta' ignores all Unity meta files that change frequently
+    // - 'Build*' ignores the Build directory which is not relevant
+    // - 'StreamingAssets*' ensures we only diff the Bridge subdirectory explicitly
+    // - 'thumbnail.png' is auto-generated by Unity for WebGL templates
+    const excludes = [
+      'Build/', 
+      'Build',
+      'StreamingAssets',  // Ignore the entire StreamingAssets directory, we'll compare Bridge separately
+      'StreamingAssets/', 
+      'GUID.txt', 
+      'ProjectVersion.txt', 
+      'dependencies.txt',
+      '*.meta',
+      'thumbnail.png'     // Unity auto-generated thumbnail
+    ];
+    
+    fs.writeFileSync(excludeFile, excludes.join('\n'));
+    
+    console.log(chalk.yellow('=== WebGL Template Differences ==='));
+    console.log(chalk.gray(`< Repo: ${webGLTemplatePath}`));
+    console.log(chalk.gray(`> Build: ${buildPath}`));
+    const templateDiffCmd = `diff -r --exclude-from="${excludeFile}" "${buildPath}" "${webGLTemplatePath}" | grep -v ".meta"`;
+    try {
+      const templateDiff = execSync(templateDiffCmd, { encoding: 'utf8' });
+      
+      if (templateDiff.trim()) {
+        console.log(templateDiff);
+      } else {
+        console.log(chalk.green('No differences in WebGL template files.'));
+      }
+    } catch (diffError) {
+      // diff returns non-zero (1) if files differ
+      if (diffError.status === 1 && diffError.stdout) {
+        // Filter out .meta files from the output
+        const filteredOutput = diffError.stdout.split('\n')
+          .filter(line => !line.includes('.meta'))
+          .join('\n');
+        
+        if (filteredOutput.trim()) {
+          console.log(filteredOutput);
+        } else {
+          console.log(chalk.green('No differences in WebGL template files (excluding .meta files).'));
+        }
+      } else if (diffError.status > 1) {
+        // Real error occurred
+        console.error(chalk.red(`Diff error: ${diffError.message}`));
+      } else {
+        console.log(chalk.green('No differences in WebGL template files.'));
+      }
+    }
+    
+    // Diff the StreamingAssets/Bridge files
+    console.log(chalk.yellow('\n=== StreamingAssets/Bridge Differences ==='));
+    console.log(chalk.gray(`< Repo: ${streamingAssetsPath}`));
+    console.log(chalk.gray(`> Build: ${buildPath}/StreamingAssets/Bridge`));
+    const bridgeDiffCmd = `diff -r "${buildPath}/StreamingAssets/Bridge" "${streamingAssetsPath}" | grep -v ".meta"`;
+    try {
+      const bridgeDiff = execSync(bridgeDiffCmd, { encoding: 'utf8' });
+      
+      if (bridgeDiff.trim()) {
+        console.log(bridgeDiff);
+      } else {
+        console.log(chalk.green('No differences in StreamingAssets/Bridge files.'));
+      }
+    } catch (diffError) {
+      // diff returns non-zero (1) if files differ
+      if (diffError.status === 1 && diffError.stdout) {
+        // Filter out .meta files from the output for extra safety
+        const filteredOutput = diffError.stdout.split('\n')
+          .filter(line => !line.includes('.meta'))
+          .join('\n');
+        
+        if (filteredOutput.trim()) {
+          console.log(filteredOutput);
+        } else {
+          console.log(chalk.green('No differences in StreamingAssets/Bridge files (excluding .meta files).'));
+        }
+      } else if (diffError.status > 1) {
+        // Real error occurred
+        console.error(chalk.red(`Diff error: ${diffError.message}`));
+      } else {
+        console.log(chalk.green('No differences in StreamingAssets/Bridge files.'));
+      }
+    }
+    
+    // Clean up temporary exclude file
+    fs.unlinkSync(excludeFile);
+    
+    console.log(chalk.green('\nWebGL diff completed!'));
+  } catch (error) {
+    console.error(chalk.red(`WebGL diff failed: ${error.message}`));
+    throw error;
+  }
+}
+
+/**
  * Show help information
  */
 function showHelp() {
-  console.log(chalk.blue('Unity Automation Tool'));
-  console.log('');
-  console.log('Commands:');
-  console.log('  regenerate-schemas   Regenerate Unity C# schemas from TypeScript/JSON Schema');
-  console.log('  build-dev            Build development version of the Unity project');
-  console.log('  build-prod           Build production version of the Unity project');
-  console.log('  test                 Run Unity tests');
-  console.log('  ci                   Run CI build script');
-  console.log('  check-logs           Check Unity logs for errors');
-  console.log('  install              Install Unity automation files');
-  console.log('  list-versions        List installed Unity versions');
-  console.log('');
-  console.log('Environment Variables:');
-  console.log('  UNITY_PRECONFIGURED  Set to true for preconfigured environments');
-  console.log('  UNITY_APP            Path to Unity project');
-  console.log('  UNITY_VERSION        Unity version to use');
-  console.log('  UNITY_PATH           Direct path to Unity executable');
+  console.log(`
+${chalk.bold('Unity Automation Script')}
+
+${chalk.italic('Usage:')}
+  tsx scripts/unity-automation.js <command> [options]
+
+${chalk.italic('Commands:')}
+  generate-schemas      - Generate C# classes from JSON schemas
+  build-dev             - Build Unity project in development mode
+  build-prod            - Build Unity project in production mode
+  build-webgl-dev       - Build WebGL project in development mode
+  build-webgl-prod      - Build WebGL project in production mode
+  unbuild-webgl         - Copy files from build back to source (for runtime changes)
+  diff-webgl            - Show differences between build and source
+  serve-webgl           - Serve the built WebGL files for testing
+  ci                    - Run Unity CI build
+  check-logs            - Check Unity logs for errors
+  install               - Create Unity automation files
+  list-versions         - List installed Unity versions
+
+${chalk.italic('Options:')}
+  --verbose             - Enable verbose logging (displays Unity environment discovery details)
+
+${chalk.italic('Environment Variables:')}
+  UNITY_APP             - Path to the Unity project (default: ../../Unity/CraftSpace)
+  UNITY_VERSION         - Version of Unity to use
+  UNITY_PATH            - Direct path to Unity executable
+  `);
 }

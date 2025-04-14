@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////
 // UnityBridge.cs
 // Copyright (C) 2018 by Don Hopkins, Ground Up Software.
-
+// This is for access to various Unity functions and properties.
 
 using System;
 using System.Collections;

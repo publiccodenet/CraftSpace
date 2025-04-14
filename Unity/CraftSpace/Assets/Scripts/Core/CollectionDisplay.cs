@@ -14,19 +14,18 @@ public class CollectionDisplay : MonoBehaviour
     public CollectionView collectionView;
     
     [Header("Item Detail Display")]
-    public GameObject itemInfoPanel;
-    public TextMeshProUGUI itemTitleText;
+    public ItemInfoPanel itemInfoPanel;
     
     [Header("Settings")]
     public bool loadOnStart = true;
     public string collectionId;
     
-    [Header("Input References")]
-    public InputManager inputManager;
-    
     // Cache for collections and pending display
     private Dictionary<string, Collection> cachedCollections = new Dictionary<string, Collection>();
-    private Item selectedItem;
+    private Item currentDisplayedItem;
+    
+    // Reference to SpaceShipBridge
+    private SpaceShipBridge spaceShip;
     
     private void Start()
     {
@@ -41,72 +40,38 @@ public class CollectionDisplay : MonoBehaviour
         // Subscribe to Brewster event *before* potentially loading
         Brewster.Instance.OnAllContentLoaded += HandleAllContentLoaded;
         
-        // Subscribe to InputManager events if available
-        
-        if (inputManager != null)
+        // Get the SpaceShipBridge reference
+        spaceShip = SpaceShipBridge.spaceShip;
+        if (spaceShip == null)
         {
-            inputManager.OnItemHoverStart.AddListener(HandleItemHoverStart);
-            inputManager.OnItemHoverEnd.AddListener(HandleItemHoverEnd);
-            inputManager.OnItemSelected.AddListener(HandleItemSelected);
-            inputManager.OnItemDeselected.AddListener(HandleItemDeselected);
-        }
-        else
-        {
-            Debug.LogWarning("No InputManager found. Item hover/selection display will not function.");
+            Debug.LogError("No SpaceShipBridge found. Required for collection display functionality.");
+            enabled = false;
+            return;
         }
     }
     
-    private void OnDestroy()
+    private void Update()
     {
-        // Unsubscribe from events when destroyed
-        if (inputManager != null)
-        {
-            inputManager.OnItemHoverStart.RemoveListener(HandleItemHoverStart);
-            inputManager.OnItemHoverEnd.RemoveListener(HandleItemHoverEnd);
-            inputManager.OnItemSelected.RemoveListener(HandleItemSelected);
-            inputManager.OnItemDeselected.RemoveListener(HandleItemDeselected);
-        }
+        if (spaceShip == null) return;
         
+        // Check for state changes that require UI updates
+        if (spaceShip.selectedItemsChanged || spaceShip.highlightedItemsChanged)
+        {
+            UpdateDetailPanel();
+            
+            // Reset the flags after we've processed them
+            spaceShip.selectedItemsChanged = false;
+            spaceShip.highlightedItemsChanged = false;
+        }
+    }
+    
+    public void OnDestroy()
+    {
         // Unsubscribe from Brewster event
         if (Brewster.Instance != null)
         {
             Brewster.Instance.OnAllContentLoaded -= HandleAllContentLoaded;
         }
-    }
-    
-    // Event handlers
-    private void HandleItemHoverStart(ItemView itemView)
-    {
-        // Debug.Log($"[CollectionDisplay] HandleItemHoverStart for item: {itemView?.Model?.Title ?? "NULL"}");
-        if (itemView != null && itemView.Model != null)
-        {
-            DisplayItemDetails(itemView.Model);
-        }
-    }
-    
-    private void HandleItemHoverEnd(ItemView itemView)
-    {
-        // Debug.Log($"[CollectionDisplay] HandleItemHoverEnd for item: {itemView?.Model?.Title ?? "NULL"}");
-        // Only hide if we're not currently showing a selected item
-        if (selectedItem == null)
-        {
-            HideItemDetails();
-        }
-    }
-    
-    private void HandleItemSelected(ItemView itemView)
-    {
-        if (itemView != null && itemView.Model != null)
-        {
-            selectedItem = itemView.Model;
-            DisplayItemDetails(itemView.Model);
-        }
-    }
-    
-    private void HandleItemDeselected(ItemView itemView)
-    {
-        selectedItem = null;
-        HideItemDetails();
     }
     
     /// <summary>
@@ -168,11 +133,72 @@ public class CollectionDisplay : MonoBehaviour
     }
     
     /// <summary>
+    /// Updates the detail panel based on item state (highlighted first, then selected)
+    /// </summary>
+    private void UpdateDetailPanel()
+    {
+        if (spaceShip == null)
+        {
+            HideItemDetails();
+            return;
+        }
+        
+        Item itemToDisplay = null;
+        
+        // Priority 1: Show the first highlighted item if any exist
+        if (spaceShip.highlightedItemIds.Count > 0)
+        {
+            string highlightedId = spaceShip.highlightedItemIds[0];
+            if (!string.IsNullOrEmpty(highlightedId))
+            {
+                ItemView itemView = spaceShip.InputManager?.FindItemViewById(highlightedId);
+                if (itemView != null && itemView.Model != null)
+                {
+                    itemToDisplay = itemView.Model;
+                }
+            }
+        }
+        
+        // Priority 2: If no highlighted items, show the first selected item
+        if (itemToDisplay == null && spaceShip.selectedItemIds.Count > 0)
+        {
+            string selectedId = spaceShip.selectedItemIds[0];
+            if (!string.IsNullOrEmpty(selectedId))
+            {
+                ItemView itemView = spaceShip.InputManager?.FindItemViewById(selectedId);
+                if (itemView != null && itemView.Model != null)
+                {
+                    itemToDisplay = itemView.Model;
+                }
+            }
+        }
+        
+        // Update the UI based on the item to display
+        if (itemToDisplay != null)
+        {
+            // Check if this is a different item than what's currently displayed
+            if (currentDisplayedItem != itemToDisplay)
+            {
+                currentDisplayedItem = itemToDisplay;
+                DisplayItemDetails(itemToDisplay);
+            }
+        }
+        else
+        {
+            // No item to display
+            if (currentDisplayedItem != null)
+            {
+                currentDisplayedItem = null;
+                HideItemDetails();
+            }
+        }
+    }
+    
+    /// <summary>
     /// Display item title in the InfoText panel
     /// </summary>
     public void DisplayItemDetails(Item item)
     {
-        // Debug.Log($"[CollectionDisplay] DisplayItemDetails for item: {item?.Title ?? "NULL"}");
         if (item == null)
         {
             HideItemDetails();
@@ -180,15 +206,10 @@ public class CollectionDisplay : MonoBehaviour
         }
         
         // Show title in the InfoText component
-        if (itemTitleText != null)
+        if (itemInfoPanel != null)
         {
-            itemTitleText.text = item.Title;
-            
-            // Make panel visible if it exists
-            if (itemInfoPanel != null)
-            {
-                itemInfoPanel.SetActive(true);
-            }
+            itemInfoPanel.gameObject.SetActive(true);
+            itemInfoPanel.ShowInfo(item.Title);
         }
     }
     
@@ -197,17 +218,11 @@ public class CollectionDisplay : MonoBehaviour
     /// </summary>
     public void HideItemDetails()
     {
-        // Debug.Log("[CollectionDisplay] HideItemDetails called.");
-        // Clear title text if present
-        if (itemTitleText != null)
-        {
-            itemTitleText.text = "";
-        }
-        
         // Hide panel if present
-        if (itemInfoPanel != null && itemInfoPanel.activeSelf)
+        if (itemInfoPanel != null)
         {
-            itemInfoPanel.SetActive(false);
+            itemInfoPanel.ClearInfo();
+            itemInfoPanel.gameObject.SetActive(false);
         }
     }
     
@@ -218,20 +233,12 @@ public class CollectionDisplay : MonoBehaviour
     {
         HideItemDetails();
     }
-    
+
     /// <summary>
-    /// Handle item selection from UI or input
+    /// Displays a collection by ID (alias for DisplayCollection to match SpaceShipBridge reference)
     /// </summary>
-    public void OnItemSelected(ItemView itemView)
+    public void ShowCollection(string collectionId)
     {
-        if (itemView != null && itemView.Model != null)
-        {
-            selectedItem = itemView.Model;
-            DisplayItemDetails(itemView.Model);
-        }
-        else
-        {
-            HideItemDetails();
-        }
+        DisplayCollection(collectionId);
     }
 } 

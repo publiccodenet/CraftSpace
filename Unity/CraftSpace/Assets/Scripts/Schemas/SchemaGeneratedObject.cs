@@ -228,18 +228,11 @@ public abstract class SchemaGeneratedObject : ScriptableObject
     /// <param name="view">The view to register</param>
     public virtual void RegisterView(object view)
     {
-        try
-        {
-            if (view != null && !registeredViews.Contains(view))
-            {
-                registeredViews.Add(view);
-                Debug.Log($"[{GetType().Name}] Registered view: {view.GetType().Name}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[{GetType().Name}] Error registering view: {ex.Message}");
-        }
+        //if (enableDebug) {
+        //    Debug.Log("[" + GetType().Name + "] Registered view: " + ((view == null) ? "null" : view.GetType().Name));
+        //}
+
+        registeredViews.Add(view);
     }
     
     /// <summary>
@@ -253,7 +246,9 @@ public abstract class SchemaGeneratedObject : ScriptableObject
             if (view != null)
             {
                 registeredViews.Remove(view);
-                Debug.Log($"[{GetType().Name}] Unregistered view: {view.GetType().Name}");
+                //if (enableDebug) {
+                //    Debug.Log("[" + GetType().Name + "] Unregistered view: " + ((view == null) ? "null" : view.GetType().Name));
+                //}
             }
         }
         catch (Exception ex)
@@ -301,7 +296,11 @@ public abstract class SchemaGeneratedObject : ScriptableObject
                 }
             }
             
-            Debug.Log($"[{GetType().Name}] Notified {count} views of type {typeof(TView).Name}");
+            //if (enableDebug) {
+            //    if (count > 0) {
+            //        Debug.Log("[" + GetType().Name + "] Notified " + count + " views of type " + typeof(TView).Name);
+            //    }
+            //}
         }
         catch (Exception ex)
         {

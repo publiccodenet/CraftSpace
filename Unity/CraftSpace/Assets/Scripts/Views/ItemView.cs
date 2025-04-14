@@ -24,18 +24,25 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     [Header("Materials")]
     [SerializeField] private Material loadingMaterial;
     
-    [Header("Highlighting")]
+    [Header("Highlighting and Selecting")]
     [SerializeField] private GameObject highlightMesh; // Dedicated mesh for highlighting
-    [SerializeField] private Material highlightMaterial; // Material for hover state
-    [SerializeField] private Material selectionMaterial; // Material for selection state
-    [SerializeField] private float highlightElevation = 0.1f;
+    [SerializeField] private Material highlightMaterial; // Material for highlight state
+    [SerializeField] private float highlightElevation = -0.01f; // Slight back offset for highlight mesh
+    [SerializeField] private float highlightMargin = 0.1f; // Margin around the item for highlight mesh
     [SerializeField] private Color highlightColor = new Color(1f, 0.8f, 0.2f, 0.7f);
-    [SerializeField] private Color selectionColor = new Color(1f, 0.5f, 0f, 0.9f);
+
+    [Header("Selection")]
+    [SerializeField] private GameObject selectionMesh; // Dedicated mesh for selection
+    [SerializeField] private Material selectionMaterial; // Material for selection state
+    [SerializeField] private float selectionElevation = -0.02f; // Further back offset for selection mesh
+    [SerializeField] private float selectionMargin = 0.2f; // Larger margin around the item for selection mesh
+    [SerializeField] private Color selectionColor = new Color(0f, 0.5f, 0f, 1.0f);
     
     // State
     private bool isHighlighted = false;
     private bool isSelected = false;
     private Material originalMaterial;
+    private int highlightCount = 0;
     
     // Cached component references
     private MeshFilter meshFilter;
@@ -76,17 +83,8 @@ public class ItemView : MonoBehaviour, IModelView<Item>
             
         boxCollider = GetComponent<BoxCollider>();
         
-        // Create highlight mesh if it doesn't exist
-        if (highlightMesh == null)
-        {
-            CreateHighlightMesh();
-        }
-        
-        // Initially disable highlight mesh
-        if (highlightMesh != null)
-        {
-            highlightMesh.SetActive(false);
-        }
+        // Note: We don't create the highlight/selection meshes here anymore
+        // They will be created lazily when needed in SetHighlighted/SetSelected
         
         if (model != null)
         {
@@ -108,14 +106,13 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         
         // Create a slightly larger quad
         Mesh highlightQuad = new Mesh();
-        float padding = 0.05f; // Padding around the item
         
         Vector3[] vertices = new Vector3[4]
         {
-            new Vector3(-(itemWidth + padding)/2, 0.01f, -(itemHeight + padding)/2),
-            new Vector3((itemWidth + padding)/2, 0.01f, -(itemHeight + padding)/2),
-            new Vector3(-(itemWidth + padding)/2, 0.01f, (itemHeight + padding)/2),
-            new Vector3((itemWidth + padding)/2, 0.01f, (itemHeight + padding)/2)
+            new Vector3(-(itemWidth + highlightMargin)/2, highlightElevation, -(itemHeight + highlightMargin)/2),
+            new Vector3((itemWidth + highlightMargin)/2, highlightElevation, -(itemHeight + highlightMargin)/2),
+            new Vector3(-(itemWidth + highlightMargin)/2, highlightElevation, (itemHeight + highlightMargin)/2),
+            new Vector3((itemWidth + highlightMargin)/2, highlightElevation, (itemHeight + highlightMargin)/2)
         };
         
         Vector2[] uv = new Vector2[4]
@@ -139,13 +136,63 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         
         highlightFilter.mesh = highlightQuad;
         
-        // Create default materials if not assigned
+        // Create default material if not assigned
         if (highlightMaterial == null)
         {
             highlightMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             highlightMaterial.color = highlightColor;
         }
+        if (selectionMaterial == null)
+        {
+            selectionMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            selectionMaterial.color = selectionColor;
+        }
+    }
+    
+    private void CreateSelectionMesh()
+    {
+        // Create a selection object as a child
+        selectionMesh = new GameObject("SelectionMesh");
+        selectionMesh.transform.SetParent(transform, false);
+        selectionMesh.transform.localPosition = Vector3.zero;
         
+        // Add mesh components
+        MeshFilter selectionFilter = selectionMesh.AddComponent<MeshFilter>();
+        MeshRenderer selectionRenderer = selectionMesh.AddComponent<MeshRenderer>();
+        
+        // Create an even larger quad for selection
+        Mesh selectionQuad = new Mesh();
+        
+        Vector3[] vertices = new Vector3[4]
+        {
+            new Vector3(-(itemWidth + selectionMargin)/2, selectionElevation, -(itemHeight + selectionMargin)/2),
+            new Vector3((itemWidth + selectionMargin)/2, selectionElevation, -(itemHeight + selectionMargin)/2),
+            new Vector3(-(itemWidth + selectionMargin)/2, selectionElevation, (itemHeight + selectionMargin)/2),
+            new Vector3((itemWidth + selectionMargin)/2, selectionElevation, (itemHeight + selectionMargin)/2)
+        };
+        
+        Vector2[] uv = new Vector2[4]
+        {
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(0, 1),
+            new Vector2(1, 1)
+        };
+        
+        int[] triangles = new int[6]
+        {
+            0, 2, 1,
+            2, 3, 1
+        };
+        
+        selectionQuad.vertices = vertices;
+        selectionQuad.uv = uv;
+        selectionQuad.triangles = triangles;
+        selectionQuad.RecalculateNormals();
+        
+        selectionFilter.mesh = selectionQuad;
+        
+        // Create default material if not assigned
         if (selectionMaterial == null)
         {
             selectionMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -224,8 +271,26 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         float aspectRatio = (float)texture.width / texture.height;
         UpdateMeshForAspectRatio(aspectRatio);
         
-        // Update highlight mesh size if it exists
-        UpdateHighlightMeshSize();
+        // Apply highlight and selection colors to ensure they're visible
+        if (highlightMesh != null)
+        {
+            MeshRenderer highlightRenderer = highlightMesh.GetComponent<MeshRenderer>();
+            if (highlightRenderer != null && highlightMaterial != null)
+            {
+                highlightMaterial.color = highlightColor;
+                highlightRenderer.material = highlightMaterial;
+            }
+        }
+        
+        if (selectionMesh != null)
+        {
+            MeshRenderer selectionRenderer = selectionMesh.GetComponent<MeshRenderer>();
+            if (selectionRenderer != null && selectionMaterial != null)
+            {
+                selectionMaterial.color = selectionColor;
+                selectionRenderer.material = selectionMaterial;
+            }
+        }
     }
     
     // Apply placeholder material
@@ -254,55 +319,112 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         // Use standard book aspect ratio (2:3)
         UpdateMeshForAspectRatio(2f/3f);
         
-        // Update highlight mesh size
+        // Update highlight and selection mesh sizes
         UpdateHighlightMeshSize();
     }
     
     // Update highlight mesh to match current item dimensions
     private void UpdateHighlightMeshSize()
     {
-        if (highlightMesh == null || meshFilter == null || meshFilter.mesh == null) return;
+        // Use the stored dimensions instead of trying to get from mesh bounds
+        float width = itemWidth;
+        float height = itemHeight;
         
-        MeshFilter highlightFilter = highlightMesh.GetComponent<MeshFilter>();
-        if (highlightFilter == null || highlightFilter.mesh == null) return;
+        if (width <= 0 || height <= 0) return;
         
-        // Get current item bounds
-        Bounds bounds = meshFilter.mesh.bounds;
-        float width = bounds.size.x;
-        float height = bounds.size.z;
-        float padding = 0.05f;
-        
-        // Create a slightly larger quad
-        Mesh highlightQuad = new Mesh();
-        
-        Vector3[] vertices = new Vector3[4]
+        // Update highlight mesh if it exists
+        if (highlightMesh != null)
         {
-            new Vector3(-(width + padding)/2, 0.01f, -(height + padding)/2),
-            new Vector3((width + padding)/2, 0.01f, -(height + padding)/2),
-            new Vector3(-(width + padding)/2, 0.01f, (height + padding)/2),
-            new Vector3((width + padding)/2, 0.01f, (height + padding)/2)
-        };
+            MeshFilter highlightFilter = highlightMesh.GetComponent<MeshFilter>();
+            if (highlightFilter != null)
+            {
+                // Create a slightly larger quad that matches the item's aspect ratio
+                Mesh highlightQuad = new Mesh();
+                
+                Vector3[] vertices = new Vector3[4]
+                {
+                    new Vector3(-(width + highlightMargin)/2, highlightElevation, -(height + highlightMargin)/2),
+                    new Vector3((width + highlightMargin)/2, highlightElevation, -(height + highlightMargin)/2),
+                    new Vector3(-(width + highlightMargin)/2, highlightElevation, (height + highlightMargin)/2),
+                    new Vector3((width + highlightMargin)/2, highlightElevation, (height + highlightMargin)/2)
+                };
+                
+                Vector2[] uv = new Vector2[4]
+                {
+                    new Vector2(0, 0),
+                    new Vector2(1, 0),
+                    new Vector2(0, 1),
+                    new Vector2(1, 1)
+                };
+                
+                int[] triangles = new int[6]
+                {
+                    0, 2, 1,
+                    2, 3, 1
+                };
+                
+                highlightQuad.vertices = vertices;
+                highlightQuad.uv = uv;
+                highlightQuad.triangles = triangles;
+                highlightQuad.RecalculateNormals();
+                
+                highlightFilter.mesh = highlightQuad;
+                
+                // Make sure the material is applied
+                MeshRenderer highlightRenderer = highlightMesh.GetComponent<MeshRenderer>();
+                if (highlightRenderer != null && highlightMaterial != null)
+                {
+                    highlightRenderer.material = highlightMaterial;
+                }
+            }
+        }
         
-        Vector2[] uv = new Vector2[4]
+        // Update selection mesh if it exists
+        if (selectionMesh != null)
         {
-            new Vector2(0, 0),
-            new Vector2(1, 0),
-            new Vector2(0, 1),
-            new Vector2(1, 1)
-        };
-        
-        int[] triangles = new int[6]
-        {
-            0, 2, 1,
-            2, 3, 1
-        };
-        
-        highlightQuad.vertices = vertices;
-        highlightQuad.uv = uv;
-        highlightQuad.triangles = triangles;
-        highlightQuad.RecalculateNormals();
-        
-        highlightFilter.mesh = highlightQuad;
+            MeshFilter selectionFilter = selectionMesh.GetComponent<MeshFilter>();
+            if (selectionFilter != null)
+            {
+                // Create an even larger quad for selection that matches the item's aspect ratio
+                Mesh selectionQuad = new Mesh();
+                
+                Vector3[] vertices = new Vector3[4]
+                {
+                    new Vector3(-(width + selectionMargin)/2, selectionElevation, -(height + selectionMargin)/2),
+                    new Vector3((width + selectionMargin)/2, selectionElevation, -(height + selectionMargin)/2),
+                    new Vector3(-(width + selectionMargin)/2, selectionElevation, (height + selectionMargin)/2),
+                    new Vector3((width + selectionMargin)/2, selectionElevation, (height + selectionMargin)/2)
+                };
+                
+                Vector2[] uv = new Vector2[4]
+                {
+                    new Vector2(0, 0),
+                    new Vector2(1, 0),
+                    new Vector2(0, 1),
+                    new Vector2(1, 1)
+                };
+                
+                int[] triangles = new int[6]
+                {
+                    0, 2, 1,
+                    2, 3, 1
+                };
+                
+                selectionQuad.vertices = vertices;
+                selectionQuad.uv = uv;
+                selectionQuad.triangles = triangles;
+                selectionQuad.RecalculateNormals();
+                
+                selectionFilter.mesh = selectionQuad;
+                
+                // Make sure the material is applied
+                MeshRenderer selectionRenderer = selectionMesh.GetComponent<MeshRenderer>();
+                if (selectionRenderer != null && selectionMaterial != null)
+                {
+                    selectionRenderer.material = selectionMaterial;
+                }
+            }
+        }
     }
     
     // Update mesh based on aspect ratio to fit within a 1x1 unit square
@@ -313,17 +435,20 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         if (aspectRatio >= 1f) // Landscape or square
         {
             // Set width to 1, scale height
-            width = 1.0f;
+            width = itemWidth;
             height = width / aspectRatio; 
         }
         else // Portrait
         {
             // Set height to 1, scale width
-            height = 1.0f;
+            height = itemHeight;
             width = height * aspectRatio;
         }
         
         CreateOrUpdateMesh(width, height);
+        
+        // Update highlight and selection meshes to match the new size
+        UpdateHighlightMeshSize();
     }
     
     // Create or update the mesh
@@ -331,6 +456,10 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     {
         if (meshFilter == null) return;
         if (width <= 0 || height <= 0) return;
+        
+        // Store dimensions for highlight/selection meshes to use
+        itemWidth = width;
+        itemHeight = height;
         
         // Create a simple quad mesh
         Mesh mesh = new Mesh();
@@ -376,6 +505,9 @@ public class ItemView : MonoBehaviour, IModelView<Item>
             // Optional: Adjust center if needed, but likely okay at 0,0,0 if mesh is centered
             // boxCollider.center = Vector3.zero; 
         }
+        
+        // Update highlight and selection meshes to match the new size
+        UpdateHighlightMeshSize();
     }
     
     // Set the model and update the view
@@ -407,7 +539,7 @@ public class ItemView : MonoBehaviour, IModelView<Item>
     }
     
     /// <summary>
-    /// Set this item's highlight state. This is typically used for hover effects.
+    /// Set this item's highlight state. This is typically used for mouse interaction or other highlighting mechanisms.
     /// </summary>
     public void SetHighlighted(bool highlighted)
     {
@@ -416,20 +548,26 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         
         isHighlighted = highlighted;
         
-        // Don't apply hover highlight if item is selected
-        if (isSelected) return;
-        
         if (highlighted)
         {
-            ApplyHighlight();
-        }
-        else
-        {
-            // Hide highlight mesh
-            if (highlightMesh != null)
+            // Create highlight mesh if it doesn't exist yet
+            if (highlightMesh == null)
             {
-                highlightMesh.SetActive(false);
+                CreateHighlightMesh();
             }
+            
+            // Ensure mesh is active and has the right material
+            highlightMesh.SetActive(true);
+            MeshRenderer highlightRenderer = highlightMesh.GetComponent<MeshRenderer>();
+            if (highlightRenderer != null && highlightMaterial != null)
+            {
+                highlightRenderer.material = highlightMaterial;
+            }
+        }
+        else if (highlightMesh != null)
+        {
+            // Deactivate the mesh when not highlighted
+            highlightMesh.SetActive(false);
         }
     }
     
@@ -444,59 +582,60 @@ public class ItemView : MonoBehaviour, IModelView<Item>
         
         if (selected)
         {
-            ApplySelection();
+            // Create selection mesh if it doesn't exist yet
+            if (selectionMesh == null)
+            {
+                CreateSelectionMesh();
+            }
+            
+            // Ensure mesh is active and has the right material
+            selectionMesh.SetActive(true);
+            MeshRenderer selectionRenderer = selectionMesh.GetComponent<MeshRenderer>();
+            if (selectionRenderer != null && selectionMaterial != null)
+            {
+                selectionRenderer.material = selectionMaterial;
+            }
         }
-        else
+        else if (selectionMesh != null)
         {
-            // If still highlighted, apply highlight, otherwise restore original
-            if (isHighlighted)
-            {
-                ApplyHighlight();
-            }
-            else
-            {
-                // Hide highlight mesh
-                if (highlightMesh != null)
-                {
-                    highlightMesh.SetActive(false);
-                }
-            }
+            // Deactivate the mesh when not selected
+            selectionMesh.SetActive(false);
         }
     }
     
     /// <summary>
-    /// Apply highlight visual effect using the highlight mesh
+    /// Set the highlight count for this item.
+    /// For now, this just enables/disables the highlight when count > 0,
+    /// but in the future it could adjust visual properties based on count.
+    /// 
+    /// Future enhancement possibilities:
+    /// - Vary highlight color intensity based on count
+    /// - Increase margin/size of highlight mesh for higher counts
+    /// - Add pulsing/animation effects for high counts
+    /// - Display numeric indicator for multiple users
+    /// 
+    /// This method is called by SpaceShipBridge when highlight state changes
+    /// either locally or from networked users.
     /// </summary>
-    private void ApplyHighlight()
+    public void SetHighlightCount(int count)
     {
-        if (highlightMesh == null) return;
+        highlightCount = count;
+        SetHighlighted(highlightCount > 0);
         
-        // Show the highlight mesh
-        highlightMesh.SetActive(true);
-        
-        // Apply hover material
-        MeshRenderer highlightRenderer = highlightMesh.GetComponent<MeshRenderer>();
-        if (highlightRenderer != null && highlightMaterial != null)
-        {
-            highlightRenderer.material = highlightMaterial;
-        }
-    }
-    
-    /// <summary>
-    /// Apply selection visual effect using the highlight mesh
-    /// </summary>
-    private void ApplySelection()
-    {
-        if (highlightMesh == null) return;
-        
-        // Show the highlight mesh
-        highlightMesh.SetActive(true);
-        
-        // Apply selection material
-        MeshRenderer highlightRenderer = highlightMesh.GetComponent<MeshRenderer>();
-        if (highlightRenderer != null && selectionMaterial != null)
-        {
-            highlightRenderer.material = selectionMaterial;
-        }
+        // In future: Adjust highlight appearance based on count
+        // if (highlightMesh != null && highlightCount > 0)
+        // {
+        //     MeshRenderer renderer = highlightMesh.GetComponent<MeshRenderer>();
+        //     if (renderer != null && renderer.material != null)
+        //     {
+        //         // Example of how we could vary appearance by count:
+        //         // float intensity = Mathf.Min(0.5f + (0.1f * highlightCount), 1.0f);
+        //         // renderer.material.color = new Color(highlightColor.r, highlightColor.g, highlightColor.b, intensity);
+        //         
+        //         // Example of how to scale highlight size with count:
+        //         // float scale = 1.0f + (0.05f * highlightCount);
+        //         // highlightMesh.transform.localScale = new Vector3(scale, 1f, scale);
+        //     }
+        // }
     }
 } 

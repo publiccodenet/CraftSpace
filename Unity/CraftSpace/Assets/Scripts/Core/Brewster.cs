@@ -53,7 +53,7 @@ public class Brewster : MonoBehaviour
             StartCoroutine(LoadContentSequence());
     }
     
-    void OnDestroy()
+    /*override*/ public void OnDestroy()
     {
         _collections.Clear();
         _items.Clear();
@@ -72,6 +72,8 @@ public class Brewster : MonoBehaviour
         }
         _textureCache.Clear();
         _texturesLoading.Clear();
+
+        //base.OnDestroy();
     }
 
     /// <summary>

@@ -8,6 +8,8 @@
 mergeInto(LibraryManager.library, {
 
 
+    //console.log("Bridge.jslib: called mergeInfo ================");
+
     // Called by Unity when awakened.
     _Bridge_HandleAwake: function _Bridge_HandleAwake(allocateTextureCallback, freeTextureCallback, lockTextureCallback, unlockTextureCallback, allocateDataCallback, freeDataCallback, lockDataCallback, unlockDataCallback)
     {
@@ -135,7 +137,7 @@ mergeInto(LibraryManager.library, {
     // Called by Unity to evaluate JS code.
     _Bridge_EvaluateJS: function _Bridge_EvaluateJS(jsPointer)
     {
-        var js = Pointer_stringify(jsPointer);
+        var js = UTF8ToString(jsPointer);
         //console.log("Bridge.jslib: _Bridge_EvaluateJS: js:", js);
         bridge.evaluateJS(js);
     },
@@ -165,7 +167,7 @@ mergeInto(LibraryManager.library, {
     // Called by Unity to queue events to JS.
     _Bridge_SendUnityToBridgeEvents: function _Bridge_SendUnityToBridgeEvents(evListStringPointer)
     {
-        var evListString = Pointer_stringify(evListStringPointer);
+        var evListString = UTF8ToString(evListStringPointer);
         window.bridge._Bridge_UnityToBridgeEventQueue.push(evListString);
     },
 
